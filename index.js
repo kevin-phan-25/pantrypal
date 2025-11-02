@@ -220,4 +220,97 @@ app.delete('/item/:id', async (req, res) => {
           spreadsheetId: SHEET_ID,
           range: `${SHEET_NAME}!A:G`,
           valueInputOption: 'RAW',
-          requestBody: { values: [[new Date().toISOString(), removed.barcode, removed.itemName
+          requestBody: { values: [[new Date().toISOString(), removed.barcode, removed.itemName, 0, removed.expires, 'DELETED']] },
+        });
+      } catch (err) {
+        console.error('Sheets delete failed:', err.message);
+      }
+    }
+    res.json({ success: true });
+  } else {
+    res.status(400).json({ error: 'Invalid ID' });
+  }
+});
+
+// === SHOPPING LIST: GET ===
+app.get('/shopping', (req, res) => {
+  const lowStock = pantry
+    .filter(i => i.quantity <= 2)
+    .map(i => ({ barcode: i.barcode, itemName: i.itemName, needed: Math.max(1, 3 - i.quantity) }));
+  res.json({ list: shoppingList, lowStock });
+});
+
+// === SHOPPING LIST: ADD ===
+app.post('/shopping', (req, res) => {
+  const { barcode, itemName, needed = 1 } = req.body;
+  if (!barcode || !itemName) return res.status(400).json({ error: 'Invalid data' });
+  const existing = shoppingList.find(i => i.barcode === barcode);
+  if (existing) {
+    existing.needed += needed;
+  } else {
+    shoppingList.push({ barcode, itemName, needed: parseInt(needed) });
+  }
+  saveData();
+  res.json({ success: true });
+});
+
+// === SHOPPING LIST: REMOVE ITEM ===
+app.delete('/shopping/:barcode', (req, res) => {
+  const barcode = req.params.barcode;
+  shoppingList = shoppingList.filter(i => i.barcode !== barcode);
+  saveData();
+  res.json({ success: true });
+});
+
+// === SHOPPING LIST: CLEAR ALL ===
+app.delete('/shopping', (req, res) => {
+  shoppingList = [];
+  saveData();
+  res.json({ success: true });
+});
+
+// === RECIPES ===
+app.get('/recipes', async (req, res) => {
+  if (!SPOONACULAR_KEY) {
+    console.log('SPOONACULAR_KEY missing in .env');
+    return res.json({ error: 'Add SPOONACULAR_KEY to .env (free at spoonacular.com)' });
+  }
+  const ingredients = pantry.map(i => i.itemName).filter(Boolean).join(', ');
+  if (!ingredients) return res.json([]);
+  console.log(`Fetching recipes for: ${ingredients}`);
+  try {
+    const apiRes = await fetch(
+      `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_KEY}&query=${encodeURIComponent(ingredients)}&number=5&addRecipeInformation=true`
+    );
+    const data = await apiRes.json();
+    if (data.results) {
+      const recipes = data.results.map(r => ({
+        title: r.title,
+        image: r.image,
+        readyIn: r.readyInMinutes,
+        servings: r.servings,
+        link: r.sourceUrl || `https://spoonacular.com/recipes/${r.id}`
+      }));
+      console.log(`Found ${recipes.length} recipes`);
+      res.json(recipes);
+    } else {
+      res.json([]);
+    }
+  } catch (err) {
+    console.error('Recipe API error:', err.message);
+    res.json({ error: 'Service down' });
+  }
+});
+
+// === SERVE UI ===
+app.get('/', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+});
+
+// === START SERVER ===
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\nPantryPal FULLY LOADED!`);
+  console.log(` Open: http://localhost:3000`);
+  console.log(` Features: OFF, Recipes, Shopping List, Sheets Sync`);
+  console.log(` SPOONACULAR_KEY: ${SPOONACULAR_KEY ? 'SET' : 'MISSING'}\n`);
+});
