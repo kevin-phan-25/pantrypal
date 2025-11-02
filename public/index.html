@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PantryPal</title>
+
+  <!-- PWA Meta -->
+  <meta name="theme-color" content="#007bff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
   <style>
     body { font-family: Arial; margin: 0; background: #f4f6f9; }
     .header { background: #007bff; color: white; padding: 15px; text-align: center; }
@@ -32,19 +39,34 @@
       width: 50px; height: 50px; object-fit: cover; border-radius: 5px; display: block; margin: 0 auto;
     }
     .print-btn { background: #28a745; margin-top: 10px; }
+    .auth-box {
+      position: fixed; top: 10px; right: 10px; background: white; padding: 10px; border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 14px; z-index: 1000;
+    }
+    .auth-box button { font-size: 12px; padding: 5px 10px; margin-left: 5px; }
     @media print {
-      .header, .tabs, .scanner, button, input { display: none; }
+      .header, .tabs, .scanner, button, input, .auth-box { display: none; }
       .card { box-shadow: none; border: 1px solid #ddd; }
     }
   </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
+  <!-- HTML5 QR Code -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
+  <!-- AUTH BOX (TOP RIGHT) -->
+  <div id="auth-box" class="auth-box">
+    <div id="auth-status">Loading...</div>
+  </div>
+
   <div class="header">
     <h1>PantryPal</h1>
     <p>Smart Pantry with OFF + Recipes + Shopping</p>
   </div>
-
   <div class="container">
     <div class="scanner">
       <video id="video" style="width:100%; max-width:400px; border:2px solid #007bff; border-radius:10px;"></video>
@@ -52,14 +74,11 @@
       <button id="start">Start Scanner</button>
       <button id="stop" style="display:none;">Stop</button>
     </div>
-
     <div class="tabs">
       <div class="tab active" onclick="showTab('inventory')">Inventory</div>
       <div class="tab" onclick="showTab('shopping')">Shopping List</div>
     </div>
-
     <div id="stats" class="stats"></div>
-
     <div class="card">
       <h2>Manual Add</h2>
       <input type="text" id="barcode" placeholder="Barcode">
@@ -67,7 +86,6 @@
       <input type="date" id="expires">
       <button onclick="addItem()">Add Item</button>
     </div>
-
     <!-- INVENTORY TAB -->
     <div id="inventory-tab">
       <div class="card">
@@ -77,7 +95,6 @@
         <div id="inventory"></div>
       </div>
     </div>
-
     <!-- SHOPPING LIST TAB -->
     <div id="shopping-tab" style="display:none;">
       <div class="card">
@@ -91,6 +108,71 @@
   </div>
 
   <script>
+    // === PASTE YOUR firebaseConfig HERE (from Firebase Console) ===
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "pantrypal-12345.firebaseapp.com",
+      projectId: "pantrypal-12345",
+      storageBucket: "pantrypal-12345.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdef1234567890"
+    };
+    // === REPLACE ABOVE WITH YOUR REAL CONFIG ===
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    // Global token function
+    window.getAuthToken = async () => {
+      const user = auth.currentUser;
+      return user ? await user.getIdToken() : null;
+    };
+
+    // Auth UI
+    const authBox = document.getElementById('auth-status');
+    function updateAuthUI(user) {
+      if (user) {
+        authBox.innerHTML = `
+          <strong>${user.displayName || user.email}</strong><br>
+          <button onclick="signOutUser()">Sign Out</button>
+        `;
+      } else {
+        authBox.innerHTML = `<button onclick="signInWithGoogle()">Sign in with Google</button>`;
+      }
+    }
+
+    // Sign In
+    window.signInWithGoogle = () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider)
+        .catch(err => alert("Login failed: " + err.message));
+    };
+
+    // Sign Out
+    window.signOutUser = () => {
+      auth.signOut().then(() => location.reload());
+    };
+
+    // Auth State
+    auth.onAuthStateChanged(user => {
+      updateAuthUI(user);
+      if (user) {
+        loadInventory();
+        if (document.getElementById('shopping-tab').style.display !== 'none') loadShoppingList();
+      }
+    });
+
+    // === SECURE FETCH WITH TOKEN ===
+    async function authFetch(url, options = {}) {
+      const token = await window.getAuthToken();
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      };
+      return fetch(url, { ...options, headers });
+    }
+
     const html5QrCode = new Html5Qrcode("video");
 
     // Tab switching
@@ -121,7 +203,6 @@
       document.getElementById("start").style.display = "none";
       document.getElementById("stop").style.display = "inline";
     };
-
     document.getElementById("stop").onclick = () => {
       html5QrCode.stop();
       document.getElementById("start").style.display = "inline";
@@ -142,30 +223,30 @@
     }
 
     async function logItem(barcode, quantity, expires) {
-      const res = await fetch('/log', {
+      const res = await authFetch('/log', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ barcode, quantity, expires })
       });
       const data = await res.json();
       if (data.success) {
         alert(`Added: ${data.itemName} x${data.quantity}`);
         loadInventory();
+      } else {
+        alert("Error: " + (data.error || "Failed to add"));
       }
     }
 
     // Inventory
     async function loadInventory() {
-      const res = await fetch('/inventory');
+      const res = await authFetch('/inventory');
+      if (!res.ok) { document.getElementById("inventory").innerHTML = "<p>Please sign in</p>"; return; }
       const { inventory, summary } = await res.json();
-
       document.getElementById("stats").innerHTML = `
         <div class="stat low">Low Stock<br><b>${summary.lowStock}</b></div>
         <div class="stat expiring">Expiring Soon<br><b>${summary.expiringSoon}</b></div>
         <div class="stat expired">Expired<br><b>${summary.expired}</b></div>
         <div class="stat good">Total Items<br><b>${summary.totalItems}</b></div>
       `;
-
       let html = `<table><tr><th>Img</th><th>Item</th><th>Qty</th><th>Expires</th><th>Status</th><th>Actions</th></tr>`;
       inventory.forEach((item, i) => {
         const statusClass = item.status === 'expired' ? 'expired' : item.status === 'expiring' ? 'expiring' : '';
@@ -176,8 +257,8 @@
           <td>${item.expires}</td>
           <td class="${statusClass}">${item.status}</td>
           <td class="actions">
-            <button onclick="edit(${i})">Edit</button>
-            <button onclick="remove(${i})" style="background:#dc3545;">Delete</button>
+            <button onclick="edit('${item.id || i}')">Edit</button>
+            <button onclick="remove('${item.id || i}')" style="background:#dc3545;">Delete</button>
           </td>
         </tr>`;
       });
@@ -185,33 +266,33 @@
       document.getElementById("inventory").innerHTML = html;
     }
 
-    window.edit = async (i) => {
-      const { inventory } = await (await fetch('/inventory')).json();
-      const item = inventory[i];
+    window.edit = async (id) => {
+      const { inventory } = await (await authFetch('/inventory')).json();
+      const item = inventory.find(i => (i.id || inventory.indexOf(i)) == id);
+      if (!item) return;
       const qty = prompt("New quantity:", item.quantity);
       const exp = prompt("New expiry:", item.expires);
       if (qty !== null) {
-        await fetch(`/item/${i}`, {
+        await authFetch(`/item/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ quantity: parseInt(qty), expires: exp })
         });
         loadInventory();
       }
     };
 
-    window.remove = async (i) => {
+    window.remove = async (id) => {
       if (confirm("Delete?")) {
-        await fetch(`/item/${i}`, { method: 'DELETE' });
+        await authFetch(`/item/${id}`, { method: 'DELETE' });
         loadInventory();
       }
     };
 
     // Shopping List
     async function loadShoppingList() {
-      const res = await fetch('/shopping');
+      const res = await authFetch('/shopping');
+      if (!res.ok) return;
       const { list, lowStock } = await res.json();
-
       let html = `<table><tr><th>Item</th><th>Need</th><th>Actions</th></tr>`;
       if (list.length === 0) {
         html += `<tr><td colspan="3" style="text-align:center; color:#666;">Empty</td></tr>`;
@@ -225,21 +306,18 @@
         });
       }
       html += `</table>`;
-
       if (lowStock.length > 0) {
         html += `<p><strong>Low Stock:</strong> ${lowStock.map(i => `${i.itemName} (+${i.needed})`).join(', ')}</p>`;
       }
-
       document.getElementById("shopping-list").innerHTML = html;
     }
 
     async function addLowStockToList() {
-      const res = await fetch('/shopping');
+      const res = await authFetch('/shopping');
       const { lowStock } = await res.json();
       for (const item of lowStock) {
-        await fetch('/shopping', {
+        await authFetch('/shopping', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(item)
         });
       }
@@ -247,13 +325,13 @@
     }
 
     async function removeFromList(barcode) {
-      await fetch(`/shopping/${barcode}`, { method: 'DELETE' });
+      await authFetch(`/shopping/${barcode}`, { method: 'DELETE' });
       loadShoppingList();
     }
 
     async function clearShoppingList() {
       if (confirm("Clear entire list?")) {
-        await fetch('/shopping', { method: 'DELETE' });
+        await authFetch('/shopping', { method: 'DELETE' });
         loadShoppingList();
       }
     }
@@ -264,7 +342,7 @@
 
     // Recipes
     async function loadRecipes() {
-      const res = await fetch('/recipes');
+      const res = await authFetch('/recipes');
       const recipes = await res.json();
       if (recipes.error) {
         document.getElementById("recipes").innerHTML = `<p style="color:red;">${recipes.error}</p>`;
@@ -282,11 +360,12 @@
 
     // Auto-refresh
     setInterval(() => {
-      if (document.getElementById('inventory-tab').style.display !== 'none') loadInventory();
-      if (document.getElementById('shopping-tab').style.display !== 'none') loadShoppingList();
+      if (auth.currentUser && document.getElementById('inventory-tab').style.display !== 'none') loadInventory();
+      if (auth.currentUser && document.getElementById('shopping-tab').style.display !== 'none') loadShoppingList();
     }, 5000);
 
-    loadInventory();
+    // Initial load
+    if (auth.currentUser) loadInventory();
   </script>
 </body>
 </html>
