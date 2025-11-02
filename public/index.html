@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PantryPal</title>
+  <style>
+    body { font-family: Arial; margin: 0; background: #f4f6f9; }
+    .header { background: #007bff; color: white; padding: 15px; text-align: center; }
+    .container { max-width: 1000px; margin: 20px auto; padding: 20px; }
+    .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+    .tab { padding: 10px 20px; background: #e9ecef; border-radius: 8px 8px 0 0; cursor: pointer; }
+    .tab.active { background: white; font-weight: bold; }
+    .stats { display: flex; gap: 15px; flex-wrap: wrap; }
+    .stat { flex: 1; min-width: 120px; text-align: center; padding: 10px; border-radius: 8px; color: white; }
+    .low { background: #ffc107; }
+    .expiring { background: #fd7e14; }
+    .expired { background: #dc3545; }
+    .good { background: #28a745; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #f8f9fa; }
+    .actions button { margin: 0 5px; padding: 5px 10px; font-size: 12px; }
+    .scanner { text-align: center; margin: 20px 0; }
+    input, button { padding: 10px; margin: 5px; font-size: 16px; }
+    button { background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .expired { color: #dc3545; font-weight: bold; }
+    .expiring { color: #fd7e14; font-weight: bold; }
+    img.item-img {
+      width: 50px; height: 50px; object-fit: cover; border-radius: 5px; display: block; margin: 0 auto;
+    }
+    .print-btn { background: #28a745; margin-top: 10px; }
+    @media print {
+      .header, .tabs, .scanner, button, input { display: none; }
+      .card { box-shadow: none; border: 1px solid #ddd; }
+    }
+  </style>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>PantryPal</h1>
+    <p>Smart Pantry with OFF + Recipes + Shopping</p>
+  </div>
+
+  <div class="container">
+    <div class="scanner">
+      <video id="video" style="width:100%; max-width:400px; border:2px solid #007bff; border-radius:10px;"></video>
+      <br><br>
+      <button id="start">Start Scanner</button>
+      <button id="stop" style="display:none;">Stop</button>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('inventory')">Inventory</div>
+      <div class="tab" onclick="showTab('shopping')">Shopping List</div>
+    </div>
+
+    <div id="stats" class="stats"></div>
+
+    <div class="card">
+      <h2>Manual Add</h2>
+      <input type="text" id="barcode" placeholder="Barcode">
+      <input type="number" id="qty" value="1" min="1" style="width:70px;">
+      <input type="date" id="expires">
+      <button onclick="addItem()">Add Item</button>
+    </div>
+
+    <!-- INVENTORY TAB -->
+    <div id="inventory-tab">
+      <div class="card">
+        <h2>Inventory</h2>
+        <button onclick="loadRecipes()" style="margin-bottom:10px;">Get Recipe Ideas</button>
+        <div id="recipes"></div>
+        <div id="inventory"></div>
+      </div>
+    </div>
+
+    <!-- SHOPPING LIST TAB -->
+    <div id="shopping-tab" style="display:none;">
+      <div class="card">
+        <h2>Shopping List</h2>
+        <button onclick="addLowStockToList()" style="background:#ffc107; color:black;">Add Low Stock</button>
+        <button onclick="clearShoppingList()" style="background:#dc3545; margin-left:10px;">Clear List</button>
+        <button onclick="printList()" class="print-btn">Print / Export PDF</button>
+        <div id="shopping-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const html5QrCode = new Html5Qrcode("video");
+
+    // Tab switching
+    function showTab(tab) {
+      document.getElementById('inventory-tab').style.display = tab === 'inventory' ? 'block' : 'none';
+      document.getElementById('shopping-tab').style.display = tab === 'shopping' ? 'block' : 'none';
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab')[tab === 'inventory' ? 0 : 1].classList.add('active');
+      if (tab === 'inventory') loadInventory();
+      if (tab === 'shopping') loadShoppingList();
+    }
+
+    // Scanner
+    document.getElementById("start").onclick = () => {
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        async (text) => {
+          const qty = prompt("How many?", "1") || "1";
+          const exp = prompt("Expiration (YYYY-MM-DD) or leave blank", "") || "";
+          await logItem(text, qty, exp);
+          html5QrCode.stop();
+          document.getElementById("start").style.display = "inline";
+          document.getElementById("stop").style.display = "none";
+        },
+        () => {}
+      );
+      document.getElementById("start").style.display = "none";
+      document.getElementById("stop").style.display = "inline";
+    };
+
+    document.getElementById("stop").onclick = () => {
+      html5QrCode.stop();
+      document.getElementById("start").style.display = "inline";
+      document.getElementById("stop").style.display = "none";
+    };
+
+    // Add item
+    async function addItem() {
+      const barcode = document.getElementById("barcode").value.trim();
+      const quantity = document.getElementById("qty").value;
+      const expires = document.getElementById("expires").value;
+      if (barcode) {
+        await logItem(barcode, quantity, expires);
+        document.getElementById("barcode").value = "";
+        document.getElementById("qty").value = "1";
+        document.getElementById("expires").value = "";
+      }
+    }
+
+    async function logItem(barcode, quantity, expires) {
+      const res = await fetch('/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode, quantity, expires })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Added: ${data.itemName} x${data.quantity}`);
+        loadInventory();
+      }
+    }
+
+    // Inventory
+    async function loadInventory() {
+      const res = await fetch('/inventory');
+      const { inventory, summary } = await res.json();
+
+      document.getElementById("stats").innerHTML = `
+        <div class="stat low">Low Stock<br><b>${summary.lowStock}</b></div>
+        <div class="stat expiring">Expiring Soon<br><b>${summary.expiringSoon}</b></div>
+        <div class="stat expired">Expired<br><b>${summary.expired}</b></div>
+        <div class="stat good">Total Items<br><b>${summary.totalItems}</b></div>
+      `;
+
+      let html = `<table><tr><th>Img</th><th>Item</th><th>Qty</th><th>Expires</th><th>Status</th><th>Actions</th></tr>`;
+      inventory.forEach((item, i) => {
+        const statusClass = item.status === 'expired' ? 'expired' : item.status === 'expiring' ? 'expiring' : '';
+        html += `<tr>
+          <td>${item.imageUrl ? `<img src="${item.imageUrl}" class="item-img" onerror="this.src='https://via.placeholder.com/50?text=No+Img'">` : '—'}</td>
+          <td><strong>${item.itemName}</strong><br><small>${item.barcode}</small></td>
+          <td>${item.quantity}</td>
+          <td>${item.expires}</td>
+          <td class="${statusClass}">${item.status}</td>
+          <td class="actions">
+            <button onclick="edit(${i})">Edit</button>
+            <button onclick="remove(${i})" style="background:#dc3545;">Delete</button>
+          </td>
+        </tr>`;
+      });
+      html += `</table>`;
+      document.getElementById("inventory").innerHTML = html;
+    }
+
+    window.edit = async (i) => {
+      const { inventory } = await (await fetch('/inventory')).json();
+      const item = inventory[i];
+      const qty = prompt("New quantity:", item.quantity);
+      const exp = prompt("New expiry:", item.expires);
+      if (qty !== null) {
+        await fetch(`/item/${i}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quantity: parseInt(qty), expires: exp })
+        });
+        loadInventory();
+      }
+    };
+
+    window.remove = async (i) => {
+      if (confirm("Delete?")) {
+        await fetch(`/item/${i}`, { method: 'DELETE' });
+        loadInventory();
+      }
+    };
+
+    // Shopping List
+    async function loadShoppingList() {
+      const res = await fetch('/shopping');
+      const { list, lowStock } = await res.json();
+
+      let html = `<table><tr><th>Item</th><th>Need</th><th>Actions</th></tr>`;
+      if (list.length === 0) {
+        html += `<tr><td colspan="3" style="text-align:center; color:#666;">Empty</td></tr>`;
+      } else {
+        list.forEach(item => {
+          html += `<tr>
+            <td><strong>${item.itemName}</strong><br><small>${item.barcode}</small></td>
+            <td>${item.needed}</td>
+            <td><button onclick="removeFromList('${item.barcode}')" style="background:#dc3545; font-size:10px;">Remove</button></td>
+          </tr>`;
+        });
+      }
+      html += `</table>`;
+
+      if (lowStock.length > 0) {
+        html += `<p><strong>Low Stock:</strong> ${lowStock.map(i => `${i.itemName} (+${i.needed})`).join(', ')}</p>`;
+      }
+
+      document.getElementById("shopping-list").innerHTML = html;
+    }
+
+    async function addLowStockToList() {
+      const res = await fetch('/shopping');
+      const { lowStock } = await res.json();
+      for (const item of lowStock) {
+        await fetch('/shopping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item)
+        });
+      }
+      loadShoppingList();
+    }
+
+    async function removeFromList(barcode) {
+      await fetch(`/shopping/${barcode}`, { method: 'DELETE' });
+      loadShoppingList();
+    }
+
+    async function clearShoppingList() {
+      if (confirm("Clear entire list?")) {
+        await fetch('/shopping', { method: 'DELETE' });
+        loadShoppingList();
+      }
+    }
+
+    function printList() {
+      window.print();
+    }
+
+    // Recipes
+    async function loadRecipes() {
+      const res = await fetch('/recipes');
+      const recipes = await res.json();
+      if (recipes.error) {
+        document.getElementById("recipes").innerHTML = `<p style="color:red;">${recipes.error}</p>`;
+        return;
+      }
+      document.getElementById("recipes").innerHTML = recipes.map(r => `
+        <div class="card" style="display:inline-block; width:300px; margin:10px;">
+          <h4>${r.title}</h4>
+          <img src="${r.image}" width="100%">
+          <p>Ready in ${r.readyIn} min • ${r.servings} servings</p>
+          <a href="${r.link}" target="_blank">View Recipe</a>
+        </div>
+      `).join('');
+    }
+
+    // Auto-refresh
+    setInterval(() => {
+      if (document.getElementById('inventory-tab').style.display !== 'none') loadInventory();
+      if (document.getElementById('shopping-tab').style.display !== 'none') loadShoppingList();
+    }, 5000);
+
+    loadInventory();
+  </script>
+</body>
+</html>
