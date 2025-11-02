@@ -1,4 +1,4 @@
-// index.js - FULL PANTRYPAL: OFF + RECIPES + SHOPPING LIST + SHEETS
+// index.js - FULL PANTRYPAL: OFF + RECIPES + SHOPPING LIST + SHEETS + AI SCAN
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import { google } from 'googleapis';
 import path from 'path';
 import fs from 'fs';
+import multer from 'multer';
+import vision from '@google-cloud/vision';
 
 dotenv.config();
 
@@ -24,7 +26,19 @@ let pantry = [];
 let shoppingList = [];
 let sheets;
 
-// === LOAD DATA (pantry + shopping list) ===
+// === FILE UPLOAD (for AI scanning) ===
+const upload = multer({ dest: 'uploads/' });
+
+// === GOOGLE CLOUD VISION SETUP ===
+let visionClient;
+try {
+  visionClient = new vision.ImageAnnotatorClient(); // Uses GOOGLE_APPLICATION_CREDENTIALS from Render Secret
+  console.log('Google Vision API ENABLED');
+} catch (err) {
+  console.error('Vision API setup failed:', err.message);
+}
+
+// === LOAD DATA ===
 function loadData() {
   if (fs.existsSync(DATA_FILE)) {
     try {
@@ -40,7 +54,7 @@ function loadData() {
   }
 }
 
-// === SAVE DATA (pantry + shopping list) ===
+// === SAVE DATA ===
 function saveData() {
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify({ pantry, shoppingList }, null, 2), 'utf-8');
@@ -66,7 +80,7 @@ if (SHEET_ID) {
   }
 }
 
-// === SHELF LIFE MAP (OFF categories → days) ===
+// === SHELF LIFE MAP ===
 const shelfLifeMap = {
   'breakfast cereals': 365,
   'cereals': 365,
@@ -134,7 +148,7 @@ async function lookupItem(barcode) {
   };
 }
 
-// === LOG ITEM (ADD TO PANTRY) ===
+// === LOG ITEM ===
 app.post('/log', async (req, res) => {
   const { barcode, quantity = 1, expires } = req.body;
   if (!barcode) return res.status(400).json({ error: 'barcode required' });
@@ -179,6 +193,44 @@ app.get('/inventory', (req, res) => {
     expired: pantry.filter(i => new Date(i.expires) < now).length,
   };
   res.json({ inventory, summary });
+});
+
+// === SCAN IMAGE (AI Vision) ===
+app.post('/scan', upload.single('image'), async (req, res) => {
+  if (!visionClient) return res.status(500).json({ error: 'Vision API not configured' });
+  if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+
+  try {
+    const [result] = await visionClient.textDetection(req.file.path);
+    const detections = result.textAnnotations;
+    fs.unlinkSync(req.file.path);
+
+    if (!detections || detections.length === 0)
+      return res.json({ message: 'No text detected in image.' });
+
+    const text = detections[0].description;
+    console.log('Detected text:\n', text);
+
+    const expRegex = /(exp|expires|best by|use by)[:\s\-]*([0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{2,4})/i;
+    const expMatch = text.match(expRegex);
+    const expirationDate = expMatch ? expMatch[2] : null;
+
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const probableName = lines.sort((a, b) => b.length - a.length)[0] || 'Unknown Product';
+
+    const record = {
+      itemName: probableName,
+      detectedText: text.slice(0, 100) + '...',
+      expirationDate: expirationDate || 'Unknown',
+      scannedAt: new Date().toISOString(),
+    };
+
+    console.log('AI Scan:', record);
+    res.json({ success: true, record });
+  } catch (err) {
+    console.error('Scan failed:', err.message);
+    res.status(500).json({ error: 'Image recognition failed' });
+  }
 });
 
 // === EDIT ITEM ===
@@ -232,7 +284,7 @@ app.delete('/item/:id', async (req, res) => {
   }
 });
 
-// === SHOPPING LIST: GET ===
+// === SHOPPING LIST ===
 app.get('/shopping', (req, res) => {
   const lowStock = pantry
     .filter(i => i.quantity <= 2)
@@ -240,21 +292,16 @@ app.get('/shopping', (req, res) => {
   res.json({ list: shoppingList, lowStock });
 });
 
-// === SHOPPING LIST: ADD ===
 app.post('/shopping', (req, res) => {
   const { barcode, itemName, needed = 1 } = req.body;
   if (!barcode || !itemName) return res.status(400).json({ error: 'Invalid data' });
   const existing = shoppingList.find(i => i.barcode === barcode);
-  if (existing) {
-    existing.needed += needed;
-  } else {
-    shoppingList.push({ barcode, itemName, needed: parseInt(needed) });
-  }
+  if (existing) existing.needed += needed;
+  else shoppingList.push({ barcode, itemName, needed: parseInt(needed) });
   saveData();
   res.json({ success: true });
 });
 
-// === SHOPPING LIST: REMOVE ITEM ===
 app.delete('/shopping/:barcode', (req, res) => {
   const barcode = req.params.barcode;
   shoppingList = shoppingList.filter(i => i.barcode !== barcode);
@@ -262,7 +309,6 @@ app.delete('/shopping/:barcode', (req, res) => {
   res.json({ success: true });
 });
 
-// === SHOPPING LIST: CLEAR ALL ===
 app.delete('/shopping', (req, res) => {
   shoppingList = [];
   saveData();
@@ -271,13 +317,9 @@ app.delete('/shopping', (req, res) => {
 
 // === RECIPES ===
 app.get('/recipes', async (req, res) => {
-  if (!SPOONACULAR_KEY) {
-    console.log('SPOONACULAR_KEY missing in .env');
-    return res.json({ error: 'Add SPOONACULAR_KEY to .env (free at spoonacular.com)' });
-  }
+  if (!SPOONACULAR_KEY) return res.json({ error: 'Add SPOONACULAR_KEY to .env' });
   const ingredients = pantry.map(i => i.itemName).filter(Boolean).join(', ');
   if (!ingredients) return res.json([]);
-  console.log(`Fetching recipes for: ${ingredients}`);
   try {
     const apiRes = await fetch(
       `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_KEY}&query=${encodeURIComponent(ingredients)}&number=5&addRecipeInformation=true`
@@ -291,11 +333,8 @@ app.get('/recipes', async (req, res) => {
         servings: r.servings,
         link: r.sourceUrl || `https://spoonacular.com/recipes/${r.id}`
       }));
-      console.log(`Found ${recipes.length} recipes`);
       res.json(recipes);
-    } else {
-      res.json([]);
-    }
+    } else res.json([]);
   } catch (err) {
     console.error('Recipe API error:', err.message);
     res.json({ error: 'Service down' });
@@ -309,8 +348,7 @@ app.get('/', (req, res) => {
 
 // === START SERVER ===
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\nPantryPal FULLY LOADED!`);
-  console.log(` Open: http://localhost:3000`);
-  console.log(` Features: OFF, Recipes, Shopping List, Sheets Sync`);
-  console.log(` SPOONACULAR_KEY: ${SPOONACULAR_KEY ? 'SET' : 'MISSING'}\n`);
+  console.log(`\nPantryPal AI READY!`);
+  console.log(` Open: http://localhost:${PORT}`);
+  console.log(` Features: OFF, Recipes, Shopping List, Sheets Sync, Vision Scan`);
 });
