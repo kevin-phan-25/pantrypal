@@ -4,13 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PantryPal</title>
-
   <!-- PWA Meta -->
   <meta name="theme-color" content="#007bff">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-
   <style>
     body { font-family: Arial; margin: 0; background: #f4f6f9; }
     .header { background: #007bff; color: white; padding: 15px; text-align: center; }
@@ -49,11 +47,9 @@
       .card { box-shadow: none; border: 1px solid #ddd; }
     }
   </style>
-
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-
   <!-- HTML5 QR Code -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
@@ -62,7 +58,6 @@
   <div id="auth-box" class="auth-box">
     <div id="auth-status">Loading...</div>
   </div>
-
   <div class="header">
     <h1>PantryPal</h1>
     <p>Smart Pantry with OFF + Recipes + Shopping</p>
@@ -118,17 +113,14 @@
       appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
       measurementId: "G-P641JW4KS4"
     };
-
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
-
     // Global token function
     window.getAuthToken = async () => {
       const user = auth.currentUser;
       return user ? await user.getIdToken() : null;
     };
-
     // Auth UI
     const authBox = document.getElementById('auth-status');
     function updateAuthUI(user) {
@@ -141,19 +133,16 @@
         authBox.innerHTML = `<button onclick="signInWithGoogle()">Sign in with Google</button>`;
       }
     }
-
     // Sign In
     window.signInWithGoogle = () => {
       const provider = new firebase.auth.GoogleAuthProvider();
       auth.signInWithPopup(provider)
         .catch(err => alert("Login failed: " + err.message));
     };
-
     // Sign Out
     window.signOutUser = () => {
       auth.signOut().then(() => location.reload());
     };
-
     // Auth State
     auth.onAuthStateChanged(user => {
       updateAuthUI(user);
@@ -162,7 +151,6 @@
         if (document.getElementById('shopping-tab').style.display !== 'none') loadShoppingList();
       }
     });
-
     // === SECURE FETCH WITH TOKEN ===
     async function authFetch(url, options = {}) {
       const token = await window.getAuthToken();
@@ -172,9 +160,7 @@
       };
       return fetch(url, { ...options, headers });
     }
-
     const html5QrCode = new Html5Qrcode("video");
-
     // Tab switching
     function showTab(tab) {
       document.getElementById('inventory-tab').style.display = tab === 'inventory' ? 'block' : 'none';
@@ -184,7 +170,6 @@
       if (tab === 'inventory') loadInventory();
       if (tab === 'shopping') loadShoppingList();
     }
-
     // Scanner
     document.getElementById("start").onclick = () => {
       html5QrCode.start(
@@ -208,7 +193,6 @@
       document.getElementById("start").style.display = "inline";
       document.getElementById("stop").style.display = "none";
     };
-
     // Add item
     async function addItem() {
       const barcode = document.getElementById("barcode").value.trim();
@@ -221,7 +205,6 @@
         document.getElementById("expires").value = "";
       }
     }
-
     async function logItem(barcode, quantity, expires) {
       const res = await authFetch('/log', {
         method: 'POST',
@@ -235,7 +218,6 @@
         alert("Error: " + (data.error || "Failed to add"));
       }
     }
-
     // Inventory
     async function loadInventory() {
       const res = await authFetch('/inventory');
@@ -265,7 +247,6 @@
       html += `</table>`;
       document.getElementById("inventory").innerHTML = html;
     }
-
     window.edit = async (id) => {
       const { inventory } = await (await authFetch('/inventory')).json();
       const item = inventory.find(i => (i.id || inventory.indexOf(i)) == id);
@@ -280,14 +261,12 @@
         loadInventory();
       }
     };
-
     window.remove = async (id) => {
       if (confirm("Delete?")) {
         await authFetch(`/item/${id}`, { method: 'DELETE' });
         loadInventory();
       }
     };
-
     // Shopping List
     async function loadShoppingList() {
       const res = await authFetch('/shopping');
@@ -311,7 +290,6 @@
       }
       document.getElementById("shopping-list").innerHTML = html;
     }
-
     async function addLowStockToList() {
       const res = await authFetch('/shopping');
       const { lowStock } = await res.json();
@@ -323,23 +301,19 @@
       }
       loadShoppingList();
     }
-
     async function removeFromList(barcode) {
       await authFetch(`/shopping/${barcode}`, { method: 'DELETE' });
       loadShoppingList();
     }
-
     async function clearShoppingList() {
       if (confirm("Clear entire list?")) {
         await authFetch('/shopping', { method: 'DELETE' });
         loadShoppingList();
       }
     }
-
     function printList() {
       window.print();
     }
-
     // Recipes
     async function loadRecipes() {
       const res = await authFetch('/recipes');
@@ -357,15 +331,32 @@
         </div>
       `).join('');
     }
-
     // Auto-refresh
     setInterval(() => {
       if (auth.currentUser && document.getElementById('inventory-tab').style.display !== 'none') loadInventory();
       if (auth.currentUser && document.getElementById('shopping-tab').style.display !== 'none') loadShoppingList();
     }, 5000);
-
     // Initial load
     if (auth.currentUser) loadInventory();
+
+    // === PWA: SERVICE WORKER + OFFLINE BANNER ===
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('SW registered'))
+          .catch(err => console.log('SW failed:', err));
+      });
+    }
+
+    // Offline Banner
+    const offlineBanner = document.createElement('div');
+    offlineBanner.id = 'offline';
+    offlineBanner.style.cssText = 'background:#ffc107; color:black; padding:10px; text-align:center; font-weight:bold; display:none; position:fixed; top:0; width:100%; z-index:1000;';
+    offlineBanner.textContent = 'Offline — Data will sync when back online';
+    document.body.prepend(offlineBanner);
+
+    window.addEventListener('online', () => { document.getElementById('offline').style.display = 'none'; });
+    window.addEventListener('offline', () => { document.getElementById('offline').style.display = 'block'; });
   </script>
 </body>
 </html>
