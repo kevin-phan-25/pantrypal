@@ -33,19 +33,11 @@
     button:hover { background: #0056b3; }
     .expired { color: #dc3545; font-weight: bold; }
     .expiring { color: #fd7e14; font-weight: bold; }
-    img.item-img {
-      width: 50px; height: 50px; object-fit: cover; border-radius: 5px; display: block; margin: 0 auto;
-    }
+    img.item-img { width: 50px; height: 50px; object-fit: cover; border-radius: 5px; display: block; margin: 0 auto; }
     .print-btn { background: #28a745; margin-top: 10px; }
-    .auth-box {
-      position: fixed; top: 10px; right: 10px; background: white; padding: 10px; border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 14px; z-index: 1000;
-    }
+    .auth-box { position: fixed; top: 10px; right: 10px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 14px; z-index: 1000; }
     .auth-box button { font-size: 12px; padding: 5px 10px; margin-left: 5px; }
-    @media print {
-      .header, .tabs, .scanner, button, input, .auth-box { display: none; }
-      .card { box-shadow: none; border: 1px solid #ddd; }
-    }
+    @media print { .header, .tabs, .scanner, button, input, .auth-box { display: none; } .card { box-shadow: none; border: 1px solid #ddd; } }
   </style>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -54,7 +46,6 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
-  <!-- AUTH BOX (TOP RIGHT) -->
   <div id="auth-box" class="auth-box">
     <div id="auth-status">Loading...</div>
   </div>
@@ -69,11 +60,22 @@
       <button id="start">Start Scanner</button>
       <button id="stop" style="display:none;">Stop</button>
     </div>
+
+    <!-- AI Scan Section -->
+    <div class="card">
+      <h3>AI Scan Product</h3>
+      <input type="file" id="scan-image" accept="image/*">
+      <button onclick="scanImage()">Scan with AI</button>
+      <div id="scan-result" style="margin-top:10px;"></div>
+    </div>
+
     <div class="tabs">
       <div class="tab active" onclick="showTab('inventory')">Inventory</div>
       <div class="tab" onclick="showTab('shopping')">Shopping List</div>
     </div>
+
     <div id="stats" class="stats"></div>
+
     <div class="card">
       <h2>Manual Add</h2>
       <input type="text" id="barcode" placeholder="Barcode">
@@ -81,6 +83,7 @@
       <input type="date" id="expires">
       <button onclick="addItem()">Add Item</button>
     </div>
+
     <!-- INVENTORY TAB -->
     <div id="inventory-tab">
       <div class="card">
@@ -90,6 +93,7 @@
         <div id="inventory"></div>
       </div>
     </div>
+
     <!-- SHOPPING LIST TAB -->
     <div id="shopping-tab" style="display:none;">
       <div class="card">
@@ -102,261 +106,124 @@
     </div>
   </div>
 
-  <script>
-    // YOUR REAL firebaseConfig (from Firebase Console)
-    const firebaseConfig = {
-      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-      authDomain: "pantrypal-6e410.firebaseapp.com",
-      projectId: "pantrypal-6e410",
-      storageBucket: "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
-      measurementId: "G-P641JW4KS4"
-    };
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    // Global token function
-    window.getAuthToken = async () => {
-      const user = auth.currentUser;
-      return user ? await user.getIdToken() : null;
-    };
-    // Auth UI
-    const authBox = document.getElementById('auth-status');
-    function updateAuthUI(user) {
-      if (user) {
-        authBox.innerHTML = `
-          <strong>${user.displayName || user.email}</strong><br>
-          <button onclick="signOutUser()">Sign Out</button>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+    authDomain: "pantrypal-6e410.firebaseapp.com",
+    projectId: "pantrypal-6e410",
+    storageBucket: "pantrypal-6e410.firebasestorage.app",
+    messagingSenderId: "592127259891",
+    appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
+    measurementId: "G-P641JW4KS4"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+
+  const authBox = document.getElementById('auth-status');
+  function updateAuthUI(user) {
+    if (user) {
+      authBox.innerHTML = `<strong>${user.displayName || user.email}</strong><br>
+      <button onclick="signOutUser()">Sign Out</button>`;
+    } else {
+      authBox.innerHTML = `<button onclick="signInWithGoogle()">Sign in with Google</button>`;
+    }
+  }
+
+  window.signInWithGoogle = () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => alert("Login failed: " + err.message));
+  };
+
+  window.signOutUser = () => {
+    auth.signOut().then(() => location.reload());
+  };
+
+  auth.onAuthStateChanged(user => {
+    updateAuthUI(user);
+    if (user) { loadInventory(); if(document.getElementById('shopping-tab').style.display!=='none') loadShoppingList(); }
+  });
+
+  window.getAuthToken = async () => {
+    const user = auth.currentUser;
+    return user ? await user.getIdToken() : null;
+  };
+
+  async function authFetch(url, options={}) {
+    const token = await window.getAuthToken();
+    const headers = { 'Content-Type':'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
+    return fetch(url, { ...options, headers });
+  }
+
+  const html5QrCode = new Html5Qrcode("video");
+  document.getElementById("start").onclick = () => {
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      async (text) => {
+        const qty = prompt("How many?", "1") || "1";
+        const exp = prompt("Expiration (YYYY-MM-DD) or leave blank", "") || "";
+        await logItem(text, qty, exp);
+        html5QrCode.stop();
+        document.getElementById("start").style.display = "inline";
+        document.getElementById("stop").style.display = "none";
+      }, () => {}
+    );
+    document.getElementById("start").style.display="none";
+    document.getElementById("stop").style.display="inline";
+  };
+  document.getElementById("stop").onclick = () => { html5QrCode.stop(); document.getElementById("start").style.display="inline"; document.getElementById("stop").style.display="none"; }
+
+  async function scanImage() {
+    const input = document.getElementById('scan-image');
+    const file = input.files[0];
+    if(!file) return alert('Please select an image first!');
+    const formData = new FormData();
+    formData.append('image', file);
+    const token = await window.getAuthToken();
+    try {
+      const res = await fetch('/scan', { method:'POST', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, body:formData });
+      const data = await res.json();
+      if(data.success) {
+        const r = data.record;
+        document.getElementById('scan-result').innerHTML = `
+          <p><strong>Name:</strong> ${r.itemName}</p>
+          <p><strong>Expiration:</strong> ${r.expirationDate || 'N/A'}</p>
+          <p><strong>Detected Text:</strong> ${r.detectedText}</p>
+          <button onclick='logItem("${r.itemName}",1,"${r.expirationDate || ''}")'>Add to Pantry</button>
         `;
       } else {
-        authBox.innerHTML = `<button onclick="signInWithGoogle()">Sign in with Google</button>`;
+        document.getElementById('scan-result').innerHTML = `<p style="color:red;">${data.error||'Scan failed'}</p>`;
       }
-    }
-    // Sign In
-    window.signInWithGoogle = () => {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider)
-        .catch(err => alert("Login failed: " + err.message));
-    };
-    // Sign Out
-    window.signOutUser = () => {
-      auth.signOut().then(() => location.reload());
-    };
-    // Auth State
-    auth.onAuthStateChanged(user => {
-      updateAuthUI(user);
-      if (user) {
-        loadInventory();
-        if (document.getElementById('shopping-tab').style.display !== 'none') loadShoppingList();
-      }
+    } catch(err) { console.error(err); alert('Scan request failed: ' + err.message); }
+  }
+
+  async function logItem(barcode, qty=1, exp='') {
+    await authFetch('/add', { method:'POST', body:JSON.stringify({barcode, quantity:qty, expiration:exp}) });
+    loadInventory();
+  }
+
+  async function loadInventory() {
+    const res = await authFetch('/inventory');
+    const data = await res.json();
+    const container = document.getElementById('inventory');
+    container.innerHTML = '';
+    if(!data || !data.items) return;
+    data.items.forEach(item => {
+      const tr = document.createElement('div');
+      tr.innerHTML = `<strong>${item.name}</strong> | Qty: ${item.quantity} | Exp: ${item.expiration||'N/A'} `;
+      const btn = document.createElement('button'); btn.innerText='Remove'; btn.onclick=()=>authFetch('/remove',{method:'POST',body:JSON.stringify({barcode:item.barcode})}).then(loadInventory);
+      tr.appendChild(btn);
+      container.appendChild(tr);
     });
-    // === SECURE FETCH WITH TOKEN ===
-    async function authFetch(url, options = {}) {
-      const token = await window.getAuthToken();
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      };
-      return fetch(url, { ...options, headers });
-    }
-    const html5QrCode = new Html5Qrcode("video");
-    // Tab switching
-    function showTab(tab) {
-      document.getElementById('inventory-tab').style.display = tab === 'inventory' ? 'block' : 'none';
-      document.getElementById('shopping-tab').style.display = tab === 'shopping' ? 'block' : 'none';
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.tab')[tab === 'inventory' ? 0 : 1].classList.add('active');
-      if (tab === 'inventory') loadInventory();
-      if (tab === 'shopping') loadShoppingList();
-    }
-    // Scanner
-    document.getElementById("start").onclick = () => {
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        async (text) => {
-          const qty = prompt("How many?", "1") || "1";
-          const exp = prompt("Expiration (YYYY-MM-DD) or leave blank", "") || "";
-          await logItem(text, qty, exp);
-          html5QrCode.stop();
-          document.getElementById("start").style.display = "inline";
-          document.getElementById("stop").style.display = "none";
-        },
-        () => {}
-      );
-      document.getElementById("start").style.display = "none";
-      document.getElementById("stop").style.display = "inline";
-    };
-    document.getElementById("stop").onclick = () => {
-      html5QrCode.stop();
-      document.getElementById("start").style.display = "inline";
-      document.getElementById("stop").style.display = "none";
-    };
-    // Add item
-    async function addItem() {
-      const barcode = document.getElementById("barcode").value.trim();
-      const quantity = document.getElementById("qty").value;
-      const expires = document.getElementById("expires").value;
-      if (barcode) {
-        await logItem(barcode, quantity, expires);
-        document.getElementById("barcode").value = "";
-        document.getElementById("qty").value = "1";
-        document.getElementById("expires").value = "";
-      }
-    }
-    async function logItem(barcode, quantity, expires) {
-      const res = await authFetch('/log', {
-        method: 'POST',
-        body: JSON.stringify({ barcode, quantity, expires })
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`Added: ${data.itemName} x${data.quantity}`);
-        loadInventory();
-      } else {
-        alert("Error: " + (data.error || "Failed to add"));
-      }
-    }
-    // Inventory
-    async function loadInventory() {
-      const res = await authFetch('/inventory');
-      if (!res.ok) { document.getElementById("inventory").innerHTML = "<p>Please sign in</p>"; return; }
-      const { inventory, summary } = await res.json();
-      document.getElementById("stats").innerHTML = `
-        <div class="stat low">Low Stock<br><b>${summary.lowStock}</b></div>
-        <div class="stat expiring">Expiring Soon<br><b>${summary.expiringSoon}</b></div>
-        <div class="stat expired">Expired<br><b>${summary.expired}</b></div>
-        <div class="stat good">Total Items<br><b>${summary.totalItems}</b></div>
-      `;
-      let html = `<table><tr><th>Img</th><th>Item</th><th>Qty</th><th>Expires</th><th>Status</th><th>Actions</th></tr>`;
-      inventory.forEach((item, i) => {
-        const statusClass = item.status === 'expired' ? 'expired' : item.status === 'expiring' ? 'expiring' : '';
-        html += `<tr>
-          <td>${item.imageUrl ? `<img src="${item.imageUrl}" class="item-img" onerror="this.src='https://via.placeholder.com/50?text=No+Img'">` : '—'}</td>
-          <td><strong>${item.itemName}</strong><br><small>${item.barcode}</small></td>
-          <td>${item.quantity}</td>
-          <td>${item.expires}</td>
-          <td class="${statusClass}">${item.status}</td>
-          <td class="actions">
-            <button onclick="edit('${item.id || i}')">Edit</button>
-            <button onclick="remove('${item.id || i}')" style="background:#dc3545;">Delete</button>
-          </td>
-        </tr>`;
-      });
-      html += `</table>`;
-      document.getElementById("inventory").innerHTML = html;
-    }
-    window.edit = async (id) => {
-      const { inventory } = await (await authFetch('/inventory')).json();
-      const item = inventory.find(i => (i.id || inventory.indexOf(i)) == id);
-      if (!item) return;
-      const qty = prompt("New quantity:", item.quantity);
-      const exp = prompt("New expiry:", item.expires);
-      if (qty !== null) {
-        await authFetch(`/item/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify({ quantity: parseInt(qty), expires: exp })
-        });
-        loadInventory();
-      }
-    };
-    window.remove = async (id) => {
-      if (confirm("Delete?")) {
-        await authFetch(`/item/${id}`, { method: 'DELETE' });
-        loadInventory();
-      }
-    };
-    // Shopping List
-    async function loadShoppingList() {
-      const res = await authFetch('/shopping');
-      if (!res.ok) return;
-      const { list, lowStock } = await res.json();
-      let html = `<table><tr><th>Item</th><th>Need</th><th>Actions</th></tr>`;
-      if (list.length === 0) {
-        html += `<tr><td colspan="3" style="text-align:center; color:#666;">Empty</td></tr>`;
-      } else {
-        list.forEach(item => {
-          html += `<tr>
-            <td><strong>${item.itemName}</strong><br><small>${item.barcode}</small></td>
-            <td>${item.needed}</td>
-            <td><button onclick="removeFromList('${item.barcode}')" style="background:#dc3545; font-size:10px;">Remove</button></td>
-          </tr>`;
-        });
-      }
-      html += `</table>`;
-      if (lowStock.length > 0) {
-        html += `<p><strong>Low Stock:</strong> ${lowStock.map(i => `${i.itemName} (+${i.needed})`).join(', ')}</p>`;
-      }
-      document.getElementById("shopping-list").innerHTML = html;
-    }
-    async function addLowStockToList() {
-      const res = await authFetch('/shopping');
-      const { lowStock } = await res.json();
-      for (const item of lowStock) {
-        await authFetch('/shopping', {
-          method: 'POST',
-          body: JSON.stringify(item)
-        });
-      }
-      loadShoppingList();
-    }
-    async function removeFromList(barcode) {
-      await authFetch(`/shopping/${barcode}`, { method: 'DELETE' });
-      loadShoppingList();
-    }
-    async function clearShoppingList() {
-      if (confirm("Clear entire list?")) {
-        await authFetch('/shopping', { method: 'DELETE' });
-        loadShoppingList();
-      }
-    }
-    function printList() {
-      window.print();
-    }
-    // Recipes
-    async function loadRecipes() {
-      const res = await authFetch('/recipes');
-      const recipes = await res.json();
-      if (recipes.error) {
-        document.getElementById("recipes").innerHTML = `<p style="color:red;">${recipes.error}</p>`;
-        return;
-      }
-      document.getElementById("recipes").innerHTML = recipes.map(r => `
-        <div class="card" style="display:inline-block; width:300px; margin:10px;">
-          <h4>${r.title}</h4>
-          <img src="${r.image}" width="100%">
-          <p>Ready in ${r.readyIn} min • ${r.servings} servings</p>
-          <a href="${r.link}" target="_blank">View Recipe</a>
-        </div>
-      `).join('');
-    }
-    // Auto-refresh
-    setInterval(() => {
-      if (auth.currentUser && document.getElementById('inventory-tab').style.display !== 'none') loadInventory();
-      if (auth.currentUser && document.getElementById('shopping-tab').style.display !== 'none') loadShoppingList();
-    }, 5000);
-    // Initial load
-    if (auth.currentUser) loadInventory();
+  }
 
-    // === PWA: SERVICE WORKER + OFFLINE BANNER ===
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('SW registered'))
-          .catch(err => console.log('SW failed:', err));
-      });
-    }
+  function showTab(tab) {
+    document.getElementById('inventory-tab').style.display = tab==='inventory'?'block':'none';
+    document.getElementById('shopping-tab').style.display = tab==='shopping'?'block':'none';
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelector(`.tab[onclick="showTab('${tab}')"]`).classList.add('active');
+  }
 
-    // Offline Banner
-    const offlineBanner = document.createElement('div');
-    offlineBanner.id = 'offline';
-    offlineBanner.style.cssText = 'background:#ffc107; color:black; padding:10px; text-align:center; font-weight:bold; display:none; position:fixed; top:0; width:100%; z-index:1000;';
-    offlineBanner.textContent = 'Offline — Data will sync when back online';
-    document.body.prepend(offlineBanner);
-
-    window.addEventListener('online', () => { document.getElementById('offline').style.display = 'none'; });
-    window.addEventListener('offline', () => { document.getElementById('offline').style.display = 'block'; });
-  </script>
+</script>
 </body>
 </html>
