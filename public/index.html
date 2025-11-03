@@ -14,7 +14,7 @@
     .container { max-width: 600px; margin: 1rem auto; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
     button { background: #007bff; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: bold; }
     button:hover { background: #0056b3; }
-    input, select { width: 100%; padding: 0.7rem; margin: 0.5rem 0; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
+    input { width: 100%; padding: 0.7rem; margin: 0.5rem 0; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
     .tab-btn { background: #e9ecef; color: #495057; }
     .tab-btn.active { background: #007bff; color: white; }
     .tab { display: none; }
@@ -83,7 +83,7 @@
         <input type="text" id="shopName" placeholder="Item Name (e.g. Coke)"/>
         <input type="number" id="shopNeeded" value="1" min="1"/>
         <button id="addToShopping" style="width:100%; margin-top:0.5rem;">Add to List</button>
-        <div id="shoppingList" style="margin-top:1rem;"></div>
+        <div id="shoppingList" style="margin:1rem 0;"></div>
       </div>
     </div>
   </div>
@@ -93,14 +93,15 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
   <script>
-    // REPLACE WITH YOUR FIREBASE WEB CONFIG
+    // CORRECT CONFIG FOR pantrypal-6e410
     const firebaseConfig = {
-      apiKey: "AIzaSyB...", // ← YOUR API KEY
-      authDomain: "pantrypal-477010.firebaseapp.com",
-      projectId: "pantrypal-477010",
-      storageBucket: "pantrypal-477010.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "1:123456789:web:abc123def456"
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
+      measurementId: "G-P641JW4KS4"
     };
 
     firebase.initializeApp(firebaseConfig);
@@ -108,10 +109,12 @@
     let currentUser = null;
     let idToken = null;
 
-    // === GOOGLE SIGN IN ===
+    // === SIGN IN ===
     document.getElementById('signInBtn').onclick = () => {
       const provider = new firebase.auth.GoogleAuthProvider();
-      firebase.auth().signInWithPopup(provider).catch(err => alert('Sign in failed: ' + err.message));
+      firebase.auth().signInWithPopup(provider).catch(err => {
+        alert('Sign in failed: ' + err.message);
+      });
     };
 
     // === SIGN OUT ===
@@ -119,7 +122,7 @@
       firebase.auth().signOut();
     };
 
-    // === AUTH STATE CHANGE ===
+    // === AUTH STATE ===
     firebase.auth().onAuthStateChanged(async (user) => {
       if (user) {
         currentUser = user;
@@ -130,14 +133,12 @@
         loadInventory();
         loadShopping();
       } else {
-        currentUser = null;
-        idToken = null;
         document.getElementById('auth-section').classList.remove('hidden');
         document.getElementById('app').classList.add('hidden');
       }
     });
 
-    // === API CALL WITH TOKEN ===
+    // === API CALL ===
     async function api(path, opts = {}) {
       if (!idToken) return alert('Not signed in');
       const res = await fetch(path, {
@@ -172,14 +173,9 @@
       const qty = document.getElementById('invQty').value;
       const exp = document.getElementById('invExp').value;
       if (!barcode) return alert('Enter barcode');
-      const res = await api('/add', {
-        method: 'POST',
-        body: JSON.stringify({ barcode, quantity: qty, expiration: exp })
-      });
-      if (res) {
-        document.getElementById('invBarcode').value = '';
-        loadInventory();
-      }
+      await api('/add', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
+      document.getElementById('invBarcode').value = '';
+      loadInventory();
     };
 
     // === ADD TO SHOPPING ===
@@ -188,91 +184,19 @@
       const name = document.getElementById('shopName').value.trim();
       const needed = document.getElementById('shopNeeded').value;
       if (!barcode || !name) return alert('Fill barcode and name');
-      const res = await api('/add-to-shopping', {
-        method: 'POST',
-        body: JSON.stringify({ barcode, itemName: name, needed })
-      });
-      if (res) {
-        document.getElementById('shopBarcode').value = '';
-        document.getElementById('shopName').value = '';
-        loadShopping();
-      }
+      await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ barcode, itemName: name, needed }) });
+      document.getElementById('shopBarcode').value = '';
+      document.getElementById('shopName').value = '';
+      loadShopping();
     };
 
     // === LOAD INVENTORY ===
     async function loadInventory() {
       const data = await api('/inventory');
       const list = document.getElementById('inventoryList');
-      if (!data?.items?.length) {
-        list.innerHTML = '<p style="color:#999; text-align:center;">No items in inventory</p>';
-        return;
-      }
-      list.innerHTML = data.items.map(i => `
+      list.innerHTML = data?.items?.length ? data.items.map(i => `
         <div class="item">
-          <div>
-            <strong>${i.name || i.barcode}</strong><br>
-            Qty: ${i.quantity} ${i.expiration ? `| Exp: ${i.expiration}` : ''}
-          </div>
+          <div><strong>${i.name || i.barcode}</strong><br>Qty: ${i.quantity} ${i.expiration ? '| Exp: ' + i.expiration : ''}</div>
           <button onclick="removeItem('${i.barcode}')">Remove</button>
         </div>
-      `).join('');
-    }
-
-    // === LOAD SHOPPING ===
-    async function loadShopping() {
-      const data = await api('/shopping');
-      const list = document.getElementById('shoppingList');
-      if (!data?.list?.length) {
-        list.innerHTML = '<p style="color:#999; text-align:center;">Shopping list empty</p>';
-        return;
-      }
-      list.innerHTML = data.list.map(i => `
-        <div class="item">
-          <div>
-            <strong>${i.itemName}</strong><br>
-            Need: ${i.needed}
-          </div>
-          <button onclick="removeFromShopping('${i.barcode}')">Remove</button>
-        </div>
-      `).join('');
-    }
-
-    // === REMOVE ITEM ===
-    window.removeItem = async (barcode) => {
-      if (confirm('Remove from inventory?')) {
-        await api('/remove', { method: 'POST', body: JSON.stringify({ barcode }) });
-        loadInventory();
-      }
-    };
-
-    window.removeFromShopping = async (barcode) => {
-      if (confirm('Remove from shopping list?')) {
-        await api('/remove-from-shopping', { method: 'POST', body: JSON.stringify({ barcode }) });
-        loadShopping();
-      }
-    };
-
-    // === AI SCAN ===
-    document.getElementById('scanBtn').onclick = async () => {
-      const file = document.getElementById('scanImage').files[0];
-      if (!file) return alert('Choose an image');
-      const form = new FormData();
-      form.append('image', file);
-      const res = await fetch('/scan', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${idToken}` },
-        body: form
-      }).then(r => r.json());
-
-      const resultDiv = document.getElementById('scanResult');
-      const textDiv = document.getElementById('scanText');
-      if (res.success) {
-        textDiv.textContent = JSON.stringify(res.record, null, 2);
-        resultDiv.style.display = 'block';
-      } else {
-        alert('Scan failed: ' + res.error);
-      }
-    };
-  </script>
-</body>
-</html>
+      `).join('') : '<p style="color
