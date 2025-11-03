@@ -13,7 +13,7 @@ app.use(bodyParser.json());
 app.use(fileUpload());
 app.use(express.static('public'));
 
-initializeApp({ credential: cert('./serviceAccount.json') });
+admin.initializeApp({ credential: admin.credential.cert('./credentials.json') });
 const auth = getAuth();
 const db = getFirestore();
 const client = new vision.ImageAnnotatorClient();
