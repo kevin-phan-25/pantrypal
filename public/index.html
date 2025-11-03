@@ -78,14 +78,20 @@
       Start Scanner (QR + Barcode)
     </button>
 
-    <!-- Voice Search Button (Shopping List) -->
+    <!-- Voice Command Center -->
     <div class="bg-white p-5 rounded-xl shadow">
       <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
         <svg class="icon"><use href="#heroicons-microphone"/></svg>
-        Voice Product Search
+        Voice Commands
       </h3>
-      <p class="text-sm text-gray-600 mb-3">Hold mic and say: <em>"Add two cans of Coke"</em></p>
-      <button id="voiceSearchBtn"
+      <p class="text-sm text-gray-600 mb-3">
+        Hold mic and say:<br>
+        • <em>"Add two Coke"</em><br>
+        • <em>"Add barcode 049000049100"</em><br>
+        • <em>"Add three Coke expiring tomorrow"</em><br>
+        • <em>"Remove Coke"</em>
+      </p>
+      <button id="voiceBtn"
               class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition">
         <svg class="icon"><use href="#heroicons-microphone"/></svg>
         <span>Hold to Speak</span>
@@ -167,7 +173,7 @@
     <symbol id="heroicons-microphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8a1 1 0 01-1-1v-1a5 5 0 1110 0v1a1 1 0 01-1 1h-4"/></symbol>
   </svg>
 
-  <!-- App Logic + Voice + QR + Barcode -->
+  <!-- App Logic + Full Voice Commands -->
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
@@ -280,8 +286,8 @@
       else alert('Scan failed: ' + (res.error || 'Unknown'));
     };
 
-    // ==== VOICE SEARCH ====
-    const voiceBtn = document.getElementById('voiceSearchBtn');
+    // ==== VOICE COMMAND SYSTEM (Shopping + Inventory) ====
+    const voiceBtn = document.getElementById('voiceBtn');
     const voiceResult = document.getElementById('voiceResult');
 
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -315,23 +321,93 @@
         recognition.stop();
       }
 
-      recognition.onresult = event => {
+      recognition.onresult = async event => {
         const transcript = event.results[0][0].transcript.trim();
         voiceResult.textContent = `"${transcript}"`;
         voiceResult.classList.remove('hidden');
 
-        // Parse: "Add 2 Coke", "I need milk", "Coca Cola"
-        const match = transcript.toLowerCase().match(/(add|need|want|get)?\s*(\d+)?\s*(.+)/i);
-        if (match) {
-          const qty = match[2] ? parseInt(match[2]) : 1;
-          const name = match[3].trim();
+        const lower = transcript.toLowerCase();
 
+        // === REMOVE COMMAND ===
+        if (lower.includes('remove') || lower.includes('delete')) {
+          const nameMatch = lower.match(/(remove|delete)\s+(.+)/i);
+          if (nameMatch) {
+            const itemName = nameMatch[2].trim();
+            const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+            if (activeTab === 'inventory') {
+              const items = (await api('/inventory'))?.items || [];
+              const item = items.find(i => (i.name || '').toLowerCase().includes(itemName));
+              if (item) removeItem(item.barcode);
+            } else {
+              const list = (await api('/shopping'))?.list || [];
+              const item = list.find(i => i.itemName.toLowerCase().includes(itemName));
+              if (item) removeFromShopping(item.barcode);
+            }
+            return;
+          }
+        }
+
+        // === ADD TO INVENTORY (with barcode or name) ===
+        if (lower.includes('barcode')) {
+          const match = lower.match(/barcode\s+([0-9]+)/i);
+          if (match) {
+            document.getElementById('invBarcode').value = match[1];
+            document.querySelector('[data-tab="inventory"]').click();
+            setTimeout(() => document.getElementById('addToInventory').click(), 500);
+            return;
+          }
+        }
+
+        if (lower.includes('expir') || lower.includes('expire')) {
+          const match = lower.match(/(add|put)\s+(\d+)?\s*(.+?)\s+expir(?:ing|e)?\s+(.+)/i);
+          if (match) {
+            const qty = match[2] ? parseInt(match[2]) : 1;
+            const name = match[3].trim();
+            const expDate = parseDate(match[4]);
+            document.getElementById('invBarcode').value = name;
+            document.getElementById('invQty').value = qty;
+            document.getElementById('invExp').value = expDate;
+            document.querySelector('[data-tab="inventory"]').click();
+            setTimeout(() => document.getElementById('addToInventory').click(), 500);
+            return;
+          }
+        }
+
+        // === ADD TO INVENTORY (name + qty) ===
+        const invMatch = lower.match(/(add|put)\s+(\d+)?\s*(.+)/i);
+        if (invMatch && !lower.includes('shopping')) {
+          const qty = invMatch[2] ? parseInt(invMatch[2]) : 1;
+          const name = invMatch[3].trim();
+          document.getElementById('invBarcode').value = name;
+          document.getElementById('invQty').value = qty;
+          document.querySelector('[data-tab="inventory"]').click();
+          setTimeout(() => document.getElementById('addToInventory').click(), 500);
+          return;
+        }
+
+        // === ADD TO SHOPPING LIST ===
+        const shopMatch = lower.match(/(add|need|want|get)\s+(\d+)?\s*(.+)/i);
+        if (shopMatch) {
+          const qty = shopMatch[2] ? parseInt(shopMatch[2]) : 1;
+          const name = shopMatch[3].trim();
           document.getElementById('shopName').value = name;
           document.getElementById('shopNeeded').value = qty;
           document.querySelector('[data-tab="shopping"]').click();
           setTimeout(() => document.getElementById('addToShopping').click(), 500);
         }
       };
+
+      function parseDate(str) {
+        const today = new Date();
+        const lower = str.toLowerCase();
+        if (lower.includes('tomorrow')) {
+          const t = new Date(today); t.setDate(t.getDate() + 1); return t.toISOString().split('T')[0];
+        }
+        if (lower.includes('week')) {
+          const t = new Date(today); t.setDate(t.getDate() + 7); return t.toISOString().split('T')[0];
+        }
+        return today.toISOString().split('T')[0];
+      }
 
       recognition.onerror = () => {
         voiceResult.textContent = 'Voice error. Try again.';
@@ -345,7 +421,7 @@
       voiceBtn.innerHTML = '<svg class="icon"><use href="#heroicons-x"/></svg> Voice Not Supported';
     }
 
-    // ==== CAMERA + QR + BARCODE SCANNER ====
+    // ==== CAMERA + QR + BARCODE SCANNER (unchanged) ====
     document.getElementById('startScanner').onclick = async () => {
       let stream, video, canvas, codeReader, quaggaRunning = false;
       try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); }
