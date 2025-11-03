@@ -240,7 +240,7 @@
 
     // === AI SCAN TEST (SAMPLE IMAGE) ===
     async function testAIScan() {
-      const sampleImageUrl = 'https://i.imgur.com/8vM3K8P.jpeg'; // Real product with name + expiry
+      const sampleImageUrl = 'https://i.imgur.com/8vM3K8P.jpeg';
       try {
         const res = await fetch(sampleImageUrl);
         const blob = await res.blob();
@@ -270,7 +270,19 @@
       }
     }
 
-    // === INVENTORY & LOG ITEM ===
+    // === MANUAL ADD (uses barcode field) ===
+    async function addItem() {
+      const barcode = document.getElementById('barcode').value.trim();
+      const qty = document.getElementById('qty').value;
+      const exp = document.getElementById('expires').value;
+      if (!barcode) return alert('Enter a barcode');
+      await logItem(barcode, qty, exp);
+      document.getElementById('barcode').value = '';
+      document.getElementById('qty').value = '1';
+      document.getElementById('expires').value = '';
+    }
+
+    // === LOG ITEM (uses barcode as ID) ===
     async function logItem(barcode, qty = 1, exp = '') {
       await authFetch('/add', {
         method: 'POST',
@@ -279,22 +291,40 @@
       loadInventory();
     }
 
+    // === LOAD INVENTORY FROM FIRESTORE ===
     async function loadInventory() {
       const res = await authFetch('/inventory');
-      if (!res.ok) return;
+      if (!res.ok) {
+        document.getElementById('inventory').innerHTML = '<p>Please sign in</p>';
+        return;
+      }
       const { items } = await res.json();
       const container = document.getElementById('inventory');
       container.innerHTML = '';
+
+      if (items.length === 0) {
+        container.innerHTML = '<p>No items yet. Scan or add one!</p>';
+        return;
+      }
+
       items.forEach(item => {
         const div = document.createElement('div');
-        div.innerHTML = `<strong>${item.name}</strong> | Qty: ${item.quantity} | Exp: ${item.expiration || 'N/A'} `;
-        const btn = document.createElement('button');
-        btn.textContent = 'Remove';
-        btn.onclick = () => authFetch('/remove', {
+        div.style = 'padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;';
+        div.innerHTML = `
+          <div>
+            <strong>${item.name || item.barcode}</strong> 
+            | Qty: <strong>${item.quantity}</strong> 
+            | Exp: <strong>${item.expiration || 'N/A'}</strong>
+          </div>
+        `;
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = 'Remove';
+        removeBtn.style = 'background:#dc3545; font-size:12px; padding:5px 10px;';
+        removeBtn.onclick = () => authFetch('/remove', {
           method: 'POST',
           body: JSON.stringify({ barcode: item.barcode })
         }).then(loadInventory);
-        div.appendChild(btn);
+        div.appendChild(removeBtn);
         container.appendChild(div);
       });
     }
