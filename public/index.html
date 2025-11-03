@@ -61,7 +61,7 @@
 
   <!-- Main App -->
   <main id="app" class="hidden max-w-3xl mx-auto p-4 space-y-6">
-    <!-- User Bar + Scan Counter -->
+    <!-- User Bar + Scan Counter + Push Button -->
     <div class="flex flex-col gap-2">
       <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
         <p class="font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
@@ -72,6 +72,7 @@
       <div id="scanCounter" class="bg-blue-50 dark:bg-blue-900 p-3 rounded-lg text-center text-sm">
         Loading scans...
       </div>
+      <button id="enableNotifs" class="mt-2 text-sm text-blue-600 underline">Enable Expiry Alerts</button>
     </div>
 
     <!-- Scanner Button -->
@@ -251,6 +252,30 @@
       document.getElementById('upgradeBtn')?.addEventListener('click', () => {
         alert('Pro upgrade coming soon!');
       });
+    }
+
+    // ==== Push Notifications ====
+    document.getElementById('enableNotifs').onclick = async () => {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        alert('Push notifications not supported');
+        return;
+      }
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array('YOUR_VAPID_PUBLIC_KEY') // Replace with your VAPID public key
+      });
+      await api('/subscribe', { method: 'POST', body: JSON.stringify(sub) });
+      alert('Expiry alerts enabled!');
+    };
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+      return outputArray;
     }
 
     // ==== Tabs, Inventory, Shopping (with icons) ====
@@ -626,6 +651,14 @@
       if (outcome === 'accepted') installBtn.style.display = 'none';
       deferredPrompt = null;
     };
+  </script>
+  <!-- Service Worker (for push) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        console.log('SW registered:', reg);
+      }).catch(err => console.error('SW failed:', err));
+    }
   </script>
 </body>
 </html>
