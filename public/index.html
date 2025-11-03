@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PantryPal</title>
-  <!-- PWA Meta -->
   <meta name="theme-color" content="#007bff">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
@@ -23,60 +22,35 @@
     .expiring { background: #fd7e14; }
     .expired { background: #dc3545; }
     .good { background: #28a745; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-    th { background: #f8f9fa; }
-    .actions button { margin: 0 5px; padding: 5px 10px; font-size: 12px; }
-    .scanner { text-align: center; margin: 20px 0; }
     input, button { padding: 10px; margin: 5px; font-size: 16px; }
     button { background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
     button:hover { background: #0056b3; }
-    .expired { color: #dc3545; font-weight: bold; }
-    .expiring { color: #fd7e14; font-weight: bold; }
-    img.item-img { width: 50px; height: 50px; object-fit: cover; border-radius: 5px; display: block; margin: 0 auto; }
-    .print-btn { background: #28a745; margin-top: 10px; }
     .auth-box { position: fixed; top: 10px; right: 10px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 14px; z-index: 1000; }
     .auth-box button { font-size: 12px; padding: 5px 10px; margin-left: 5px; }
-    @media print { .header, .tabs, .scanner, button, input, .auth-box { display: none; } .card { box-shadow: none; border: 1px solid #ddd; } }
-
-    /* CAMERA FIX */
     #video { display: none; width: 100%; max-width: 400px; border: 2px solid #007bff; border-radius: 10px; margin: 10px auto; }
   </style>
-  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <!-- HTML5 QR Code -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
-  <div id="auth-box" class="auth-box">
-    <div id="auth-status">Loading...</div>
-  </div>
-  <div class="header">
-    <h1>PantryPal</h1>
-    <p>Smart Pantry with OFF + Recipes + Shopping</p>
-  </div>
+  <div id="auth-box" class="auth-box"><div id="auth-status">Loading...</div></div>
+  <div class="header"><h1>PantryPal</h1><p>Smart Pantry with OFF + Recipes + Shopping</p></div>
   <div class="container">
-    <!-- BARCODE SCANNER -->
     <div class="scanner">
-      <video id="video"></video>
-      <br><br>
+      <video id="video"></video><br><br>
       <button id="start">Start Scanner</button>
       <button id="stop" style="display:none;">Stop</button>
     </div>
 
-    <!-- AI SCAN SECTION -->
     <div class="card">
       <h3>AI Scan Product</h3>
       <input type="file" id="scan-image" accept="image/*">
       <button onclick="scanImage()">Scan with AI</button>
       <div id="scan-result" style="margin-top:10px;"></div>
-
-      <!-- AI SCAN TEST BUTTON -->
       <div style="margin-top:15px; padding:10px; background:#e9f7ef; border-radius:8px;">
         <strong>AI SCAN TEST</strong><br>
-        <button onclick="testAIScan()" style="background:#28a745; margin-top:5px;">Test with Sample Image</button>
-        <p><small>Uses a real product label with name + expiry</small></p>
+        <button onclick="testAIScan()" style="background:#28a745; margin-top:5px;">Test with Sample</button>
       </div>
     </div>
 
@@ -84,7 +58,7 @@
       <div class="tab active" onclick="showTab('inventory')">Inventory</div>
       <div class="tab" onclick="showTab('shopping')">Shopping List</div>
     </div>
-    <div id="stats" class="stats"></div>
+
     <div class="card">
       <h2>Manual Add</h2>
       <input type="text" id="barcode" placeholder="Barcode">
@@ -92,268 +66,121 @@
       <input type="date" id="expires">
       <button onclick="addItem()">Add Item</button>
     </div>
-    <!-- INVENTORY TAB -->
+
     <div id="inventory-tab">
       <div class="card">
         <h2>Inventory</h2>
-        <button onclick="loadRecipes()" style="margin-bottom:10px;">Get Recipe Ideas</button>
-        <div id="recipes"></div>
         <div id="inventory"></div>
       </div>
     </div>
-    <!-- SHOPPING LIST TAB -->
+
     <div id="shopping-tab" style="display:none;">
-      <div class="card">
-        <h2>Shopping List</h2>
-        <button onclick="addLowStockToList()" style="background:#ffc107; color:black;">Add Low Stock</button>
-        <button onclick="clearShoppingList()" style="background:#dc3545; margin-left:10px;">Clear List</button>
-        <button onclick="printList()" class="print-btn">Print / Export PDF</button>
-        <div id="shopping-list"></div>
-      </div>
+      <div class="card"><h2>Shopping List</h2><div id="shopping-list"></div></div>
     </div>
   </div>
 
   <script>
-    // === FIREBASE CONFIG ===
-    const firebaseConfig = {
-      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-      authDomain: "pantrypal-6e410.firebaseapp.com",
-      projectId: "pantrypal-6e410",
-      storageBucket: "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
-      measurementId: "G-P641JW4KS4"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386", measurementId: "G-P641JW4KS4" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
 
-    // === AUTH UI ===
     const authBox = document.getElementById('auth-status');
     function updateAuthUI(user) {
-      if (user) {
-        authBox.innerHTML = `<strong>${user.displayName || user.email}</strong><br>
-          <button onclick="signOutUser()">Sign Out</button>`;
-      } else {
-        authBox.innerHTML = `<button onclick="signInWithGoogle()">Sign in with Google</button>`;
-      }
+      authBox.innerHTML = user ? `<strong>${user.displayName || user.email}</strong><br><button onclick="signOutUser()">Sign Out</button>` : `<button onclick="signInWithGoogle()">Sign in with Google</button>`;
     }
-    window.signInWithGoogle = () => {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider).catch(err => alert("Login failed: " + err.message));
-    };
-    window.signOutUser = () => auth.signOut().then(() => location.reload());
-    auth.onAuthStateChanged(user => {
-      updateAuthUI(user);
-      if (user) loadInventory();
-    });
-    window.getAuthToken = async () => {
-      const user = auth.currentUser;
-      return user ? await user.getIdToken() : null;
-    };
-    async function authFetch(url, options = {}) {
-      const token = await window.getAuthToken();
-      const headers = { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
-      return fetch(url, { ...options, headers });
-    }
+    window.signInWithGoogle = () => { const p = new firebase.auth.GoogleAuthProvider(); auth.signInWithPopup(p).catch(e=>alert(e.message)); };
+    window.signOutUser = () => auth.signOut().then(()=>location.reload());
+    auth.onAuthStateChanged(u => { updateAuthUI(u); if(u) loadInventory(); });
+    window.getAuthToken = async () => auth.currentUser ? await auth.currentUser.getIdToken() : null;
+    async function authFetch(url, opt={}) { const t = await window.getAuthToken(); const h = { 'Content-Type':'application/json', ...(t?{'Authorization':`Bearer ${t}`}:{}) }; return fetch(url, {...opt, headers:h}); }
 
-    // === BARCODE SCANNER (FIXED) ===
     let scanner = null;
     const video = document.getElementById('video');
     const startBtn = document.getElementById('start');
     const stopBtn = document.getElementById('stop');
 
     startBtn.onclick = async () => {
-      if (scanner) return;
+      if(scanner) return;
       try {
-        video.style.display = 'block';
-        startBtn.disabled = true;
-        startBtn.textContent = 'Starting...';
-
+        video.style.display = 'block'; startBtn.disabled = true; startBtn.textContent = 'Starting...';
         scanner = new Html5Qrcode("video");
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          async (decodedText) => {
-            const qty = prompt("How many?", "1") || "1";
-            const exp = prompt("Expiration (YYYY-MM-DD) or leave blank", "") || "";
-            await logItem(decodedText, qty, exp);
-            stopScanner();
-          },
-          (error) => console.warn("Scan error:", error)
+        await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } },
+          async (text) => { const qty = prompt("Qty?", "1")||1; const exp = prompt("Exp (YYYY-MM-DD)", "")||""; await logItem(text, qty, exp); stopScanner(); },
+          () => {}
         );
-
-        startBtn.style.display = 'none';
-        stopBtn.style.display = 'inline';
-        startBtn.disabled = false;
-        startBtn.textContent = 'Start Scanner';
-      } catch (err) {
-        console.error("Camera failed:", err);
-        alert("Camera access denied. Use phone + HTTPS.");
-        startBtn.disabled = false;
-        startBtn.textContent = 'Start Scanner';
-      }
+        startBtn.style.display = 'none'; stopBtn.style.display = 'inline'; startBtn.disabled = false; startBtn.textContent = 'Start Scanner';
+      } catch(e) { alert("Camera failed. Use phone."); startBtn.disabled = false; startBtn.textContent = 'Start Scanner'; }
     };
+    stopBtn.onclick = () => { if(scanner) scanner.stop().then(()=>{scanner=null;video.style.display='none';startBtn.style.display='inline';stopBtn.style.display='none;}); };
 
-    stopBtn.onclick = stopScanner;
-    function stopScanner() {
-      if (scanner) {
-        scanner.stop().then(() => {
-          scanner = null;
-          video.style.display = 'none';
-          startBtn.style.display = 'inline';
-          stopBtn.style.display = 'none';
-        });
-      }
-    }
-
-    // === AI SCAN ===
+    // === AI SCAN WITH NAME UPDATE ===
     async function scanImage() {
-      const input = document.getElementById('scan-image');
-      const file = input.files[0];
-      if (!file) return alert('Select an image first!');
-      const formData = new FormData();
-      formData.append('image', file);
+      const file = document.getElementById('scan-image').files[0];
+      if(!file) return alert('Select image');
+      const barcode = document.getElementById('barcode').value.trim() || prompt("Barcode?", "");
+      const formData = new FormData(); formData.append('image', file); if(barcode) formData.append('barcode', barcode);
       const token = await window.getAuthToken();
       try {
-        const res = await fetch('/scan', {
-          method: 'POST',
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-          body: formData
-        });
+        const res = await fetch('/scan', { method:'POST', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, body: formData });
         const data = await res.json();
-        const result = document.getElementById('scan-result');
-        if (data.success) {
-          const r = data.record;
-          result.innerHTML = `
-            <p><strong>Name:</strong> ${r.itemName}</p>
-            <p><strong>Expiration:</strong> ${r.expirationDate || 'N/A'}</p>
-            <p><strong>Full Text:</strong> ${r.detectedText}</p>
-            <button onclick='logItem("${r.itemName}",1,"${r.expirationDate || ''}")'>Add to Pantry</button>
-          `;
-        } else {
-          result.innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
-        }
-      } catch (err) {
-        alert('Scan failed: ' + err.message);
-      }
+        const r = document.getElementById('scan-result');
+        if(data.success) {
+          r.innerHTML = `<p><strong>Name:</strong> ${data.record.itemName}</p><p><strong>Exp:</strong> ${data.record.expirationDate||'N/A'}</p><button onclick='logItem("${barcode||data.record.itemName}",1,"${data.record.expirationDate||''}","${data.record.itemName}")'>Add</button>`;
+        } else r.innerHTML = `<p style="color:red;">${data.error}</p>`;
+      } catch(e) { alert(e.message); }
     }
 
-    // === AI SCAN TEST (SAMPLE IMAGE) ===
     async function testAIScan() {
-      const sampleImageUrl = 'https://i.imgur.com/8vM3K8P.jpeg';
-      try {
-        const res = await fetch(sampleImageUrl);
-        const blob = await res.blob();
-        const file = new File([blob], "test-product.jpg", { type: "image/jpeg" });
-        const formData = new FormData();
-        formData.append('image', file);
-        const token = await window.getAuthToken();
-        const scanRes = await fetch('/scan', {
-          method: 'POST',
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-          body: formData
-        });
-        const data = await scanRes.json();
-        const result = document.getElementById('scan-result');
-        if (data.success) {
-          result.innerHTML = `
-            <p><strong>AI TEST SUCCESS</strong></p>
-            <p><strong>Name:</strong> ${data.record.itemName}</p>
-            <p><strong>Expiry:</strong> ${data.record.expirationDate || 'Not found'}</p>
-            <img src="${sampleImageUrl}" style="max-width:200px; margin-top:10px; border-radius:8px;">
-          `;
-        } else {
-          result.innerHTML = `<p style="color:red;">Test failed: ${data.error}</p>`;
-        }
-      } catch (err) {
-        alert('Test failed: ' + err.message);
-      }
+      const url = 'https://i.imgur.com/8vM3K8P.jpeg';
+      const res = await fetch(url); const blob = await res.blob(); const file = new File([blob], "test.jpg", {type:"image/jpeg"});
+      const formData = new FormData(); formData.append('image', file); formData.append('barcode', '12345');
+      const token = await window.getAuthToken();
+      const scanRes = await fetch('/scan', { method:'POST', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, body: formData });
+      const data = await scanRes.json();
+      const r = document.getElementById('scan-result');
+      r.innerHTML = data.success ? `<p><strong>TEST OK:</strong> ${data.record.itemName}</p><img src="${url}" style="max-width:200px;">` : `<p style="color:red;">${data.error}</p>`;
     }
 
-    // === MANUAL ADD (uses barcode field) ===
     async function addItem() {
-      const barcode = document.getElementById('barcode').value.trim();
-      const qty = document.getElementById('qty').value;
-      const exp = document.getElementById('expires').value;
-      if (!barcode) return alert('Enter a barcode');
-      await logItem(barcode, qty, exp);
-      document.getElementById('barcode').value = '';
-      document.getElementById('qty').value = '1';
-      document.getElementById('expires').value = '';
+      const b = document.getElementById('barcode').value.trim();
+      const q = document.getElementById('qty').value;
+      const e = document.getElementById('expires').value;
+      if(!b) return alert('Enter barcode');
+      await logItem(b, q, e);
+      document.getElementById('barcode').value=''; document.getElementById('qty').value='1'; document.getElementById('expires').value='';
     }
 
-    // === LOG ITEM (uses barcode as ID) ===
-    async function logItem(barcode, qty = 1, exp = '') {
-      await authFetch('/add', {
-        method: 'POST',
-        body: JSON.stringify({ barcode, quantity: qty, expiration: exp })
-      });
+    async function logItem(barcode, qty=1, exp='', name='') {
+      await authFetch('/add', { method:'POST', body:JSON.stringify({barcode, quantity:qty, expiration:exp, name}) });
       loadInventory();
     }
 
-    // === LOAD INVENTORY FROM FIRESTORE ===
     async function loadInventory() {
       const res = await authFetch('/inventory');
-      if (!res.ok) {
-        document.getElementById('inventory').innerHTML = '<p>Please sign in</p>';
-        return;
-      }
-      const { items } = await res.json();
-      const container = document.getElementById('inventory');
-      container.innerHTML = '';
-
-      if (items.length === 0) {
-        container.innerHTML = '<p>No items yet. Scan or add one!</p>';
-        return;
-      }
-
-      items.forEach(item => {
-        const div = document.createElement('div');
-        div.style = 'padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;';
-        div.innerHTML = `
-          <div>
-            <strong>${item.name || item.barcode}</strong> 
-            | Qty: <strong>${item.quantity}</strong> 
-            | Exp: <strong>${item.expiration || 'N/A'}</strong>
-          </div>
-        `;
-        const removeBtn = document.createElement('button');
-        removeBtn.textContent = 'Remove';
-        removeBtn.style = 'background:#dc3545; font-size:12px; padding:5px 10px;';
-        removeBtn.onclick = () => authFetch('/remove', {
-          method: 'POST',
-          body: JSON.stringify({ barcode: item.barcode })
-        }).then(loadInventory);
-        div.appendChild(removeBtn);
-        container.appendChild(div);
+      if(!res.ok) { document.getElementById('inventory').innerHTML='<p>Sign in</p>'; return; }
+      const {items} = await res.json();
+      const c = document.getElementById('inventory'); c.innerHTML='';
+      if(items.length===0) { c.innerHTML='<p>No items. Scan one!</p>'; return; }
+      items.forEach(i => {
+        const d = document.createElement('div'); d.style='padding:10px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;';
+        d.innerHTML = `<div><strong>${i.name||i.barcode}</strong> | Qty: <strong>${i.quantity}</strong> | Exp: <strong>${i.expiration||'N/A'}</strong></div>`;
+        const b = document.createElement('button'); b.textContent='Remove'; b.style='background:#dc3545;font-size:12px;padding:5px 10px;';
+        b.onclick = () => authFetch('/remove', {method:'POST', body:JSON.stringify({barcode:i.barcode})}).then(loadInventory);
+        d.appendChild(b); c.appendChild(d);
       });
     }
 
-    // === TAB SWITCHING ===
-    function showTab(tab) {
-      document.getElementById('inventory-tab').style.display = tab === 'inventory' ? 'block' : 'none';
-      document.getElementById('shopping-tab').style.display = tab === 'shopping' ? 'block' : 'none';
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelector(`.tab[onclick="showTab('${tab}')"]`).classList.add('active');
+    function showTab(t) {
+      document.getElementById('inventory-tab').style.display = t==='inventory'?'block':'none';
+      document.getElementById('shopping-tab').style.display = t==='shopping'?'block':'none';
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      document.querySelector(`.tab[onclick="showTab('${t}')"]`).classList.add('active');
     }
 
-    // === PWA SERVICE WORKER ===
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(() => console.log('SW registered'))
-          .catch(err => console.log('SW failed:', err));
-      });
-    }
-
-    // Offline banner
-    const offlineBanner = document.createElement('div');
-    offlineBanner.id = 'offline';
-    offlineBanner.style.cssText = 'background:#ffc107;color:black;padding:10px;text-align:center;font-weight:bold;display:none;position:fixed;top:0;width:100%;z-index:1000;';
-    offlineBanner.textContent = 'Offline — Data will sync when back online';
-    document.body.prepend(offlineBanner);
-    window.addEventListener('online', () => offlineBanner.style.display = 'none');
-    window.addEventListener('offline', () => offlineBanner.style.display = 'block');
+    if('serviceWorker' in navigator) window.addEventListener('load', ()=>navigator.serviceWorker.register('/sw.js'));
+    const ob = document.createElement('div'); ob.id='offline'; ob.style.cssText='background:#ffc107;color:black;padding:10px;text-align:center;font-weight:bold;display:none;position:fixed;top:0;width:100%;z-index:1000;';
+    ob.textContent='Offline — Data will sync when back online'; document.body.prepend(ob);
+    window.addEventListener('online', ()=>ob.style.display='none'); window.addEventListener('offline', ()=>ob.style.display='block');
   </script>
 </body>
 </html>
