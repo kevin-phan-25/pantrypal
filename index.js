@@ -1,4 +1,4 @@
-// index.js – PantryPal AI + Firestore + PWA (Render-ready)
+// index.js – PantryPal AI + Firestore + PWA (Render + Firebase)
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import bodyParser from 'body-parser';
@@ -9,6 +9,7 @@ import vision from '@google-cloud/vision';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 // ---- ES-module __dirname fix -------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
@@ -20,19 +21,31 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(fileUpload({
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB max
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   abortOnLimit: true,
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ---- Firebase Admin --------------------------------------------------------
+// ---- Firebase Admin: ENV VAR or FILE ---------------------------------------
+let credential;
+
 try {
-  initializeApp({
-    credential: cert('./credentials.json')   // <-- your service-account JSON
-  });
-  console.log('Firebase Admin initialized');
+  if (process.env.FIREBASE_CREDENTIALS) {
+    // Use JSON string from Render environment variable
+    console.log('Using Firebase credentials from FIREBASE_CREDENTIALS env var');
+    credential = cert(JSON.parse(process.env.FIREBASE_CREDENTIALS));
+  } else if (fs.existsSync('./credentials.json')) {
+    // Fallback to local file
+    console.log('Using Firebase credentials from ./credentials.json');
+    credential = cert('./credentials.json');
+  } else {
+    throw new Error('No Firebase credentials found: Set FIREBASE_CREDENTIALS env var or include credentials.json');
+  }
+
+  initializeApp({ credential });
+  console.log('Firebase Admin initialized successfully');
 } catch (err) {
-  console.error('Firebase Admin init error:', err);
+  console.error('Firebase Admin initialization failed:', err.message);
   process.exit(1);
 }
 
@@ -44,24 +57,24 @@ const visionClient = new vision.ImageAnnotatorClient();
 async function checkAuth(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing token' });
+    return res.status(401).json({ error: 'Missing Authorization Bearer token' });
   }
 
   const idToken = header.split('Bearer ')[1];
   try {
     const decoded = await auth.verifyIdToken(idToken);
-    req.user = decoded;           // uid, email, etc.
+    req.user = decoded;
     next();
   } catch (e) {
-    console.error('Token verification failed:', e.message);
+    console.error('Invalid Firebase ID token:', e.message);
     return res.status(401).json({ error: 'Invalid token' });
   }
 }
 
-// ---- /scan – AI receipt scan (Vision) --------------------------------------
+// ---- /scan – AI receipt scan with Google Vision ----------------------------
 app.post('/scan', checkAuth, async (req, res) => {
   if (!req.files?.image) {
-    return res.status(400).json({ error: 'Image required' });
+    return res.status(400).json({ error: 'No image uploaded' });
   }
 
   const imageBuffer = req.files.image.data;
@@ -74,7 +87,7 @@ app.post('/scan', checkAuth, async (req, res) => {
     const itemName = lines[0] || 'Unknown Item';
     const expirationDate = lines.find(l => /\d{4}-\d{2}-\d{2}/.test(l)) || '';
 
-    // ---- Optional: auto-update name in Firestore if barcode supplied ----
+    // Optional: auto-update item name in Firestore
     const barcode = req.body.barcode;
     if (barcode) {
       const userId = req.user.uid;
@@ -82,7 +95,7 @@ app.post('/scan', checkAuth, async (req, res) => {
       const snap = await itemRef.get();
       if (snap.exists) {
         await itemRef.update({ name: itemName });
-        console.log(`Updated name for ${barcode} → ${itemName}`);
+        console.log(`[SCAN] Updated name for ${barcode} → "${itemName}"`);
       }
     }
 
@@ -91,17 +104,17 @@ app.post('/scan', checkAuth, async (req, res) => {
       record: { itemName, expirationDate, detectedText: fullText }
     });
   } catch (err) {
-    console.error('Vision error:', err);
+    console.error('Vision API error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ---- /add – add / increment item -----------------------------------------
+// ---- /add – add or increment item -----------------------------------------
 app.post('/add', checkAuth, async (req, res) => {
   const { barcode, quantity = 1, expiration = '', name } = req.body;
   const userId = req.user.uid;
 
-  if (!barcode) return res.status(400).json({ error: 'barcode required' });
+  if (!barcode) return res.status(400).json({ error: 'barcode is required' });
 
   try {
     const itemRef = db.collection('users').doc(userId).collection('items').doc(barcode);
@@ -122,12 +135,12 @@ app.post('/add', checkAuth, async (req, res) => {
     }
     res.json({ success: true });
   } catch (err) {
-    console.error('Add error:', err);
+    console.error('Add item error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ---- /inventory – list all items -----------------------------------------
+// ---- /inventory – get all user items --------------------------------------
 app.get('/inventory', checkAuth, async (req, res) => {
   const userId = req.user.uid;
   try {
@@ -138,23 +151,23 @@ app.get('/inventory', checkAuth, async (req, res) => {
     }));
     res.json({ items });
   } catch (err) {
-    console.error('Inventory error:', err);
+    console.error('Inventory fetch error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ---- /remove – delete item -----------------------------------------------
+// ---- /remove – delete item ------------------------------------------------
 app.post('/remove', checkAuth, async (req, res) => {
   const { barcode } = req.body;
   const userId = req.user.uid;
 
-  if (!barcode) return res.status(400).json({ error: 'barcode required' });
+  if (!barcode) return res.status(400).json({ error: 'barcode is required' });
 
   try {
     await db.collection('users').doc(userId).collection('items').doc(barcode).delete();
     res.json({ success: true });
   } catch (err) {
-    console.error('Remove error:', err);
+    console.error('Remove item error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -168,8 +181,9 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log('\nPantryPal AI + Firestore + PWA');
-  console.log(`Listening on http://0.0.0.0:${PORT}`);
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
   console.log('Vision AI: ENABLED');
   console.log('Firestore: PER-USER');
-  console.log('PWA: READY\n');
+  console.log('PWA: READY');
+  console.log('Credentials: ENV VAR or ./credentials.json\n');
 });
