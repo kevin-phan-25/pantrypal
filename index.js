@@ -1,4 +1,4 @@
-// index.js – PantryPal AI + Firestore + PWA + Google Auth
+// index.js – PantryPal AI + Firestore + PWA + Google Auth + Push Notifications
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import bodyParser from 'body-parser';
@@ -10,6 +10,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import webpush from 'web-push';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,6 +43,13 @@ try {
 const auth = getAuth();
 const db = getFirestore();
 const visionClient = new vision.ImageAnnotatorClient();
+
+// === Web Push Setup ===
+webpush.setVapidDetails(
+  'mailto:you@example.com', // Replace with your email
+  process.env.VAPID_PUBLIC_KEY, // Set in env vars
+  process.env.VAPID_PRIVATE_KEY // Set in env vars
+);
 
 // === Auth Middleware ===
 async function checkAuth(req, res, next) {
@@ -207,6 +215,33 @@ app.get('/export-csv', checkAuth, async (req, res) => {
   res.set('Content-Type', 'text/csv');
   res.set('Content-Disposition', 'attachment; filename="pantrypal-inventory.csv"');
   res.send(csv);
+});
+
+// === SUBSCRIBE TO PUSH NOTIFICATIONS ===
+app.post('/subscribe', checkAuth, async (req, res) => {
+  const subscription = req.body;
+  await db.collection('users').doc(req.user.uid).update({ pushSub: subscription }, { merge: true });
+  res.json({ success: true });
+});
+
+// === CHECK EXPIRIES (Daily Cron) ===
+app.get('/check-expiries', async (req, res) => {
+  const users = await db.collection('users').get();
+  for (const userDoc of users.docs) {
+    const uid = userDoc.id;
+    const items = await db.collection('users').doc(uid).collection('items').get();
+    const expiring = items.docs
+      .map(d => d.data())
+      .filter(i => i.expiration && new Date(i.expiration) <= new Date(Date.now() + 86400000)); // 24h
+    if (expiring.length && userDoc.data().pushSub) {
+      webpush.sendNotification(userDoc.data().pushSub, JSON.stringify({
+        title: 'Item Expiring Soon!',
+        body: expiring.map(e => `${e.name || e.barcode} expires tomorrow`).join(', '),
+        icon: 'icon-192.png'
+      })).catch(err => console.error('Push failed:', err));
+    }
+  }
+  res.json({ ok: true });
 });
 
 // === SERVE PWA ===
