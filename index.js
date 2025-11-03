@@ -1,4 +1,4 @@
-// index.js – PantryPal AI + Firestore + PWA (Render + Firebase)
+// index.js – PantryPal AI + Firestore + PWA + Google Auth
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import bodyParser from 'body-parser';
@@ -11,41 +11,31 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 
-// ---- ES-module __dirname fix -------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ---- Express setup ---------------------------------------------------------
 const app = express();
-
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
-app.use(fileUpload({
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
-  abortOnLimit: true,
-}));
+app.use(fileUpload({ limits: { fileSize: 10 * 1024 * 1024 } }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ---- Firebase Admin: ENV VAR or FILE ---------------------------------------
+// === Firebase Admin: ENV or File ===
 let credential;
-
 try {
   if (process.env.FIREBASE_CREDENTIALS) {
-    // Use JSON string from Render environment variable
-    console.log('Using Firebase credentials from FIREBASE_CREDENTIALS env var');
     credential = cert(JSON.parse(process.env.FIREBASE_CREDENTIALS));
+    console.log('Using FIREBASE_CREDENTIALS env var');
   } else if (fs.existsSync('./credentials.json')) {
-    // Fallback to local file
-    console.log('Using Firebase credentials from ./credentials.json');
     credential = cert('./credentials.json');
+    console.log('Using ./credentials.json');
   } else {
-    throw new Error('No Firebase credentials found: Set FIREBASE_CREDENTIALS env var or include credentials.json');
+    throw new Error('No Firebase credentials');
   }
-
   initializeApp({ credential });
-  console.log('Firebase Admin initialized successfully');
+  console.log('Firebase Admin OK');
 } catch (err) {
-  console.error('Firebase Admin initialization failed:', err.message);
+  console.error('Firebase init failed:', err.message);
   process.exit(1);
 }
 
@@ -53,137 +43,118 @@ const auth = getAuth();
 const db = getFirestore();
 const visionClient = new vision.ImageAnnotatorClient();
 
-// ---- Auth middleware -------------------------------------------------------
+// === Auth Middleware ===
 async function checkAuth(req, res, next) {
   const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing Authorization Bearer token' });
-  }
-
-  const idToken = header.split('Bearer ')[1];
+  if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'No token' });
+  const token = header.split(' ')[1];
   try {
-    const decoded = await auth.verifyIdToken(idToken);
-    req.user = decoded;
+    req.user = await auth.verifyIdToken(token);
     next();
   } catch (e) {
-    console.error('Invalid Firebase ID token:', e.message);
-    return res.status(401).json({ error: 'Invalid token' });
+    res.status(401).json({ error: 'Invalid token' });
   }
 }
 
-// ---- /scan – AI receipt scan with Google Vision ----------------------------
+// === AI SCAN ===
 app.post('/scan', checkAuth, async (req, res) => {
-  if (!req.files?.image) {
-    return res.status(400).json({ error: 'No image uploaded' });
-  }
-
-  const imageBuffer = req.files.image.data;
-
+  if (!req.files?.image) return res.status(400).json({ error: 'No image' });
   try {
-    const [result] = await visionClient.textDetection({ image: { content: imageBuffer } });
-    const fullText = result.textAnnotations?.[0]?.description || '';
-    const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
+    const [result] = await visionClient.textDetection({ image: { content: req.files.image.data } });
+    const text = result.textAnnotations?.[0]?.description || '';
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const itemName = lines[0] || 'Unknown';
+    const exp = lines.find(l => /\d{4}-\d{2}-\d{2}/.test(l)) || '';
 
-    const itemName = lines[0] || 'Unknown Item';
-    const expirationDate = lines.find(l => /\d{4}-\d{2}-\d{2}/.test(l)) || '';
-
-    // Optional: auto-update item name in Firestore
     const barcode = req.body.barcode;
     if (barcode) {
-      const userId = req.user.uid;
-      const itemRef = db.collection('users').doc(userId).collection('items').doc(barcode);
-      const snap = await itemRef.get();
-      if (snap.exists) {
-        await itemRef.update({ name: itemName });
-        console.log(`[SCAN] Updated name for ${barcode} → "${itemName}"`);
-      }
+      const ref = db.collection('users').doc(req.user.uid).collection('items').doc(barcode);
+      const doc = await ref.get();
+      if (doc.exists) await ref.update({ name: itemName });
     }
 
-    res.json({
-      success: true,
-      record: { itemName, expirationDate, detectedText: fullText }
-    });
+    res.json({ success: true, record: { itemName, expirationDate: exp, detectedText: text } });
   } catch (err) {
-    console.error('Vision API error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ---- /add – add or increment item -----------------------------------------
+// === ADD TO INVENTORY (from Inventory tab) ===
 app.post('/add', checkAuth, async (req, res) => {
   const { barcode, quantity = 1, expiration = '', name } = req.body;
   const userId = req.user.uid;
+  if (!barcode) return res.status(400).json({ error: 'barcode required' });
 
-  if (!barcode) return res.status(400).json({ error: 'barcode is required' });
+  const ref = db.collection('users').doc(userId).collection('items').doc(barcode);
+  const doc = await ref.get();
 
-  try {
-    const itemRef = db.collection('users').doc(userId).collection('items').doc(barcode);
-    const doc = await itemRef.get();
-
-    if (doc.exists) {
-      await itemRef.update({
-        quantity: FieldValue.increment(parseInt(quantity)),
-        expiration: expiration || doc.data().expiration
-      });
-    } else {
-      await itemRef.set({
-        name: name || barcode,
-        quantity: parseInt(quantity),
-        expiration,
-        addedAt: FieldValue.serverTimestamp()
-      });
-    }
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Add item error:', err.message);
-    res.status(500).json({ error: err.message });
+  if (doc.exists) {
+    await ref.update({
+      quantity: FieldValue.increment(parseInt(quantity)),
+      expiration: expiration || doc.data().expiration
+    });
+  } else {
+    await ref.set({
+      name: name || barcode,
+      quantity: parseInt(quantity),
+      expiration,
+      addedAt: FieldValue.serverTimestamp()
+    });
   }
+  res.json({ success: true });
 });
 
-// ---- /inventory – get all user items --------------------------------------
-app.get('/inventory', checkAuth, async (req, res) => {
+// === ADD TO SHOPPING LIST ONLY (from Shopping tab) ===
+app.post('/add-to-shopping', checkAuth, async (req, res) => {
+  const { barcode, itemName, needed = 1 } = req.body;
   const userId = req.user.uid;
-  try {
-    const snapshot = await db.collection('users').doc(userId).collection('items').get();
-    const items = snapshot.docs.map(doc => ({
-      barcode: doc.id,
-      ...doc.data()
-    }));
-    res.json({ items });
-  } catch (err) {
-    console.error('Inventory fetch error:', err.message);
-    res.status(500).json({ error: err.message });
+  if (!barcode || !itemName) return res.status(400).json({ error: 'barcode and itemName required' });
+
+  const ref = db.collection('users').doc(userId).collection('shopping').doc(barcode);
+  const doc = await ref.get();
+
+  if (doc.exists) {
+    await ref.update({ needed: FieldValue.increment(parseInt(needed)) });
+  } else {
+    await ref.set({ itemName, needed: parseInt(needed), addedAt: FieldValue.serverTimestamp() });
   }
+  res.json({ success: true });
 });
 
-// ---- /remove – delete item ------------------------------------------------
+// === GET INVENTORY ===
+app.get('/inventory', checkAuth, async (req, res) => {
+  const snapshot = await db.collection('users').doc(req.user.uid).collection('items').get();
+  const items = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
+  res.json({ items });
+});
+
+// === GET SHOPPING LIST ===
+app.get('/shopping', checkAuth, async (req, res) => {
+  const snapshot = await db.collection('users').doc(req.user.uid).collection('shopping').get();
+  const list = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
+  res.json({ list });
+});
+
+// === REMOVE FROM INVENTORY ===
 app.post('/remove', checkAuth, async (req, res) => {
   const { barcode } = req.body;
-  const userId = req.user.uid;
-
-  if (!barcode) return res.status(400).json({ error: 'barcode is required' });
-
-  try {
-    await db.collection('users').doc(userId).collection('items').doc(barcode).delete();
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Remove item error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
+  await db.collection('users').doc(req.user.uid).collection('items').doc(barcode).delete();
+  res.json({ success: true });
 });
 
-// ---- Serve PWA (fallback to index.html) -----------------------------------
+// === REMOVE FROM SHOPPING ===
+app.post('/remove-from-shopping', checkAuth, async (req, res) => {
+  const { barcode } = req.body;
+  await db.collection('users').doc(req.user.uid).collection('shopping').doc(barcode).delete();
+  res.json({ success: true });
+});
+
+// === SERVE PWA ===
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ---- Start server ---------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('\nPantryPal AI + Firestore + PWA');
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
-  console.log('Vision AI: ENABLED');
-  console.log('Firestore: PER-USER');
-  console.log('PWA: READY');
-  console.log('Credentials: ENV VAR or ./credentials.json\n');
+  console.log(`PantryPal running on port ${PORT}`);
 });
