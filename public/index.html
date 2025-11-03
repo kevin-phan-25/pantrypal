@@ -11,13 +11,25 @@
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Heroicons (outline) -->
-  <script src="https://unpkg.com/heroicons@2.1.1/dist/heroicons.min.js"></script>
+  <!-- QuaggaJS for barcode scanning -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 
   <style>
     .icon { @apply w-5 h-5 inline-block; }
     .tab { @apply hidden; }
     .tab.active { @apply block; }
+    #scanner-container { position: relative; }
+    #scanner-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+    #scanner-overlay::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 80%; height: 60px;
+      border: 3px solid rgba(59, 130, 246, 0.8);
+      border-radius: 8px;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
@@ -44,7 +56,7 @@
     <p class="text-center text-xs text-gray-500 mt-3">Secure login required</p>
   </section>
 
-  <!-- Main App (hidden until signed in) -->
+  <!-- Main App -->
   <main id="app" class="hidden max-w-3xl mx-auto p-4 space-y-6">
 
     <!-- User Bar -->
@@ -95,7 +107,7 @@
     <!-- Inventory Tab -->
     <section id="inventory" class="tab active bg-white p-5 rounded-b-xl shadow">
       <h3 class="text-lg font-semibold mb-3">Add to Inventory</h3>
-      <input type="text" id="invBarcode" placeholder="Barcode (e.g. 049000049100)"
+      <input type="text" id="invBarcode" placeholder="Barcode (auto-filled from scan)"
              class="w-full p-3 border border-gray-300 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
       <div class="grid grid-cols-2 gap-2">
         <input type="number" id="invQty" value="1" min="1"
@@ -132,7 +144,7 @@
 
   </main>
 
-  <!-- Firebase SDK (compat) -->
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
@@ -157,9 +169,12 @@
     <symbol id="heroicons-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M12 4v16m8-8H4"/>
     </symbol>
+    <symbol id="heroicons-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M6 18L18 6M6 6l12 12"/>
+    </symbol>
   </svg>
 
-  <!-- Main App Logic + Camera Scanner -->
+  <!-- Main App Logic + Barcode Scanner -->
   <script>
     // ==== Firebase Config ====
     const firebaseConfig = {
@@ -222,7 +237,7 @@
       };
     });
 
-    // ==== Inventory ====
+    // ==== Inventory & Shopping (unchanged) ====
     document.getElementById('addToInventory').onclick = async () => {
       const barcode = document.getElementById('invBarcode').value.trim();
       const qty = parseInt(document.getElementById('invQty').value);
@@ -261,7 +276,6 @@
       }
     };
 
-    // ==== Shopping ====
     document.getElementById('addToShopping').onclick = async () => {
       const barcode = document.getElementById('shopBarcode').value.trim();
       const name = document.getElementById('shopName').value.trim();
@@ -304,7 +318,7 @@
       }
     };
 
-    // ==== AI Scan (File Upload) ====
+    // ==== AI Scan (File) ====
     document.getElementById('scanBtn').onclick = async () => {
       const file = document.getElementById('scanImage').files[0];
       if (!file) return alert('Choose an image');
@@ -325,39 +339,72 @@
       }
     };
 
-    // ==== CAMERA SCANNER (LIVE CAPTURE) ====
+    // ==== CAMERA + BARCODE AUTO-DETECTION ====
     document.getElementById('startScanner').onclick = async () => {
-      let stream;
+      let stream, video, canvas, quaggaInitialized = false;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       } catch (err) {
-        return alert('Camera access denied or not available');
+        return alert('Camera access denied');
       }
-
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      video.play();
 
       const modal = document.createElement('div');
       modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
       modal.innerHTML = `
         <div class="relative bg-white rounded-xl w-full max-w-lg overflow-hidden">
-          <button class="absolute top-3 right-3 text-gray-600 z-10 bg-white rounded-full p-1 shadow" onclick="this.closest('[role=dialog]').remove();">
+          <button class="absolute top-3 right-3 text-gray-600 z-10 bg-white rounded-full p-1 shadow" onclick="closeScanner()">
             <svg class="w-5 h-5"><use href="#heroicons-x"/></svg>
           </button>
-          <video class="w-full h-96 object-cover" autoplay playsinline></video>
-          <div class="p-4">
+          <div id="scanner-container" class="relative">
+            <video id="scanner-video" class="w-full h-96 object-cover" autoplay playsinline></video>
+            <div id="scanner-overlay"></div>
+          </div>
+          <div class="p-4 space-y-3">
+            <div id="barcode-result" class="text-center font-mono text-lg font-bold text-green-600 hidden"></div>
             <button id="captureBtn" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition">
               <svg class="icon"><use href="#heroicons-camera"/></svg>
               Capture Photo
             </button>
           </div>
         </div>`;
-      modal.querySelector('video').srcObject = stream;
       document.body.appendChild(modal);
 
-      modal.querySelector('#captureBtn').onclick = () => {
-        const canvas = document.createElement('canvas');
+      video = modal.querySelector('#scanner-video');
+      video.srcObject = stream;
+      video.play();
+
+      // Start QuaggaJS
+      Quagga.init({
+        inputStream: { name: "Live", type: "LiveStream", target: video },
+        decoder: { readers: ["ean_reader", "upc_reader", "code_128_reader"] },
+        locate: true,
+        numOfWorkers: 2,
+        locator: { patchSize: "medium", halfSample: true }
+      }, err => {
+        if (err) { console.error(err); return; }
+        Quagga.start();
+        quaggaInitialized = true;
+      });
+
+      Quagga.onDetected(data => {
+        const code = data.codeResult.code;
+        if (code && code.length >= 8) {
+          document.getElementById('barcode-result').textContent = code;
+          document.getElementById('barcode-result').classList.remove('hidden');
+          setTimeout(() => captureAndScan(code), 800);
+        }
+      });
+
+      modal.querySelector('#captureBtn').onclick = () => captureAndScan();
+
+      window.closeScanner = () => {
+        if (quaggaInitialized) Quagga.stop();
+        modal.remove();
+        stream.getTracks().forEach(t => t.stop());
+      };
+
+      async function captureAndScan(detectedBarcode = null) {
+        canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
@@ -369,6 +416,7 @@
             headers: { 'Authorization': `Bearer ${idToken}` },
             body: form
           }).then(r => r.json());
+
           const resultDiv = document.getElementById('scanResult');
           const textDiv = document.getElementById('scanText');
           if (res.success) {
@@ -377,16 +425,17 @@
           } else {
             alert('Scan failed: ' + (res.error || 'Unknown'));
           }
-          modal.remove();
-          stream.getTracks().forEach(t => t.stop());
-        }, 'image/jpeg', 0.9);
-      };
-    };
 
-    // Add X icon for modal close
-    const xIcon = document.createElement('svg');
-    xIcon.innerHTML = `<symbol id="heroicons-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></symbol>`;
-    document.querySelector('svg.hidden').appendChild(xIcon.firstChild);
+          closeScanner();
+
+          // Auto-fill barcode in inventory
+          if (detectedBarcode) {
+            document.getElementById('invBarcode').value = detectedBarcode;
+            document.querySelector('[data-tab="inventory"]').click();
+          }
+        }, 'image/jpeg', 0.9);
+      }
+    };
   </script>
 </body>
 </html>
