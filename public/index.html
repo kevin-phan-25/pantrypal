@@ -1,186 +1,208 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PantryPal</title>
-  <meta name="theme-color" content="#007bff">
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icon-192.png">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" href="icon-192.png"/>
+  <meta name="theme-color" content="#007bff"/>
   <style>
-    body { font-family: Arial; margin: 0; background: #f4f6f9; }
-    .header { background: #007bff; color: white; padding: 15px; text-align: center; }
-    .container { max-width: 1000px; margin: 20px auto; padding: 20px; }
-    .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-    .tab { padding: 10px 20px; background: #e9ecef; border-radius: 8px 8px 0 0; cursor: pointer; }
-    .tab.active { background: white; font-weight: bold; }
-    .stats { display: flex; gap: 15px; flex-wrap: wrap; }
-    .stat { flex: 1; min-width: 120px; text-align: center; padding: 10px; border-radius: 8px; color: white; }
-    .low { background: #ffc107; }
-    .expiring { background: #fd7e14; }
-    .expired { background: #dc3545; }
-    .good { background: #28a745; }
-    input, button { padding: 10px; margin: 5px; font-size: 16px; }
-    button { background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    body { font-family: Arial; margin: 0; background: #f4f4f4; }
+    header { background: #007bff; color: white; padding: 1rem; text-align: center; }
+    .container { max-width: 600px; margin: 2rem auto; padding: 1rem; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    button { background: #007bff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
     button:hover { background: #0056b3; }
-    .auth-box { position: fixed; top: 10px; right: 10px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 14px; z-index: 1000; }
-    .auth-box button { font-size: 12px; padding: 5px 10px; margin-left: 5px; }
-    #video { display: none; width: 100%; max-width: 400px; border: 2px solid #007bff; border-radius: 10px; margin: 10px auto; }
+    input, select { padding: 0.5rem; margin: 0.5rem 0; border: 1px solid #ccc; border-radius: 4px; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+    .nav { display: flex; gap: 1rem; margin: 1rem 0; }
+    .nav button { background: #eee; color: #333; }
+    .nav button.active { background: #007bff; color: white; }
+    #auth-section { text-align: center; margin: 2rem; }
+    .hidden { display: none; }
   </style>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
-  <div id="auth-box" class="auth-box"><div id="auth-status">Loading...</div></div>
-  <div class="header"><h1>PantryPal</h1><p>Smart Pantry with OFF + Recipes + Shopping</p></div>
-  <div class="container">
-    <div class="scanner">
-      <video id="video"></video><br><br>
-      <button id="start">Start Scanner</button>
-      <button id="stop" style="display:none;">Stop</button>
-    </div>
+  <header>
+    <h1>PantryPal</h1>
+    <p>Smart Pantry with OFF + Recipes + Shopping</p>
+  </header>
 
-    <div class="card">
-      <h3>AI Scan Product</h3>
-      <input type="file" id="scan-image" accept="image/*">
-      <button onclick="scanImage()">Scan with AI</button>
-      <div id="scan-result" style="margin-top:10px;"></div>
-      <div style="margin-top:15px; padding:10px; background:#e9f7ef; border-radius:8px;">
-        <strong>AI SCAN TEST</strong><br>
-        <button onclick="testAIScan()" style="background:#28a745; margin-top:5px;">Test with Sample</button>
+  <div id="auth-section">
+    <button id="signInBtn">Sign in with Google</button>
+    <p id="userEmail"></p>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="container">
+      <button id="startScanner">Start Scanner</button>
+
+      <div class="container" style="margin-top:1rem;">
+        <h3>AI Scan Product</h3>
+        <input type="file" id="scanImage" accept="image/*"/>
+        <button id="scanBtn">Scan with AI</button>
+        <div id="scanResult"></div>
       </div>
-    </div>
 
-    <div class="tabs">
-      <div class="tab active" onclick="showTab('inventory')">Inventory</div>
-      <div class="tab" onclick="showTab('shopping')">Shopping List</div>
-    </div>
-
-    <div class="card">
-      <h2>Manual Add</h2>
-      <input type="text" id="barcode" placeholder="Barcode">
-      <input type="number" id="qty" value="1" min="1" style="width:70px;">
-      <input type="date" id="expires">
-      <button onclick="addItem()">Add Item</button>
-    </div>
-
-    <div id="inventory-tab">
-      <div class="card">
-        <h2>Inventory</h2>
-        <div id="inventory"></div>
+      <div class="nav">
+        <button class="tab-btn active" data-tab="inventory">Inventory</button>
+        <button class="tab-btn" data-tab="shopping">Shopping List</button>
       </div>
-    </div>
 
-    <div id="shopping-tab" style="display:none;">
-      <div class="card"><h2>Shopping List</h2><div id="shopping-list"></div></div>
+      <!-- INVENTORY TAB -->
+      <div id="inventory" class="tab active">
+        <h3>Manual Add</h3>
+        <input type="text" id="invBarcode" placeholder="Barcode"/>
+        <input type="number" id="invQty" value="1" min="1"/>
+        <input type="date" id="invExp"/>
+        <button id="addToInventory">Add Item</button>
+        <div id="inventoryList"></div>
+      </div>
+
+      <!-- SHOPPING TAB -->
+      <div id="shopping" class="tab">
+        <h3>Add to Shopping List</h3>
+        <input type="text" id="shopBarcode" placeholder="Barcode"/>
+        <input type="text" id="shopName" placeholder="Item Name"/>
+        <input type="number" id="shopNeeded" value="1" min="1"/>
+        <button id="addToShopping">Add to List</button>
+        <div id="shoppingList"></div>
+      </div>
     </div>
   </div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
   <script>
-    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386", measurementId: "G-P641JW4KS4" };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-
-    const authBox = document.getElementById('auth-status');
-    function updateAuthUI(user) {
-      authBox.innerHTML = user ? `<strong>${user.displayName || user.email}</strong><br><button onclick="signOutUser()">Sign Out</button>` : `<button onclick="signInWithGoogle()">Sign in with Google</button>`;
-    }
-    window.signInWithGoogle = () => { const p = new firebase.auth.GoogleAuthProvider(); auth.signInWithPopup(p).catch(e=>alert(e.message)); };
-    window.signOutUser = () => auth.signOut().then(()=>location.reload());
-    auth.onAuthStateChanged(u => { updateAuthUI(u); if(u) loadInventory(); });
-    window.getAuthToken = async () => auth.currentUser ? await auth.currentUser.getIdToken() : null;
-    async function authFetch(url, opt={}) { const t = await window.getAuthToken(); const h = { 'Content-Type':'application/json', ...(t?{'Authorization':`Bearer ${t}`}:{}) }; return fetch(url, {...opt, headers:h}); }
-
-    let scanner = null;
-    const video = document.getElementById('video');
-    const startBtn = document.getElementById('start');
-    const stopBtn = document.getElementById('stop');
-
-    startBtn.onclick = async () => {
-      if(scanner) return;
-      try {
-        video.style.display = 'block'; startBtn.disabled = true; startBtn.textContent = 'Starting...';
-        scanner = new Html5Qrcode("video");
-        await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } },
-          async (text) => { const qty = prompt("Qty?", "1")||1; const exp = prompt("Exp (YYYY-MM-DD)", "")||""; await logItem(text, qty, exp); stopScanner(); },
-          () => {}
-        );
-        startBtn.style.display = 'none'; stopBtn.style.display = 'inline'; startBtn.disabled = false; startBtn.textContent = 'Start Scanner';
-      } catch(e) { alert("Camera failed. Use phone."); startBtn.disabled = false; startBtn.textContent = 'Start Scanner'; }
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "pantrypal-477010.firebaseapp.com",
+      projectId: "pantrypal-477010",
+      storageBucket: "pantrypal-477010.firebasestorage.app",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
     };
-    stopBtn.onclick = () => { if(scanner) scanner.stop().then(()=>{scanner=null;video.style.display='none';startBtn.style.display='inline';stopBtn.style.display='none;}); };
+    firebase.initializeApp(firebaseConfig);
 
-    // === AI SCAN WITH NAME UPDATE ===
-    async function scanImage() {
-      const file = document.getElementById('scan-image').files[0];
-      if(!file) return alert('Select image');
-      const barcode = document.getElementById('barcode').value.trim() || prompt("Barcode?", "");
-      const formData = new FormData(); formData.append('image', file); if(barcode) formData.append('barcode', barcode);
-      const token = await window.getAuthToken();
-      try {
-        const res = await fetch('/scan', { method:'POST', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, body: formData });
-        const data = await res.json();
-        const r = document.getElementById('scan-result');
-        if(data.success) {
-          r.innerHTML = `<p><strong>Name:</strong> ${data.record.itemName}</p><p><strong>Exp:</strong> ${data.record.expirationDate||'N/A'}</p><button onclick='logItem("${barcode||data.record.itemName}",1,"${data.record.expirationDate||''}","${data.record.itemName}")'>Add</button>`;
-        } else r.innerHTML = `<p style="color:red;">${data.error}</p>`;
-      } catch(e) { alert(e.message); }
+    let currentUser = null;
+    let idToken = null;
+
+    // === Google Sign-In ===
+    document.getElementById('signInBtn').onclick = () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      firebase.auth().signInWithPopup(provider);
+    };
+
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        currentUser = user;
+        idToken = await user.getIdToken();
+        document.getElementById('userEmail').textContent = user.email;
+        document.getElementById('auth-section').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        loadInventory();
+        loadShopping();
+      } else {
+        document.getElementById('auth-section').classList.remove('hidden');
+        document.getElementById('app').classList.add('hidden');
+      }
+    });
+
+    // === API Helper ===
+    async function api(path, opts = {}) {
+      return fetch(path, {
+        ...opts,
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+          ...opts.headers
+        }
+      }).then(r => r.json());
     }
 
-    async function testAIScan() {
-      const url = 'https://i.imgur.com/8vM3K8P.jpeg';
-      const res = await fetch(url); const blob = await res.blob(); const file = new File([blob], "test.jpg", {type:"image/jpeg"});
-      const formData = new FormData(); formData.append('image', file); formData.append('barcode', '12345');
-      const token = await window.getAuthToken();
-      const scanRes = await fetch('/scan', { method:'POST', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, body: formData });
-      const data = await scanRes.json();
-      const r = document.getElementById('scan-result');
-      r.innerHTML = data.success ? `<p><strong>TEST OK:</strong> ${data.record.itemName}</p><img src="${url}" style="max-width:200px;">` : `<p style="color:red;">${data.error}</p>`;
-    }
+    // === Tabs ===
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      };
+    });
 
-    async function addItem() {
-      const b = document.getElementById('barcode').value.trim();
-      const q = document.getElementById('qty').value;
-      const e = document.getElementById('expires').value;
-      if(!b) return alert('Enter barcode');
-      await logItem(b, q, e);
-      document.getElementById('barcode').value=''; document.getElementById('qty').value='1'; document.getElementById('expires').value='';
-    }
-
-    async function logItem(barcode, qty=1, exp='', name='') {
-      await authFetch('/add', { method:'POST', body:JSON.stringify({barcode, quantity:qty, expiration:exp, name}) });
+    // === Add to Inventory ===
+    document.getElementById('addToInventory').onclick = async () => {
+      const barcode = document.getElementById('invBarcode').value.trim();
+      const qty = document.getElementById('invQty').value;
+      const exp = document.getElementById('invExp').value;
+      if (!barcode) return alert('Enter barcode');
+      await api('/add', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
       loadInventory();
-    }
+    };
 
+    // === Add to Shopping ===
+    document.getElementById('addToShopping').onclick = async () => {
+      const barcode = document.getElementById('shopBarcode').value.trim();
+      const name = document.getElementById('shopName').value.trim();
+      const needed = document.getElementById('shopNeeded').value;
+      if (!barcode || !name) return alert('Fill barcode and name');
+      await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ barcode, itemName: name, needed }) });
+      loadShopping();
+    };
+
+    // === Load Inventory ===
     async function loadInventory() {
-      const res = await authFetch('/inventory');
-      if(!res.ok) { document.getElementById('inventory').innerHTML='<p>Sign in</p>'; return; }
-      const {items} = await res.json();
-      const c = document.getElementById('inventory'); c.innerHTML='';
-      if(items.length===0) { c.innerHTML='<p>No items. Scan one!</p>'; return; }
-      items.forEach(i => {
-        const d = document.createElement('div'); d.style='padding:10px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;';
-        d.innerHTML = `<div><strong>${i.name||i.barcode}</strong> | Qty: <strong>${i.quantity}</strong> | Exp: <strong>${i.expiration||'N/A'}</strong></div>`;
-        const b = document.createElement('button'); b.textContent='Remove'; b.style='background:#dc3545;font-size:12px;padding:5px 10px;';
-        b.onclick = () => authFetch('/remove', {method:'POST', body:JSON.stringify({barcode:i.barcode})}).then(loadInventory);
-        d.appendChild(b); c.appendChild(d);
-      });
+      const data = await api('/inventory');
+      const list = document.getElementById('inventoryList');
+      list.innerHTML = data.items.map(i => `
+        <div style="padding:0.5rem;border-bottom:1px solid #eee;">
+          <strong>${i.name || i.barcode}</strong> — Qty: ${i.quantity}
+          ${i.expiration ? `| Exp: ${i.expiration}` : ''}
+          <button onclick="removeItem('${i.barcode}')">Remove</button>
+        </div>
+      `).join('');
     }
 
-    function showTab(t) {
-      document.getElementById('inventory-tab').style.display = t==='inventory'?'block':'none';
-      document.getElementById('shopping-tab').style.display = t==='shopping'?'block':'none';
-      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-      document.querySelector(`.tab[onclick="showTab('${t}')"]`).classList.add('active');
+    // === Load Shopping ===
+    async function loadShopping() {
+      const data = await api('/shopping');
+      const list = document.getElementById('shoppingList');
+      list.innerHTML = data.list.map(i => `
+        <div style="padding:0.5rem;border-bottom:1px solid #eee;">
+          <strong>${i.itemName}</strong> — Need: ${i.needed}
+          <button onclick="removeFromShopping('${i.barcode}')">Remove</button>
+        </div>
+      `).join('');
     }
 
-    if('serviceWorker' in navigator) window.addEventListener('load', ()=>navigator.serviceWorker.register('/sw.js'));
-    const ob = document.createElement('div'); ob.id='offline'; ob.style.cssText='background:#ffc107;color:black;padding:10px;text-align:center;font-weight:bold;display:none;position:fixed;top:0;width:100%;z-index:1000;';
-    ob.textContent='Offline — Data will sync when back online'; document.body.prepend(ob);
-    window.addEventListener('online', ()=>ob.style.display='none'); window.addEventListener('offline', ()=>ob.style.display='block');
+    window.removeItem = async (barcode) => {
+      await api('/remove', { method: 'POST', body: JSON.stringify({ barcode }) });
+      loadInventory();
+    };
+
+    window.removeFromShopping = async (barcode) => {
+      await api('/remove-from-shopping', { method: 'POST', body: JSON.stringify({ barcode }) });
+      loadShopping();
+    };
+
+    // === AI Scan ===
+    document.getElementById('scanBtn').onclick = async () => {
+      const file = document.getElementById('scanImage').files[0];
+      if (!file) return alert('Choose image');
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch('/scan', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` },
+        body: form
+      }).then(r => r.json());
+      document.getElementById('scanResult').innerHTML = `
+        <pre>${JSON.stringify(res.record, null, 2)}</pre>
+      `;
+    };
   </script>
 </body>
 </html>
