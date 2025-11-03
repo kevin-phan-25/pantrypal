@@ -5,6 +5,7 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import vision from '@google-cloud/vision';
+import admin from 'firebase-admin';  
 import cors from 'cors';
 
 const app = express();
