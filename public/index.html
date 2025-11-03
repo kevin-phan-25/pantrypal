@@ -8,20 +8,19 @@
   <link rel="icon" href="icon-192.png"/>
   <meta name="theme-color" content="#3b82f6"/>
 
-  <!-- Tailwind CSS -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- QuaggaJS (Barcode: EAN, UPC, Code128) -->
+  <!-- QuaggaJS (Barcode) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 
-  <!-- ZXing Browser (QR Code + All Barcodes) -->
+  <!-- ZXing (QR + Barcode) -->
   <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
 
   <style>
     .icon { @apply w-5 h-5 inline-block; }
     .tab { @apply hidden; }
     .tab.active { @apply block; }
-    #scanner-container { position: relative; }
     #scanner-overlay::after {
       content: '';
       position: absolute;
@@ -33,6 +32,8 @@
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
       pointer-events: none;
     }
+    .pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
@@ -44,7 +45,7 @@
         <svg class="icon"><use href="#heroicons-home"/></svg>
         PantryPal
       </h1>
-      <p class="text-sm opacity-90">AI Scan • QR • Barcode • Inventory</p>
+      <p class="text-sm opacity-90">Voice • QR • Barcode • AI Scan</p>
     </div>
   </header>
 
@@ -77,6 +78,21 @@
       Start Scanner (QR + Barcode)
     </button>
 
+    <!-- Voice Search Button (Shopping List) -->
+    <div class="bg-white p-5 rounded-xl shadow">
+      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+        <svg class="icon"><use href="#heroicons-microphone"/></svg>
+        Voice Product Search
+      </h3>
+      <p class="text-sm text-gray-600 mb-3">Hold mic and say: <em>"Add two cans of Coke"</em></p>
+      <button id="voiceSearchBtn"
+              class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition">
+        <svg class="icon"><use href="#heroicons-microphone"/></svg>
+        <span>Hold to Speak</span>
+      </button>
+      <div id="voiceResult" class="mt-3 text-center text-sm text-green-600 hidden"></div>
+    </div>
+
     <!-- AI Scan Card -->
     <section class="bg-white p-5 rounded-xl shadow">
       <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -90,7 +106,6 @@
         <svg class="icon"><use href="#heroicons-magnifying-glass"/></svg>
         Scan with AI
       </button>
-
       <div id="scanResult" class="mt-4 p-4 bg-gray-50 rounded-lg hidden">
         <pre id="scanText" class="text-xs overflow-x-auto"></pre>
       </div>
@@ -123,7 +138,8 @@
     <section id="shopping" class="tab bg-white p-5 rounded-b-xl shadow">
       <h3 class="text-lg font-semibold mb-3">Add to Shopping List</h3>
       <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-      <input type="text" id="shopName" placeholder="Item Name (e.g. Coke)" class="w-full p-3 border border-gray-300 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <input type="text" id="shopName" placeholder="Item Name (auto-filled by voice)"
+             class="w-full p-3 border border-gray-300 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
       <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
       <button id="addToShopping"
               class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
@@ -148,9 +164,10 @@
     <symbol id="heroicons-magnifying-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></symbol>
     <symbol id="heroicons-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></symbol>
     <symbol id="heroicons-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></symbol>
+    <symbol id="heroicons-microphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8a1 1 0 01-1-1v-1a5 5 0 1110 0v1a1 1 0 01-1 1h-4"/></symbol>
   </svg>
 
-  <!-- App Logic + QR + Barcode Scanner -->
+  <!-- App Logic + Voice + QR + Barcode -->
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
@@ -164,6 +181,7 @@
     firebase.initializeApp(firebaseConfig);
     let currentUser = null;
     let idToken = null;
+    let recognition = null;
 
     // ==== Auth ====
     document.getElementById('signInBtn').onclick = () => {
@@ -207,7 +225,7 @@
       };
     });
 
-    // ==== Inventory & Shopping (unchanged) ====
+    // ==== Inventory & Shopping ====
     document.getElementById('addToInventory').onclick = async () => {
       const barcode = document.getElementById('invBarcode').value.trim();
       const qty = parseInt(document.getElementById('invQty').value);
@@ -262,6 +280,71 @@
       else alert('Scan failed: ' + (res.error || 'Unknown'));
     };
 
+    // ==== VOICE SEARCH ====
+    const voiceBtn = document.getElementById('voiceSearchBtn');
+    const voiceResult = document.getElementById('voiceResult');
+
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      let isRecording = false;
+
+      voiceBtn.addEventListener('mousedown', () => startVoice());
+      voiceBtn.addEventListener('touchstart', e => { e.preventDefault(); startVoice(); });
+      voiceBtn.addEventListener('mouseup', () => stopVoice());
+      voiceBtn.addEventListener('touchend', () => stopVoice());
+
+      function startVoice() {
+        if (isRecording) return;
+        isRecording = true;
+        voiceBtn.classList.add('pulse', 'bg-red-600');
+        voiceBtn.querySelector('span').textContent = 'Listening...';
+        voiceResult.classList.add('hidden');
+        recognition.start();
+      }
+
+      function stopVoice() {
+        if (!isRecording) return;
+        isRecording = false;
+        voiceBtn.classList.remove('pulse', 'bg-red-600');
+        voiceBtn.querySelector('span').textContent = 'Hold to Speak';
+        recognition.stop();
+      }
+
+      recognition.onresult = event => {
+        const transcript = event.results[0][0].transcript.trim();
+        voiceResult.textContent = `"${transcript}"`;
+        voiceResult.classList.remove('hidden');
+
+        // Parse: "Add 2 Coke", "I need milk", "Coca Cola"
+        const match = transcript.toLowerCase().match(/(add|need|want|get)?\s*(\d+)?\s*(.+)/i);
+        if (match) {
+          const qty = match[2] ? parseInt(match[2]) : 1;
+          const name = match[3].trim();
+
+          document.getElementById('shopName').value = name;
+          document.getElementById('shopNeeded').value = qty;
+          document.querySelector('[data-tab="shopping"]').click();
+          setTimeout(() => document.getElementById('addToShopping').click(), 500);
+        }
+      };
+
+      recognition.onerror = () => {
+        voiceResult.textContent = 'Voice error. Try again.';
+        voiceResult.classList.remove('hidden');
+        stopVoice();
+      };
+
+      recognition.onend = stopVoice;
+    } else {
+      voiceBtn.disabled = true;
+      voiceBtn.innerHTML = '<svg class="icon"><use href="#heroicons-x"/></svg> Voice Not Supported';
+    }
+
     // ==== CAMERA + QR + BARCODE SCANNER ====
     document.getElementById('startScanner').onclick = async () => {
       let stream, video, canvas, codeReader, quaggaRunning = false;
@@ -293,7 +376,6 @@
       video.srcObject = stream;
       video.play();
 
-      // === ZXing: QR + All Barcodes ===
       codeReader = new ZXing.BrowserMultiFormatReader();
       codeReader.decodeFromVideoDevice(undefined, video, (result, err) => {
         if (result) {
@@ -304,14 +386,11 @@
         }
       }, { delay: 300 });
 
-      // === QuaggaJS: Legacy Barcode Fallback ===
       Quagga.init({
         inputStream: { name: "Live", type: "LiveStream", target: video },
         decoder: { readers: ["ean_reader", "upc_reader", "code_128_reader"] },
         locate: true
-      }, err => {
-        if (!err) { Quagga.start(); quaggaRunning = true; }
-      });
+      }, err => { if (!err) { Quagga.start(); quaggaRunning = true; } });
 
       Quagga.onDetected(data => {
         const code = data.codeResult.code;
