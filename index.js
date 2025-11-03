@@ -13,14 +13,14 @@ import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const app = express();
+
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(fileUpload({ limits: { fileSize: 10 * 1024 * 1024 } }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// === Firebase Admin: ENV or File ===
+// === Firebase Admin ===
 let credential;
 try {
   if (process.env.FIREBASE_CREDENTIALS) {
@@ -50,6 +50,11 @@ async function checkAuth(req, res, next) {
   const token = header.split(' ')[1];
   try {
     req.user = await auth.verifyIdToken(token);
+    const userRef = db.collection('users').doc(req.user.uid);
+    const doc = await userRef.get();
+    if (!doc.exists) {
+      await userRef.set({ scans: 0, isPro: false, createdAt: FieldValue.serverTimestamp() });
+    }
     next();
   } catch (e) {
     res.status(401).json({ error: 'Invalid token' });
@@ -65,29 +70,25 @@ app.post('/scan', checkAuth, async (req, res) => {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const itemName = lines[0] || 'Unknown';
     const exp = lines.find(l => /\d{4}-\d{2}-\d{2}/.test(l)) || '';
-
     const barcode = req.body.barcode;
     if (barcode) {
       const ref = db.collection('users').doc(req.user.uid).collection('items').doc(barcode);
       const doc = await ref.get();
       if (doc.exists) await ref.update({ name: itemName });
     }
-
     res.json({ success: true, record: { itemName, expirationDate: exp, detectedText: text } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// === ADD TO INVENTORY (from Inventory tab) ===
+// === ADD TO INVENTORY ===
 app.post('/add', checkAuth, async (req, res) => {
   const { barcode, quantity = 1, expiration = '', name } = req.body;
   const userId = req.user.uid;
   if (!barcode) return res.status(400).json({ error: 'barcode required' });
-
   const ref = db.collection('users').doc(userId).collection('items').doc(barcode);
   const doc = await ref.get();
-
   if (doc.exists) {
     await ref.update({
       quantity: FieldValue.increment(parseInt(quantity)),
@@ -104,15 +105,13 @@ app.post('/add', checkAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-// === ADD TO SHOPPING LIST ONLY (from Shopping tab) ===
+// === ADD TO SHOPPING LIST ===
 app.post('/add-to-shopping', checkAuth, async (req, res) => {
   const { barcode, itemName, needed = 1 } = req.body;
   const userId = req.user.uid;
   if (!barcode || !itemName) return res.status(400).json({ error: 'barcode and itemName required' });
-
   const ref = db.collection('users').doc(userId).collection('shopping').doc(barcode);
   const doc = await ref.get();
-
   if (doc.exists) {
     await ref.update({ needed: FieldValue.increment(parseInt(needed)) });
   } else {
@@ -147,6 +146,67 @@ app.post('/remove-from-shopping', checkAuth, async (req, res) => {
   const { barcode } = req.body;
   await db.collection('users').doc(req.user.uid).collection('shopping').doc(barcode).delete();
   res.json({ success: true });
+});
+
+// === PRODUCT INFO (Open Food Facts) ===
+app.get('/product-info/:barcode', checkAuth, async (req, res) => {
+  const { barcode } = req.params;
+  try {
+    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const data = await response.json();
+    if (data.status === 1) {
+      const p = data.product;
+      res.json({
+        name: p.product_name || p.generic_name || barcode,
+        image: p.image_front_thumb_url || p.image_small_url || null
+      });
+    } else {
+      res.json({ name: barcode, image: null });
+    }
+  } catch (err) {
+    console.error('OFF API error:', err);
+    res.json({ name: barcode, image: null });
+  }
+});
+
+// === USER INFO (scan count + pro status) ===
+app.get('/user-info', checkAuth, async (req, res) => {
+  const snap = await db.collection('users').doc(req.user.uid).get();
+  const data = snap.data();
+  res.json({ scans: data.scans || 0, isPro: !!data.isPro });
+});
+
+// === RECORD SCAN (free limit 10) ===
+app.post('/record-scan', checkAuth, async (req, res) => {
+  const userRef = db.collection('users').doc(req.user.uid);
+  const snap = await userRef.get();
+  const data = snap.data();
+
+  if (data.isPro) {
+    return res.json({ allowed: true });
+  }
+
+  const newCount = (data.scans || 0) + 1;
+  if (newCount > 10) {
+    return res.json({ allowed: false, message: 'Free limit reached (10 scans). Upgrade to Pro!' });
+  }
+
+  await userRef.update({ scans: newCount });
+  res.json({ allowed: true });
+});
+
+// === EXPORT INVENTORY CSV ===
+app.get('/export-csv', checkAuth, async (req, res) => {
+  const snapshot = await db.collection('users').doc(req.user.uid).collection('items').get();
+  const items = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
+  const csv = [
+    ['Barcode', 'Name', 'Quantity', 'Expiration'],
+    ...items.map(i => [i.barcode, i.name || i.barcode, i.quantity, i.expiration || ''])
+  ].map(row => row.join(',')).join('\n');
+
+  res.set('Content-Type', 'text/csv');
+  res.set('Content-Disposition', 'attachment; filename="pantrypal-inventory.csv"');
+  res.send(csv);
 });
 
 // === SERVE PWA ===
