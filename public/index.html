@@ -7,16 +7,12 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="icon" href="icon-192.png"/>
   <meta name="theme-color" content="#3b82f6"/>
-
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-
   <!-- QuaggaJS (Barcode) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
-
   <!-- ZXing (QR + All Barcodes) -->
   <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
-
   <style>
     .icon { @apply w-5 h-5 inline-block; }
     .tab { @apply hidden; }
@@ -37,7 +33,6 @@
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
-
   <!-- Header -->
   <header class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 shadow-md">
     <div class="max-w-3xl mx-auto px-4 text-center">
@@ -48,7 +43,6 @@
       <p class="text-sm opacity-90">Voice • QR • Barcode • AI Scan</p>
     </div>
   </header>
-
   <!-- Auth Section -->
   <section id="auth-section" class="max-w-md mx-auto mt-12 p-6 bg-white rounded-xl shadow-lg">
     <h2 class="text-xl font-semibold text-center mb-4">Welcome!</h2>
@@ -59,10 +53,8 @@
     </button>
     <p class="text-center text-xs text-gray-500 mt-3">Secure login required</p>
   </section>
-
   <!-- Main App -->
   <main id="app" class="hidden max-w-3xl mx-auto p-4 space-y-6">
-
     <!-- User Bar -->
     <div class="flex justify-between items-center bg-white p-3 rounded-lg shadow">
       <p class="font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
@@ -70,14 +62,12 @@
         Sign Out
       </button>
     </div>
-
     <!-- Scanner Button -->
     <button id="startScanner"
             class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md">
       <svg class="icon"><use href="#heroicons-camera"/></svg>
       Start Scanner (QR + Barcode)
     </button>
-
     <!-- Voice Command Center -->
     <div class="bg-white p-5 rounded-xl shadow">
       <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -98,7 +88,6 @@
       </button>
       <div id="voiceResult" class="mt-3 text-center text-sm text-green-600 hidden"></div>
     </div>
-
     <!-- AI Scan Card -->
     <section class="bg-white p-5 rounded-xl shadow">
       <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -116,13 +105,11 @@
         <pre id="scanText" class="text-xs overflow-x-auto"></pre>
       </div>
     </section>
-
     <!-- Tabs -->
     <div class="flex border-b border-gray-200 bg-white rounded-t-lg overflow-hidden">
       <button class="tab-btn flex-1 py-3 font-medium text-center transition active" data-tab="inventory">Inventory</button>
       <button class="tab-btn flex-1 py-3 font-medium text-center transition" data-tab="shopping">Shopping List</button>
     </div>
-
     <!-- Inventory Tab -->
     <section id="inventory" class="tab active bg-white p-5 rounded-b-xl shadow">
       <h3 class="text-lg font-semibold mb-3">Add to Inventory</h3>
@@ -139,7 +126,6 @@
       </button>
       <div id="inventoryList" class="mt-5 space-y-2"></div>
     </section>
-
     <!-- Shopping Tab -->
     <section id="shopping" class="tab bg-white p-5 rounded-b-xl shadow">
       <h3 class="text-lg font-semibold mb-3">Add to Shopping List</h3>
@@ -154,7 +140,6 @@
       </button>
       <div id="shoppingList" class="mt-5 space-y-2"></div>
     </section>
-
   </main>
 
   <!-- Firebase SDK -->
@@ -485,14 +470,12 @@
       let canvas = null;
       let codeReader = null;
       let quaggaRunning = false;
-
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       } catch (err) {
         alert('Camera access denied or not available');
         return;
       }
-
       const modal = document.createElement('div');
       modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
       modal.innerHTML = `
@@ -501,13 +484,11 @@
           <button id="closeScannerBtn" class="absolute top-3 right-3 z-10 bg-white rounded-full p-1 shadow-lg hover:bg-gray-100 transition">
             <svg class="w-5 h-5 text-gray-600"><use href="#heroicons-x"/></svg>
           </button>
-
           <!-- Scanner Container -->
           <div id="scanner-container" class="relative">
             <video id="scanner-video" class="w-full h-96 object-cover" autoplay playsinline muted></video>
             <div id="scanner-overlay" class="absolute inset-0"></div>
           </div>
-
           <!-- Result & Capture -->
           <div class="p-4 space-y-3 bg-white">
             <div id="code-result" class="text-center font-mono text-lg font-bold text-green-600 hidden break-all p-2 bg-green-50 rounded"></div>
@@ -519,11 +500,9 @@
         </div>
       `;
       document.body.appendChild(modal);
-
       video = modal.querySelector('#scanner-video');
       video.srcObject = stream;
       await video.play();
-
       // ZXing Reader
       codeReader = new ZXing.BrowserMultiFormatReader();
       codeReader.decodeFromVideoDevice(undefined, video, (result, err) => {
@@ -534,7 +513,6 @@
           setTimeout(() => captureAndScan(code), 800);
         }
       }, { delay: 300 });
-
       // QuaggaJS Fallback
       Quagga.init({
         inputStream: { name: "Live", type: "LiveStream", target: video },
@@ -543,7 +521,6 @@
       }, err => {
         if (!err) { Quagga.start(); quaggaRunning = true; }
       });
-
       Quagga.onDetected(data => {
         const code = data.codeResult.code;
         if (code && code.length >= 8) {
@@ -552,13 +529,10 @@
           setTimeout(() => captureAndScan(code), 800);
         }
       });
-
       // Capture Button
       modal.querySelector('#captureBtn').onclick = () => captureAndScan();
-
       // Close Button
       modal.querySelector('#closeScannerBtn').onclick = closeScanner;
-
       // Global close function
       window.closeScanner = () => {
         if (codeReader) codeReader.reset();
@@ -566,24 +540,20 @@
         if (stream) stream.getTracks().forEach(t => t.stop());
         modal.remove();
       };
-
       // Capture + AI Scan
       async function captureAndScan(detectedCode = null) {
         canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
-
         canvas.toBlob(async blob => {
           const form = new FormData();
           form.append('image', blob, 'scan.jpg');
-
           const res = await fetch('/scan', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${idToken}` },
             body: form
           }).then(r => r.json());
-
           const resultDiv = document.getElementById('scanResult');
           const textDiv = document.getElementById('scanText');
           if (res.success) {
@@ -592,9 +562,7 @@
           } else {
             alert('AI scan failed: ' + (res.error || 'Unknown'));
           }
-
           closeScanner();
-
           if (detectedCode) {
             document.getElementById('invBarcode').value = detectedCode;
             document.querySelector('[data-tab="inventory"]').click();
@@ -602,6 +570,39 @@
         }, 'image/jpeg', 0.9);
       }
     };
+
+    // ==== PWA INSTALL PROMPT (ADDED & INTEGRATED) ====
+    let deferredPrompt;
+    const installBtn = document.createElement('button');
+    installBtn.className = 'fixed bottom-6 right-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg flex items-center gap-2 z-40 transition';
+    installBtn.innerHTML = `
+      <svg class="w-5 h-5"><use href="#heroicons-download"/></svg>
+      Install App
+    `;
+    installBtn.style.display = 'none';
+    document.body.appendChild(installBtn);
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'flex';
+    });
+
+    installBtn.onclick = async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        installBtn.style.display = 'none';
+      }
+      deferredPrompt = null;
+    };
+
+    // Add download icon to SVG symbols
+    const downloadIcon = `<symbol id="heroicons-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+    </symbol>`;
+    document.querySelector('svg.hidden').insertAdjacentHTML('beforeend', downloadIcon);
   </script>
 </body>
 </html>
