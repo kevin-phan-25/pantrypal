@@ -8,7 +8,7 @@
   <link rel="icon" href="icon-192.png"/>
   <meta name="theme-color" content="#3b82f6"/>
 
-  <!-- Tailwind CDN (Play CDN – works instantly) -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Heroicons (outline) -->
@@ -136,7 +136,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
-  <!-- Heroicons SVGs (only the ones we use) -->
+  <!-- Heroicons SVGs -->
   <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
     <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
@@ -159,8 +159,9 @@
     </symbol>
   </svg>
 
+  <!-- Main App Logic + Camera Scanner -->
   <script>
-    // ==== Firebase Config (unchanged) ====
+    // ==== Firebase Config ====
     const firebaseConfig = {
       apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
       authDomain: "pantrypal-6e410.firebaseapp.com",
@@ -303,7 +304,7 @@
       }
     };
 
-    // ==== AI Scan ====
+    // ==== AI Scan (File Upload) ====
     document.getElementById('scanBtn').onclick = async () => {
       const file = document.getElementById('scanImage').files[0];
       if (!file) return alert('Choose an image');
@@ -320,9 +321,72 @@
         textDiv.textContent = JSON.stringify(res.record, null, 2);
         resultDiv.classList.remove('hidden');
       } else {
-        alert('Scan failed: ' + (res.error || 'Unknown error'));
+        alert('Scan failed: ' + (res.error || 'Unknown'));
       }
     };
+
+    // ==== CAMERA SCANNER (LIVE CAPTURE) ====
+    document.getElementById('startScanner').onclick = async () => {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      } catch (err) {
+        return alert('Camera access denied or not available');
+      }
+
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.play();
+
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+      modal.innerHTML = `
+        <div class="relative bg-white rounded-xl w-full max-w-lg overflow-hidden">
+          <button class="absolute top-3 right-3 text-gray-600 z-10 bg-white rounded-full p-1 shadow" onclick="this.closest('[role=dialog]').remove();">
+            <svg class="w-5 h-5"><use href="#heroicons-x"/></svg>
+          </button>
+          <video class="w-full h-96 object-cover" autoplay playsinline></video>
+          <div class="p-4">
+            <button id="captureBtn" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition">
+              <svg class="icon"><use href="#heroicons-camera"/></svg>
+              Capture Photo
+            </button>
+          </div>
+        </div>`;
+      modal.querySelector('video').srcObject = stream;
+      document.body.appendChild(modal);
+
+      modal.querySelector('#captureBtn').onclick = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        canvas.toBlob(async blob => {
+          const form = new FormData();
+          form.append('image', blob, 'receipt.jpg');
+          const res = await fetch('/scan', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${idToken}` },
+            body: form
+          }).then(r => r.json());
+          const resultDiv = document.getElementById('scanResult');
+          const textDiv = document.getElementById('scanText');
+          if (res.success) {
+            textDiv.textContent = JSON.stringify(res.record, null, 2);
+            resultDiv.classList.remove('hidden');
+          } else {
+            alert('Scan failed: ' + (res.error || 'Unknown'));
+          }
+          modal.remove();
+          stream.getTracks().forEach(t => t.stop());
+        }, 'image/jpeg', 0.9);
+      };
+    };
+
+    // Add X icon for modal close
+    const xIcon = document.createElement('svg');
+    xIcon.innerHTML = `<symbol id="heroicons-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></symbol>`;
+    document.querySelector('svg.hidden').appendChild(xIcon.firstChild);
   </script>
 </body>
 </html>
