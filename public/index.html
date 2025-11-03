@@ -1,8 +1,175 @@
-<!-- (Keep everything above the <script> the same) -->
+<!DOCTYPE html>
+<html lang="en" class="dark:bg-gray-900 dark:text-white">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PantryPal</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" href="icon-192.png"/>
+  <meta name="theme-color" content="#3b82f6"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
+  <style>
+    .icon { @apply w-5 h-5 inline-block; }
+    .tab { @apply hidden; }
+    .tab.active { @apply block; }
+    #scanner-overlay::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 80%; height: 60px;
+      border: 3px solid rgba(59, 130, 246, 0.8);
+      border-radius: 8px;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+    }
+    .pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 shadow-md">
+    <div class="max-w-3xl mx-auto px-4 flex justify-between items-center">
+      <div class="text-center flex-1">
+        <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
+          <svg class="icon"><use href="#heroicons-home"/></svg>
+          PantryPal
+        </h2>
+        <p class="text-sm opacity-90">Voice • QR • Barcode • AI Scan</p>
+      </div>
+      <button id="darkModeBtn" class="p-2 rounded-full hover:bg-blue-700 transition">
+        <svg class="icon"><use href="#heroicons-moon"/></svg>
+      </button>
+    </div>
+  </header>
 
-  <!-- Full App Logic -->
+  <!-- Auth Section -->
+  <section id="auth-section" class="max-w-md mx-auto mt-12 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+    <h2 class="text-xl font-semibold text-center mb-4">Welcome!</h2>
+    <div id="firebaseui-auth-container"></div>
+    <p class="text-center text-xs text-gray-500 mt-3">Secure login required</p>
+  </section>
+
+  <!-- Main App -->
+  <main id="app" class="hidden max-w-3xl mx-auto p-4 space-y-6">
+    <!-- User Bar + Scan Counter -->
+    <div class="flex flex-col gap-2">
+      <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
+        <p class="font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
+        <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1 rounded transition">
+          Sign Out
+        </button>
+      </div>
+      <div id="scanCounter" class="bg-blue-50 dark:bg-blue-900 p-3 rounded-lg text-center text-sm">
+        Loading scans...
+      </div>
+    </div>
+
+    <!-- Scanner Button -->
+    <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md">
+      <svg class="icon"><use href="#heroicons-camera"/></svg>
+      Start Scanner (QR + Barcode)
+    </button>
+
+    <!-- Voice Command Center -->
+    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
+      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+        <svg class="icon"><use href="#heroicons-microphone"/></svg>
+        Voice Commands
+      </h3>
+      <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">
+        Hold mic and say:<br>
+        • <em>"Add two Coke"</em><br>
+        • <em>"Add barcode 049000049100"</em><br>
+        • <em>"Add three Coke expiring tomorrow"</em><br>
+        • <em>"Remove Coke"</em>
+      </p>
+      <button id="voiceBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition">
+        <svg class="icon"><use href="#heroicons-microphone"/></svg>
+        <span>Hold to Speak</span>
+      </button>
+      <div id="voiceResult" class="mt-3 text-center text-sm text-green-600 hidden"></div>
+    </div>
+
+    <!-- AI Scan Card -->
+    <section class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
+      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+        <svg class="icon"><use href="#heroicons-sparkles"/></svg>
+        AI Scan Product
+      </h3>
+      <input type="file" id="scanImage" accept="image/*" class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+      <button id="scanBtn" class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
+        <svg class="icon"><use href="#heroicons-magnifying-glass"/></svg>
+        Scan with AI
+      </button>
+      <div id="scanResult" class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hidden">
+        <pre id="scanText" class="text-xs overflow-x-auto"></pre>
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden">
+      <button class="tab-btn flex-1 py-3 font-medium text-center transition active" data-tab="inventory">Inventory</button>
+      <button class="tab-btn flex-1 py-3 font-medium text-center transition" data-tab="shopping">Shopping List</button>
+    </div>
+
+    <!-- Inventory Tab -->
+    <section id="inventory" class="tab active bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
+      <h3 class="text-lg font-semibold mb-3">Add to Inventory</h3>
+      <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <div class="grid grid-cols-2 gap-2">
+        <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+        <input type="date" id="invExp" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      </div>
+      <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
+        <svg class="icon"><use href="#heroicons-plus"/></svg>
+        Add to Inventory
+      </button>
+      <button id="exportCsv" class="mt-3 w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">
+        Export Inventory (CSV)
+      </button>
+      <div id="inventoryList" class="mt-5 space-y-2"></div>
+    </section>
+
+    <!-- Shopping Tab -->
+    <section id="shopping" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
+      <h2 class="text-lg font-semibold mb-3">Add to Shopping List</h2>
+      <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <input type="text" id="shopName" placeholder="Item Name (auto-filled by voice)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
+        <svg class="icon"><use href="#heroicons-plus"/></svg>
+        Add to List
+      </button>
+      <div id="shoppingList" class="mt-5 space-y-2"></div>
+    </section>
+  </main>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.js"></script>
+  <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.css" />
+
+  <!-- Heroicons -->
+  <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
+    <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></symbol>
+    <symbol id="heroicons-google" viewBox="0 0 24 24" fill="currentColor"><path d="M12.545 10.239v3.821h5.575c-.225 1.147-1.203 3.35-5.575 3.35-3.355 0-6.087-2.79-6.087-6.23s2.732-6.23 6.087-6.23c1.908 0 3.188.812 3.92 1.51l2.672-2.573C17.38 1.746 15.123.5 12.545.5c-6.628 0-12 5.373-12 12s5.372 12 12 12c6.928 0 11.51-4.87 11.51-11.725 0-.785-.082-1.73-.23-2.535H12.545z"/></symbol>
+    <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
+    <symbol id="heroicons-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></symbol>
+    <symbol id="heroicons-magnifying-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></symbol>
+    <symbol id="heroicons-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></symbol>
+    <symbol id="heroicons-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></symbol>
+    <symbol id="heroicons-microphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8a1 1 0 01-1-1v-1a5 5 0 1110 0v1a1 1 0 01-1 1h-4"/></symbol>
+    <symbol id="heroicons-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></symbol>
+    <symbol id="heroicons-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></symbol>
+  </svg>
+
+  <!-- App Logic -->
   <script>
-    // ==== Firebase Config + UI (unchanged) ====
     const firebaseConfig = {
       apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
       authDomain: "pantrypal-6e410.firebaseapp.com",
@@ -16,17 +183,22 @@
 
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
     ui.start('#firebaseui-auth-container', {
-      signInOptions: [firebase.auth.GoogleAuthProvider.PROVIDER_ID],
-      signInSuccessUrl: '/',
-      tosUrl: '/tos',
-      privacyPolicyUrl: '/privacy'
+      signInFlow: 'popup',
+      signInOptions: [
+        {
+          provider: firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+          fullLabel: 'Continue with Google'
+        }
+      ],
+      callbacks: {
+        signInSuccessWithAuthResult: () => false
+      }
     });
 
     let currentUser = null;
     let idToken = null;
     let recognition = null;
 
-    // ==== Auth State (unchanged) ===
     firebase.auth().onAuthStateChanged(async user => {
       if (user) {
         currentUser = user;
@@ -45,7 +217,6 @@
 
     document.getElementById('signOutBtn').onclick = () => firebase.auth().signOut();
 
-    // ==== API Helper (unchanged) ===
     async function api(path, opts = {}) {
       if (!idToken) return alert('Not signed in');
       const res = await fetch(path, {
@@ -60,46 +231,374 @@
       return res.json();
     }
 
-    // ==== AI Scan (Improved Debugging) ===
-    document.getElementById('scanBtn').onclick = async () => {
-      const file = document.getElementById('scanImage').files[0];
-      if (!file) return alert('Choose an image');
+    document.getElementById('darkModeBtn').onclick = () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+    };
+    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-      const form = new FormData();
-      form.append('image', file);
+    async function loadScanCount() {
+      const data = await api('/user-info');
+      const el = document.getElementById('scanCounter');
+      if (data?.isPro) {
+        el.innerHTML = 'Unlimited scans (Pro)';
+      } else {
+        el.innerHTML = `Free scans used: ${data?.scans || 0}/10 <button id="upgradeBtn" class="ml-2 text-blue-600 underline text-xs">Upgrade</button>`;
+        if (data?.scans >= 10) el.innerHTML = 'Free limit reached. <button id="upgradeBtn" class="ml-2 text-blue-600 underline text-xs">Upgrade</button>';
+      }
+      document.getElementById('upgradeBtn')?.addEventListener('click', () => alert('Pro upgrade coming soon!'));
+    }
 
-      try {
-        const res = await fetch('/scan', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${idToken}` },
-          body: form
-        }).then(r => r.json());
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      };
+    });
 
-        console.log('AI Scan Response:', res);
-
-        const resultDiv = document.getElementById('scanResult');
-        const textDiv = document.getElementById('scanText');
-        if (res.success) {
-          textDiv.textContent = JSON.stringify(res.record, null, 2);
-          resultDiv.classList.remove('hidden');
-
-          // Auto-fill inventory if barcode detected
-          if (res.record.barcode) {
-            document.getElementById('invBarcode').value = res.record.barcode;
-            document.querySelector('[data-tab="inventory"]').click();
-          }
-        } else {
-          alert('Scan failed: ' + (res.error || 'Unknown error'));
-        }
-      } catch (err) {
-        console.error('Fetch Error:', err);
-        alert('Network error: ' + err.message);
+    document.getElementById('addToInventory').onclick = async () => {
+      const barcode = document.getElementById('invBarcode').value.trim();
+      const qty = parseInt(document.getElementById('invQty').value);
+      const exp = document.getElementById('invExp').value;
+      if (!barcode) return alert('Enter barcode');
+      const res = await api('/add', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
+      if (res) {
+        document.getElementById('invBarcode').value = '';
+        document.getElementById('invQty').value = 1;
+        document.getElementById('invExp').value = '';
+        loadInventory();
       }
     };
 
-    // ==== (Rest of the script remains unchanged – copy your existing logic) ====
-    // Dark Mode, Scan Counter, Tabs, Inventory, Shopping, CSV, Voice, Scanner, PWA Install
-    // ... [Paste your existing code here, excluding any push-related parts]
+    async function loadInventory() {
+      const data = await api('/inventory');
+      const list = document.getElementById('inventoryList');
+      if (!data?.items?.length) {
+        list.innerHTML = '<p class="text-center text-gray-500">No items in inventory</p>';
+        return;
+      }
+      list.innerHTML = await Promise.all(data.items.map(async i => {
+        const info = await api(`/product-info/${i.barcode}`);
+        return `
+          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div class="flex items-center gap-3">
+              <img src="${info.image || 'icon-192.png'}" class="w-10 h-10 rounded object-cover border" onerror="this.src='icon-192.png'"/>
+              <div>
+                <strong>${info.name}</strong><br>
+                <span class="text-sm text-gray-600 dark:text-gray-400">Qty: ${i.quantity} ${i.expiration ? '| Exp: ' + i.expiration : ''}</span>
+              </div>
+            </div>
+            <button onclick="removeItem('${i.barcode}')" class="text-red-600 hover:text-red-800 text-sm">Remove</button>
+          </div>
+        `;
+      })).then(html => html.join(''));
+    }
+
+    window.removeItem = async barcode => {
+      if (confirm('Remove from inventory?')) {
+        await api('/remove', { method: 'POST', body: JSON.stringify({ barcode }) });
+        loadInventory();
+      }
+    };
+
+    // Shopping (same as inventory)
+    document.getElementById('addToShopping').onclick = async () => {
+      const barcode = document.getElementById('shopBarcode').value.trim();
+      const name = document.getElementById('shopName').value.trim();
+      const needed = parseInt(document.getElementById('shopNeeded').value);
+      if (!barcode || !name) return alert('Fill barcode and name');
+      const res = await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ barcode, itemName: name, needed }) });
+      if (res) {
+        document.getElementById('shopBarcode').value = '';
+        document.getElementById('shopName').value = '';
+        document.getElementById('shopNeeded').value = 1;
+        loadShopping();
+      }
+    };
+
+    async function loadShopping() {
+      const data = await api('/shopping');
+      const list = document.getElementById('shoppingList');
+      if (!data?.list?.length) {
+        list.innerHTML = '<p class="text-center text-gray-500">Shopping list empty</p>';
+        return;
+      }
+      list.innerHTML = await Promise.all(data.list.map(async i => {
+        const info = await api(`/product-info/${i.barcode}`);
+        return `
+          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div class="flex items-center gap-3">
+              <img src="${info.image || 'icon-192.png'}" class="w-10 h-10 rounded object-cover border" onerror="this.src='icon-192.png'"/>
+              <div>
+                <strong>${info.name}</strong><br>
+                <span class="text-sm text-gray-600 dark:text-gray-400">Need: ${i.needed}</span>
+              </div>
+            </div>
+            <button onclick="removeFromShopping('${i.barcode}')" class="text-red-600 hover:text-red-800 text-sm">Remove</button>
+          </div>
+        `;
+      })).then(html => html.join(''));
+    }
+
+    window.removeFromShopping = async barcode => {
+      if (confirm('Remove from shopping list?')) {
+        await api('/remove-from-shopping', { method: 'POST', body: JSON.stringify({ barcode }) });
+        loadShopping();
+      }
+    };
+
+    // ==== CSV Export ====
+    document.getElementById('exportCsv').onclick = async () => {
+      const link = document.createElement('a');
+      link.href = '/export-csv';
+      link.download = 'pantrypal-inventory.csv';
+      link.click();
+    };
+
+    // ==== AI Scan ====
+    document.getElementById('scanBtn').onclick = async () => {
+      const file = document.getElementById('scanImage').files[0];
+      if (!file) return alert('Choose an image');
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch('/scan', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` },
+        body: form
+      }).then(r => r.json());
+      const resultDiv = document.getElementById('scanResult');
+      const textDiv = document.getElementById('scanText');
+      if (res.success) {
+        textDiv.textContent = JSON.stringify(res.record, null, 2);
+        resultDiv.classList.remove('hidden');
+        if (res.record.barcode) {
+          document.getElementById('invBarcode').value = res.record.barcode;
+          document.querySelector('[data-tab="inventory"]').click();
+        }
+      } else {
+        alert('Scan failed: ' + (res.error || 'Unknown'));
+      }
+    };
+
+    // ==== Voice Recognition ====
+    const voiceBtn = document.getElementById('voiceBtn');
+    const voiceResult = document.getElementById('voiceResult');
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      let isRecording = false;
+
+      voiceBtn.addEventListener('mousedown', startVoice);
+      voiceBtn.addEventListener('touchstart', e => { e.preventDefault(); startVoice(); });
+      voiceBtn.addEventListener('mouseup', stopVoice);
+      voiceBtn.addEventListener('touchend', stopVoice);
+
+      function startVoice() {
+        if (isRecording) return;
+        isRecording = true;
+        voiceBtn.classList.add('pulse', 'bg-red-600');
+        voiceBtn.querySelector('span').textContent = 'Listening...';
+        voiceResult.classList.add('hidden');
+        recognition.start();
+      }
+      function stopVoice() {
+        if (!isRecording) return;
+        isRecording = false;
+        voiceBtn.classList.remove('pulse', 'bg-red-600');
+        voiceBtn.querySelector('span').textContent = 'Hold to Speak';
+        recognition.stop();
+      }
+
+      recognition.onresult = async event => {
+        const transcript = event.results[0][0].transcript.trim();
+        voiceResult.textContent = `"${transcript}"`;
+        voiceResult.classList.remove('hidden');
+        const lower = transcript.toLowerCase();
+
+        // Remove command
+        if (lower.includes('remove') || lower.includes('delete')) {
+          const name = lower.match(/(remove|delete)\s+(.+)/i)?.[2];
+          if (name) {
+            const active = document.querySelector('.tab-btn.active').dataset.tab;
+            const items = active === 'inventory' ? (await api('/inventory'))?.items : (await api('/shopping'))?.list;
+            const item = items.find(i => (i.name || i.itemName || '').toLowerCase().includes(name));
+            if (item) active === 'inventory' ? removeItem(item.barcode) : removeFromShopping(item.barcode);
+          }
+          return;
+        }
+
+        // Add to inventory
+        const addMatch = lower.match(/(add|put)\s+(\d+)?\s*(.+)/i);
+        if (addMatch && !lower.includes('shopping')) {
+          const qty = addMatch[2] ? parseInt(addMatch[2]) : 1;
+          const name = addMatch[3].trim();
+          document.getElementById('invBarcode').value = name;
+          document.getElementById('invQty').value = qty;
+          document.querySelector('[data-tab="inventory"]').click();
+          setTimeout(() => document.getElementById('addToInventory').click(), 500);
+          return;
+        }
+
+        // Add to shopping
+        const shopMatch = lower.match(/(add|need|want|get)\s+(\d+)?\s*(.+)/i);
+        if (shopMatch) {
+          const qty = shopMatch[2] ? parseInt(shopMatch[2]) : 1;
+          const name = shopMatch[3].trim();
+          document.getElementById('shopName').value = name;
+          document.getElementById('shopNeeded').value = qty;
+          document.querySelector('[data-tab="shopping"]').click();
+          setTimeout(() => document.getElementById('addToShopping').click(), 500);
+        }
+      };
+
+      recognition.onerror = () => {
+        voiceResult.textContent = 'Voice error. Try again.';
+        voiceResult.classList.remove('hidden');
+        stopVoice();
+      };
+      recognition.onend = stopVoice;
+    } else {
+      voiceBtn.disabled = true;
+      voiceBtn.innerHTML = '<svg class="icon"><use href="#heroicons-x"/></svg> Voice Not Supported';
+    }
+
+    // ==== Scanner (QR + Barcode) ====
+    document.getElementById('startScanner').onclick = async () => {
+      const res = await api('/record-scan', { method: 'POST' });
+      if (!res?.allowed) {
+        alert(res?.message || 'Scan limit reached');
+        return;
+      }
+
+      let stream = null;
+      let video = null;
+      let codeReader = null;
+      let quaggaRunning = false;
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      } catch (err) {
+        alert('Camera access denied');
+        return;
+      }
+
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+      modal.innerHTML = `
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-lg overflow-hidden">
+          <button id="closeScannerBtn" class="absolute top-3 right-3 z-10 bg-white dark:bg-gray-700 rounded-full p-1 shadow-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+            <svg class="w-5 h-5 text-gray-600 dark:text-gray-300"><use href="#heroicons-x"/></svg>
+          </button>
+          <div id="scanner-container" class="relative">
+            <video id="scanner-video" class="w-full h-96 object-cover" autoplay playsinline muted></video>
+            <div id="scanner-overlay" class="absolute inset-0"></div>
+          </div>
+          <div class="p-4 space-y-3 bg-white dark:bg-gray-800">
+            <div id="code-result" class="text-center font-mono text-lg font-bold text-green-600 hidden break-all p-2 bg-green-50 dark:bg-green-900 rounded"></div>
+            <button id="captureBtn" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition">
+              <svg class="icon"><use href="#heroicons-camera"/></svg>
+              Capture Photo
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      video = modal.querySelector('#scanner-video');
+      video.srcObject = stream;
+      await video.play();
+
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      codeReader.decodeFromVideoDevice(undefined, video, (result, err) => {
+        if (result) {
+          const code = result.getText();
+          modal.querySelector('#code-result').textContent = code;
+          modal.querySelector('#code-result').classList.remove('hidden');
+          setTimeout(() => captureAndScan(code), 800);
+        }
+      }, { delay: 300 });
+
+      Quagga.init({
+        inputStream: { name: "Live", type: "LiveStream", target: video },
+        decoder: { readers: ["ean_reader", "upc_reader", "code_128_reader"] },
+        locate: true
+      }, err => {
+        if (!err) { Quagga.start(); quaggaRunning = true; }
+      });
+      Quagga.onDetected(data => {
+        const code = data.codeResult.code;
+        if (code && code.length >= 8) {
+          modal.querySelector('#code-result').textContent = code;
+          modal.querySelector('#code-result').classList.remove('hidden');
+          setTimeout(() => captureAndScan(code), 800);
+        }
+      });
+
+      modal.querySelector('#captureBtn').onclick = () => captureAndScan();
+      modal.querySelector('#closeScannerBtn').onclick = closeScanner;
+
+      window.closeScanner = () => {
+        if (codeReader) codeReader.reset();
+        if (quaggaRunning) Quagga.stop();
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        modal.remove();
+      };
+
+      async function captureAndScan(detectedCode = null) {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        canvas.toBlob(async blob => {
+          const form = new FormData();
+          form.append('image', blob, 'scan.jpg');
+          const res = await fetch('/scan', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${idToken}` },
+            body: form
+          }).then(r => r.json());
+          const resultDiv = document.getElementById('scanResult');
+          const textDiv = document.getElementById('scanText');
+          if (res.success) {
+            textDiv.textContent = JSON.stringify(res.record, null, 2);
+            resultDiv.classList.remove('hidden');
+          } else {
+            alert('AI scan failed: ' + (res.error || 'Unknown'));
+          }
+          closeScanner();
+          if (detectedCode) {
+            document.getElementById('invBarcode').value = detectedCode;
+            document.querySelector('[data-tab="inventory"]').click();
+          }
+        }, 'image/jpeg', 0.9);
+      }
+    };
+
+    // ==== PWA Install Prompt ====
+    let deferredPrompt;
+    const installBtn = document.createElement('button');
+    installBtn.className = 'fixed bottom-6 right-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg flex items-center gap-2 z-40 transition';
+    installBtn.innerHTML = `<svg class="w-5 h-5"><use href="#heroicons-download"/></svg> Install App`;
+    installBtn.style.display = 'none';
+    document.body.appendChild(installBtn);
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'flex';
+    });
+
+    installBtn.onclick = async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') installBtn.style.display = 'none';
+      deferredPrompt = null;
+    };
   </script>
 </body>
 </html>
