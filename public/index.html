@@ -170,33 +170,103 @@
     // === ADD TO INVENTORY ===
     document.getElementById('addToInventory').onclick = async () => {
       const barcode = document.getElementById('invBarcode').value.trim();
-      const qty = document.getElementById('invQty').value;
+      const qty = parseInt(document.getElementById('invQty').value);
       const exp = document.getElementById('invExp').value;
       if (!barcode) return alert('Enter barcode');
-      await api('/add', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
-      document.getElementById('invBarcode').value = '';
-      loadInventory();
+      const res = await api('/add', {
+        method: 'POST',
+        body: JSON.stringify({ barcode, quantity: qty, expiration: exp })
+      });
+      if (res) {
+        document.getElementById('invBarcode').value = '';
+        loadInventory();
+      }
     };
 
     // === ADD TO SHOPPING ===
     document.getElementById('addToShopping').onclick = async () => {
       const barcode = document.getElementById('shopBarcode').value.trim();
       const name = document.getElementById('shopName').value.trim();
-      const needed = document.getElementById('shopNeeded').value;
+      const needed = parseInt(document.getElementById('shopNeeded').value);
       if (!barcode || !name) return alert('Fill barcode and name');
-      await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ barcode, itemName: name, needed }) });
-      document.getElementById('shopBarcode').value = '';
-      document.getElementById('shopName').value = '';
-      loadShopping();
+      const res = await api('/add-to-shopping', {
+        method: 'POST',
+        body: JSON.stringify({ barcode, itemName: name, needed })
+      });
+      if (res) {
+        document.getElementById('shopBarcode').value = '';
+        document.getElementById('shopName').value = '';
+        loadShopping();
+      }
     };
 
     // === LOAD INVENTORY ===
     async function loadInventory() {
       const data = await api('/inventory');
       const list = document.getElementById('inventoryList');
-      list.innerHTML = data?.items?.length ? data.items.map(i => `
+      if (!data?.items?.length) {
+        list.innerHTML = '<p style="color:#999; text-align:center;">No items in inventory</p>';
+        return;
+      }
+      list.innerHTML = data.items.map(i => `
         <div class="item">
           <div><strong>${i.name || i.barcode}</strong><br>Qty: ${i.quantity} ${i.expiration ? '| Exp: ' + i.expiration : ''}</div>
           <button onclick="removeItem('${i.barcode}')">Remove</button>
         </div>
-      `).join('') : '<p style="color
+      `).join('');
+    }
+
+    // === LOAD SHOPPING ===
+    async function loadShopping() {
+      const data = await api('/shopping');
+      const list = document.getElementById('shoppingList');
+      if (!data?.list?.length) {
+        list.innerHTML = '<p style="color:#999; text-align:center;">Shopping list empty</p>';
+        return;
+      }
+      list.innerHTML = data.list.map(i => `
+        <div class="item">
+          <div><strong>${i.itemName}</strong><br>Need: ${i.needed}</div>
+          <button onclick="removeFromShopping('${i.barcode}')">Remove</button>
+        </div>
+      `).join('');
+    }
+
+    // === REMOVE ITEM ===
+    window.removeItem = async (barcode) => {
+      if (confirm('Remove from inventory?')) {
+        await api('/remove', { method: 'POST', body: JSON.stringify({ barcode }) });
+        loadInventory();
+      }
+    };
+
+    window.removeFromShopping = async (barcode) => {
+      if (confirm('Remove from shopping list?')) {
+        await api('/remove-from-shopping', { method: 'POST', body: JSON.stringify({ barcode }) });
+        loadShopping();
+      }
+    };
+
+    // === AI SCAN ===
+    document.getElementById('scanBtn').onclick = async () => {
+      const file = document.getElementById('scanImage').files[0];
+      if (!file) return alert('Choose an image');
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch('/scan', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` },
+        body: form
+      }).then(r => r.json());
+      const resultDiv = document.getElementById('scanResult');
+      const textDiv = document.getElementById('scanText');
+      if (res.success) {
+        textDiv.textContent = JSON.stringify(res.record, null, 2);
+        resultDiv.style.display = 'block';
+      } else {
+        alert('Scan failed: ' + (res.error || 'Unknown error'));
+      }
+    };
+  </script>
+</body>
+</html>
