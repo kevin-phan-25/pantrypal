@@ -61,24 +61,47 @@ async function checkAuth(req, res, next) {
   }
 }
 
-// === AI SCAN ===
+// === AI SCAN (Improved for Image Upload) ===
 app.post('/scan', checkAuth, async (req, res) => {
-  if (!req.files?.image) return res.status(400).json({ error: 'No image' });
+  if (!req.files?.image) {
+    console.error('No image uploaded');
+    return res.status(400).json({ error: 'No image uploaded' });
+  }
+
   try {
     const [result] = await visionClient.textDetection({ image: { content: req.files.image.data } });
     const text = result.textAnnotations?.[0]?.description || '';
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const itemName = lines[0] || 'Unknown';
-    const exp = lines.find(l => /\d{4}-\d{2}-\d{2}/.test(l)) || '';
-    const barcode = req.body.barcode;
-    if (barcode) {
-      const ref = db.collection('users').doc(req.user.uid).collection('items').doc(barcode);
+    const expMatch = lines.find(l => /\d{4}-\d{2}-\d{2}/.test(l));
+    const expirationDate = expMatch || '';
+    const barcodeMatch = lines.find(l => /^\d{8,}$/.test(l)) || req.body.barcode || '';
+
+    console.log('AI Scan Result:', { itemName, expirationDate, barcodeMatch, fullText: text });
+
+    if (barcodeMatch) {
+      const ref = db.collection('users').doc(req.user.uid).collection('items').doc(barcodeMatch);
       const doc = await ref.get();
-      if (doc.exists) await ref.update({ name: itemName });
+      if (doc.exists) {
+        await ref.update({ name: itemName, expiration: expirationDate || doc.data().expiration });
+      } else {
+        await ref.set({
+          name: itemName,
+          barcode: barcodeMatch,
+          quantity: 1,
+          expiration: expirationDate,
+          addedAt: FieldValue.serverTimestamp()
+        });
+      }
     }
-    res.json({ success: true, record: { itemName, expirationDate: exp, detectedText: text } });
+
+    res.json({
+      success: true,
+      record: { itemName, expirationDate, barcode: barcodeMatch, detectedText: text }
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('AI Scan Error:', err);
+    res.status(500).json({ error: 'Failed to process image: ' + err.message });
   }
 });
 
