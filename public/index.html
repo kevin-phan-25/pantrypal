@@ -170,7 +170,7 @@
   <!-- Icons -->
   <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
     <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></symbol>
-    <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
+    <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 0111.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
     <symbol id="heroicons-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></symbol>
     <symbol id="heroicons-magnifying-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></symbol>
     <symbol id="heroicons-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></symbol>
@@ -193,22 +193,18 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    /* ---------- FIREBASE UI (CORRECTED) ---------- */
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
     ui.start('#firebaseui-auth-container', {
       signInFlow: 'popup',
       signInOptions: [
-        firebase.auth.GoogleAuthProvider.PROVIDER_ID,   // Google
-        'apple.com',                                    // Apple
-        firebase.auth.EmailAuthProvider.PROVIDER_ID,    // Email
-        firebase.auth.PhoneAuthProvider.PROVIDER_ID     // Phone
+        firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+        'apple.com',
+        firebase.auth.EmailAuthProvider.PROVIDER_ID,
+        firebase.auth.PhoneAuthProvider.PROVIDER_ID
       ],
-      callbacks: {
-        signInSuccessWithAuthResult: () => false      // stay on page
-      }
+      callbacks: { signInSuccessWithAuthResult: () => false }
     });
 
-    /* ---------- APP STATE ---------- */
     let currentUser = null, idToken = null, isPro = false, editingItem = null;
 
     firebase.auth().onAuthStateChanged(async user => {
@@ -241,7 +237,6 @@
       return res.json();
     }
 
-    /* ---------- UI HELPERS ---------- */
     document.getElementById('darkModeBtn').onclick = () => {
       document.documentElement.classList.toggle('dark');
       localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
@@ -256,7 +251,6 @@
       };
     });
 
-    /* ---------- DATA LOADING ---------- */
     async function loadInventory() {
       const d = await api('/inventory');
       const low = d?.items?.filter(i => i.quantity <= 2) || [];
@@ -276,7 +270,7 @@
       document.getElementById('shoppingList').innerHTML = await renderItems(d?.list || [], true);
     }
 
-    async function renderItems(items, readonly) {
+    async function renderItems(items, isShopping) {
       if (!items.length) return '<p class="text-center text-gray-500">Empty</p>';
       const rows = await Promise.all(items.map(async i => {
         let img = 'icon-192.png';
@@ -285,32 +279,30 @@
           if (p?.image) img = p.image;
         }
         return `
-          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${i.quantity <= 2 ? 'low-stock' : ''}">
+          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div class="flex items-center gap-3">
               <img src="${img}" alt="${i.name||i.itemName}" class="w-10 h-10 rounded object-cover bg-gray-200 border" loading="lazy" onerror="this.src='icon-192.png';this.onerror=null;">
               <div>
                 <strong>${i.name||i.itemName}</strong><br>
                 <span class="text-sm text-gray-600">${i.quantity||i.needed} ${i.expiration ? '| Exp: '+i.expiration : ''}</span>
-                ${i.quantity <= 2 ? '<span class="text-red-600 text-xs ml-2">Low!</span>' : ''}
               </div>
             </div>
-            ${readonly ? '' : `
-              <div class="flex gap-2">
-                <button onclick="editItem('${i.barcode}',${readonly})" class="text-blue-600 text-sm">Edit</button>
-                <button onclick="removeItem('${i.barcode}')" class="text-red-600 text-sm">Remove</button>
-              </div>
-            `}
+            <div class="flex gap-2">
+              <button onclick="editItem('${i.barcode}', ${isShopping})" class="text-blue-600 text-sm">Edit</button>
+              <button onclick="removeItem('${i.barcode}', ${isShopping})" class="text-red-600 text-sm">Remove</button>
+            </div>
           </div>`;
       }));
       return rows.join('');
     }
 
     window.editItem = async (barcode, isShopping) => {
-      if (!isPro) return alert('Pro required');
+      if (!isPro) return alert('Pro required to edit');
       editingItem = barcode;
       const data = isShopping ? await api('/shopping') : await api('/inventory');
       const itm = (isShopping ? data.list : data.items).find(x => x.barcode === barcode);
       if (!itm) return;
+
       if (isShopping) {
         document.getElementById('shopBarcode').value = itm.barcode;
         document.getElementById('shopName').value = itm.itemName;
@@ -326,8 +318,12 @@
       }
     };
 
-    window.removeItem = async barcode => {
-      if (confirm('Remove?')) {
+    window.removeItem = async (barcode, isShopping) => {
+      if (!confirm('Remove?')) return;
+      if (isShopping) {
+        await api('/remove-from-shopping', { method: 'POST', body: JSON.stringify({ barcode }) });
+        loadShopping();
+      } else {
         await api('/remove', { method: 'POST', body: JSON.stringify({ barcode }) });
         loadInventory();
       }
@@ -396,12 +392,12 @@
         return;
       }
       sec.classList.remove('hidden');
-      document.getElementById('family chaîne').textContent = d.role;
+      document.getElementById('familyRole').textContent = d.role;
       if (d.role === 'viewer') {
         document.getElementById('addToInventory').disabled = true;
         document.getElementById('addToShopping').disabled = true;
       }
-      document.getElementById('inventoryList').innerHTML = await renderItems(d.inventory, d.role === 'viewer');
+      document.getElementById('inventoryList').innerHTML = await renderItems(d.inventory, false);
       document.getElementById('shoppingList').innerHTML = await renderItems(d.shopping, true);
     }
 
