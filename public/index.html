@@ -1,90 +1,420 @@
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-    authDomain: "pantrypal-6e410.firebaseapp.com",
-    projectId: "pantrypal-6e410",
-    storageBucket: "pantrypal-6e410.firebasestorage.app",
-    messagingSenderId: "592127259891",
-    appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
-    measurementId: "G-P641JW4KS4"
-  };
+<!DOCTYPE html>
+<html lang="en" class="dark:bg-gray-900 dark:text-white">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PantryPal</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" href="icon-192.png"/>
+  <meta name="theme-color" content="#3b82f6"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
+  <style>
+    .icon { @apply w-5 h-5 inline-block; }
+    .tab { @apply hidden; }
+    .tab.active { @apply block; }
+    #scanner-overlay::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 80%; height: 60px;
+      border: 3px solid rgba(59, 130, 246, 0.8);
+      border-radius: 8px;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+    }
+    .pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .low-stock { @apply bg-yellow-100 dark:bg-yellow-900 border-l-4 border-yellow-500 p-2 text-sm; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 shadow-md">
+    <div class="max-w-3xl mx-auto px-4 flex justify-between items-center">
+      <div class="text-center flex-1">
+        <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
+          <svg class="icon"><use href="#heroicons-home"/></svg>
+          PantryPal
+        </h1>
+        <p class="text-sm opacity-90">Voice • QR • Barcode • AI Scan</p>
+      </div>
+      <button id="darkModeBtn" class="p-2 rounded-full hover:bg-blue-700 transition">
+        <svg class="icon"><use href="#heroicons-moon"/></svg>
+      </button>
+    </div>
+  </header>
 
-  firebase.initializeApp(firebaseConfig);
+  <!-- Auth Section -->
+  <section id="auth-section" class="max-w-md mx-auto mt-12 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+    <h2 class="text-xl font-semibold text-center mb-4">Welcome to PantryPal!</h2>
+    <div id="firebaseui-auth-container"></div>
+    <p class="text-center text-xs text-gray-500 mt-3">
+      Sign in with Google, Apple, Email, or Phone
+    </p>
+  </section>
 
-  // === Firebase UI – Only show enabled providers ===
-  const ui = new firebaseui.auth.AuthUI(firebase.auth());
-  ui.start('#firebaseui-auth-container', {
-    signInFlow: 'popup',
-    signInOptions: [
-      // Google
-      firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+  <!-- Main App -->
+  <main id="app" class="hidden max-w-3xl mx-auto p-4 space-y-6">
+    <!-- User + Family -->
+    <div class="flex flex-col gap-2">
+      <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
+        <p class="font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
+        <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1 rounded transition">
+          Sign Out
+        </button>
+      </div>
+      <div id="familySection" class="bg-indigo-50 dark:bg-indigo-900 p-3 rounded-lg text-sm hidden">
+        <p>Family: <span id="familyName">My Family</span> | Role: <span id="familyRole"></span></p>
+        <button id="leaveFamily" class="text-red-600 underline text-xs">Leave</button>
+      </div>
+      <div id="scanCounter" class="bg-blue-50 dark:bg-blue-900 p-3 rounded-lg text-center text-sm">
+        Loading...
+      </div>
+    </div>
 
-      // Apple
-      {
-        provider: firebase.auth.OAuthProvider.PROVIDER_ID,
-        providerId: 'apple.com',
-        fullLabel: 'Continue with Apple'
-      },
+    <!-- Scanner -->
+    <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md">
+      <svg class="icon"><use href="#heroicons-camera"/></svg>
+      Start Scanner (QR + Barcode)
+    </button>
 
-      // Email/Password
-      {
-        provider: firebase.auth.EmailAuthProvider.PROVIDER_ID,
-        requireDisplayName: false,
-        fullLabel: 'Continue with Email'
-      },
+    <!-- Voice -->
+    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
+      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+        <svg class="icon"><use href="#heroicons-microphone"/></svg>
+        Voice Commands
+      </h3>
+      <button id="voiceBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition">
+        <svg class="icon"><use href="#heroicons-microphone"/></svg>
+        <span>Hold to Speak</span>
+      </button>
+      <div id="voiceResult" class="mt-3 text-center text-sm text-green-600 hidden"></div>
+    </div>
 
-      // Phone
-      {
-        provider: firebase.auth.PhoneAuthProvider.PROVIDER_ID,
-        recaptchaParameters: {
-          size: 'invisible'
+    <!-- AI Scan -->
+    <section class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
+      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+        <svg class="icon"><use href="#heroicons-sparkles"/></svg>
+        AI Scan Product
+      </h3>
+      <input type="file" id="scanImage" accept="image/*" class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+      <button id="scanBtn" class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
+        <svg class="icon"><use href="#heroicons-magnifying-glass"/></svg>
+        Scan with AI
+      </button>
+      <div id="scanResult" class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hidden">
+        <pre id="scanText" class="text-xs overflow-x-auto"></pre>
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden">
+      <button class="tab-btn flex-1 py-3 font-medium text-center transition active" data-tab="inventory">Inventory</button>
+      <button class="tab-btn flex-1 py-3 font-medium text-center transition" data-tab="shopping">Shopping List</button>
+    </div>
+
+    <!-- Inventory -->
+    <section id="inventory" class="tab active bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
+      <h3 class="text-lg font-semibold mb-3">Add to Inventory</h3>
+      <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
+      <div class="grid grid-cols-2 gap-2">
+        <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
+        <input type="date" id="invExp" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
+      </div>
+      <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
+        <svg class="icon"><use href="#heroicons-plus"/></svg>
+        Add to Inventory
+      </button>
+      <button id="exportCsv" class="mt-3 w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">
+        Export Inventory (CSV)
+      </button>
+      <div id="inventoryList" class="mt-5 space-y-2"></div>
+    </section>
+
+    <!-- Shopping -->
+    <section id="shopping" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
+      <h2 class="text-lg font-semibold mb-3">Add to Shopping List</h2>
+      <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
+      <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
+      <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3"/>
+      <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
+        <svg class="icon"><use href="#heroicons-plus"/></svg>
+        Add to List
+      </button>
+      <div id="shoppingList" class="mt-5 space-y-2"></div>
+    </section>
+
+    <!-- Family Modal -->
+    <div id="familyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-sm w-full">
+        <h3 class="text-lg font-bold mb-3">Join Family</h3>
+        <input type="text" id="familyCodeInput" placeholder="Enter 6-digit code" class="w-full p-3 border rounded-lg mb-3"/>
+        <div class="flex gap-2">
+          <button id="joinFamilyBtn" class="flex-1 bg-blue-600 text-white py-2 rounded-lg">Join</button>
+          <button id="cancelFamilyBtn" class="flex-1 bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.js"></script>
+  <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.css" />
+
+  <!-- Icons -->
+  <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
+    <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></symbol>
+    <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
+    <symbol id="heroicons-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></symbol>
+    <symbol id="heroicons-magnifying-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></symbol>
+    <symbol id="heroicons-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></symbol>
+    <symbol id="heroicons-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></symbol>
+    <symbol id="heroicons-microphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8a1 1 0 01-1-1v-1a5 5 0 1110 0v1a1 1 0 01-1 1h-4"/></symbol>
+    <symbol id="heroicons-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></symbol>
+    <symbol id="heroicons-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></symbol>
+  </svg>
+
+  <!-- App Logic -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
+      measurementId: "G-P641JW4KS4"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+
+    // === Firebase UI – Only enabled providers ===
+    const ui = new firebaseui.auth.AuthUI(firebase.auth());
+    ui.start('#firebaseui-auth-container', {
+      signInFlow: 'popup',
+      signInOptions: [
+        // Google
+        firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+
+        // Apple
+        {
+          provider: 'apple.com',
+          fullLabel: 'Continue with Apple'
         },
-        defaultCountry: 'US',
-        fullLabel: 'Continue with Phone'
-      }
-    ],
-    callbacks: {
-      signInSuccessWithAuthResult: () => false
-    }
-  });
 
-  let currentUser = null;
-  let idToken = null;
-  let familyCode = null;
+        // Email/Password
+        {
+          provider: firebase.auth.EmailAuthProvider.PROVIDER_ID,
+          requireDisplayName: false,
+          fullLabel: 'Continue with Email'
+        },
 
-  firebase.auth().onAuthStateChanged(async user => {
-    if (user) {
-      currentUser = user;
-      idToken = await user.getIdToken();
-      document.getElementById('userEmail').textContent = user.email || user.phoneNumber || 'User';
-      document.getElementById('auth-section').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
-      loadInventory();
-      loadShopping();
-      loadScanCount();
-      loadFamily();
-    } else {
-      document.getElementById('auth-section').classList.remove('hidden');
-      document.getElementById('app').classList.add('hidden');
-    }
-  });
-
-  document.getElementById('signOutBtn').onclick = () => firebase.auth().signOut();
-
-  // === API Helper ===
-  async function api(path, opts = {}) {
-    if (!idToken) return alert('Not signed in');
-    const res = await fetch(path, {
-      ...opts,
-      headers: {
-        'Authorization': `Bearer ${idToken}`,
-        'Content-Type': 'application/json',
-        ...opts.headers
+        // Phone
+        {
+          provider: firebase.auth.PhoneAuthProvider.PROVIDER_ID,
+          recaptchaParameters: { size: 'invisible' },
+          defaultCountry: 'US',
+          fullLabel: 'Continue with Phone'
+        }
+      ],
+      callbacks: {
+        signInSuccessWithAuthResult: () => false
       }
     });
-    if (!res.ok) { const err = await res.text(); alert('API Error: ' + err); return null; }
-    return res.json();
-  }
 
-  // ... [rest of your existing JS: dark mode, voice, scanner, etc.]
-</script>
+    let currentUser = null;
+    let idToken = null;
+    let familyCode = null;
+
+    firebase.auth().onAuthStateChanged(async user => {
+      if (user) {
+        currentUser = user;
+        idToken = await user.getIdToken();
+        document.getElementById('userEmail').textContent = user.email || user.phoneNumber || 'User';
+        document.getElementById('auth-section').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        loadInventory();
+        loadShopping();
+        loadScanCount();
+        loadFamily();
+      } else {
+        document.getElementById('auth-section').classList.remove('hidden');
+        document.getElementById('app').classList.add('hidden');
+      }
+    });
+
+    document.getElementById('signOutBtn').onclick = () => firebase.auth().signOut();
+
+    // === API Helper ===
+    async function api(path, opts = {}) {
+      if (!idToken) return alert('Not signed in');
+      const res = await fetch(path, {
+        ...opts,
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+          ...opts.headers
+        }
+      });
+      if (!res.ok) { const err = await res.text(); alert('API Error: ' + err); return null; }
+      return res.json();
+    }
+
+    // === Dark Mode ===
+    document.getElementById('darkModeBtn').onclick = () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+    };
+    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+
+    // === Tab Switching ===
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      };
+    });
+
+    // === Load Data ===
+    async function loadInventory() {
+      const data = await api('/inventory');
+      const list = document.getElementById('inventoryList');
+      const low = data?.items?.filter(i => i.quantity <= 2) || [];
+      if (low.length) {
+        const toast = document.createElement('div');
+        toast.className = 'fixed bottom-6 left-6 bg-red-600 text-white p-3 rounded-lg shadow-lg z-50';
+        toast.textContent = `${low.length} item(s) low! Time to restock.`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+      }
+      list.innerHTML = renderItems(data?.items || [], false);
+    }
+
+    async function loadShopping() {
+      const data = await api('/shopping');
+      document.getElementById('shoppingList').innerHTML = renderItems(data?.list || [], true);
+    }
+
+    function renderItems(items, readonly) {
+      if (!items.length) return '<p class="text-center text-gray-500">Empty</p>';
+      return items.map(i => `
+        <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${i.quantity <= 2 ? 'low-stock' : ''}">
+          <div class="flex items-center gap-3">
+            <img src="${i.image || 'icon-192.png'}" class="w-10 h-10 rounded object-cover" onerror="this.src='icon-192.png'"/>
+            <div>
+              <strong>${i.name || i.itemName}</strong><br>
+              <span class="text-sm text-gray-600">${i.quantity || i.needed} ${i.expiration ? '| Exp: ' + i.expiration : ''}</span>
+              ${i.quantity <= 2 ? '<span class="text-red-600 text-xs ml-2">Low stock!</span>' : ''}
+            </div>
+          </div>
+          ${readonly ? '' : `<button onclick="removeItem('${i.barcode}')" class="text-red-600 text-sm">Remove</button>`}
+        </div>
+      `).join('');
+    }
+
+    window.removeItem = async barcode => {
+      if (confirm('Remove?')) {
+        await api('/remove', { method: 'POST', body: JSON.stringify({ barcode }) });
+        loadInventory();
+      }
+    };
+
+    // === Add to Inventory ===
+    document.getElementById('addToInventory').onclick = async () => {
+      const barcode = document.getElementById('invBarcode').value.trim();
+      const qty = parseInt(document.getElementById('invQty').value);
+      const exp = document.getElementById('invExp').value;
+      if (!barcode) return alert('Enter barcode');
+      await api('/add', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
+      document.getElementById('invBarcode').value = '';
+      document.getElementById('invQty').value = 1;
+      document.getElementById('invExp').value = '';
+      loadInventory();
+    };
+
+    // === Add to Shopping ===
+    document.getElementById('addToShopping').onclick = async () => {
+      const barcode = document.getElementById('shopBarcode').value.trim();
+      const name = document.getElementById('shopName').value.trim();
+      const needed = parseInt(document.getElementById('shopNeeded').value);
+      if (!barcode || !name) return alert('Fill barcode and name');
+      await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ barcode, itemName: name, needed }) });
+      document.getElementById('shopBarcode').value = '';
+      document.getElementById('shopName').value = '';
+      document.getElementById('shopNeeded').value = 1;
+      loadShopping();
+    };
+
+    // === Export CSV ===
+    document.getElementById('exportCsv').onclick = () => {
+      const link = document.createElement('a');
+      link.href = '/export-csv';
+      link.download = 'pantrypal-inventory.csv';
+      link.click();
+    };
+
+    // === Scan Count ===
+    async function loadScanCount() {
+      const data = await api('/user-info');
+      const el = document.getElementById('scanCounter');
+      if (data?.isPro) {
+        el.innerHTML = 'Unlimited scans (Pro)';
+      } else {
+        el.innerHTML = `Free scans: ${data?.scans || 0}/10`;
+      }
+    }
+
+    // === Family ===
+    async function loadFamily() {
+      const data = await api('/shared');
+      if (!data.role) {
+        document.getElementById('familySection').classList.add('hidden');
+        return;
+      }
+      document.getElementById('familySection').classList.remove('hidden');
+      document.getElementById('familyRole').textContent = data.role;
+      if (data.role === 'viewer') {
+        document.getElementById('addToInventory').disabled = true;
+        document.getElementById('addToShopping').disabled = true;
+      }
+      document.getElementById('inventoryList').innerHTML = renderItems(data.inventory, data.role === 'viewer');
+      document.getElementById('shoppingList').innerHTML = renderItems(data.shopping, true);
+    }
+
+    document.getElementById('leaveFamily').onclick = async () => {
+      if (confirm('Leave family?')) {
+        await api('/join-family', { method: 'POST', body: JSON.stringify({ code: '' }) });
+        location.reload();
+      }
+    };
+
+    // Show family modal if not joined
+    setTimeout(() => {
+      if (currentUser && !familyCode) {
+        document.getElementById('familyModal').classList.remove('hidden');
+      }
+    }, 2000);
+
+    document.getElementById('joinFamilyBtn').onclick = async () => {
+      const code = document.getElementById('familyCodeInput').value.trim().toUpperCase();
+      await api('/join-family', { method: 'POST', body: JSON.stringify({ code }) });
+      document.getElementById('familyModal').classList.add('hidden');
+      loadFamily();
+    };
+
+    document.getElementById('cancelFamilyBtn').onclick = () => {
+      document.getElementById('familyModal').classList.add('hidden');
+    };
+
+    // === AI Scan, Voice, Scanner – (keep your existing code below) ===
+    // ... [your existing AI scan, voice, scanner logic]
+  </script>
+</body>
+</html>
