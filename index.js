@@ -1,4 +1,4 @@
-// index.js – FINAL PRODUCTION VERSION
+// index.js – FINAL PRODUCTION VERSION (with Pro editing)
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import bodyParser from 'body-parser';
@@ -20,7 +20,7 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(fileUpload({ limits: { fileSize: 10 * 1024 * 1024 } }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// HEALTH CHECK (Render)
+// HEALTH CHECK
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
@@ -80,7 +80,7 @@ async function checkAuth(req, res, next) {
   }
 }
 
-// === ROUTES (unchanged) ===
+// === EXISTING ROUTES (unchanged) ===
 app.post('/scan', checkAuth, async (req, res) => {
   if (!req.files?.image) return res.status(400).json({ error: 'No image uploaded' });
   try {
@@ -256,6 +256,37 @@ app.get('/shared', checkAuth, async (req, res) => {
   });
 });
 
+// === NEW: UPDATE ITEM (Pro Only) ===
+app.post('/update-item', checkAuth, async (req, res) => {
+  const { barcode, name, quantity, expiration } = req.body;
+  const userId = req.user.uid;
+  const userSnap = await db.collection('users').doc(userId).get();
+  if (!userSnap.data().isPro) return res.status(403).json({ error: 'Pro required' });
+
+  const ref = db.collection('users').doc(userId).collection('items').doc(barcode);
+  const doc = await ref.get();
+  if (!doc.exists) return res.status(404).json({ error: 'Item not found' });
+
+  await ref.update({ name, quantity: parseInt(quantity), expiration });
+  res.json({ success: true });
+});
+
+// === NEW: UPDATE SHOPPING ITEM (Pro Only) ===
+app.post('/update-shopping', checkAuth, async (req, res) => {
+  const { barcode, itemName, needed } = req.body;
+  const userId = req.user.uid;
+  const userSnap = await db.collection('users').doc(userId).get();
+  if (!userSnap.data().isPro) return res.status(403).json({ error: 'Pro required' });
+
+  const ref = db.collection('users').doc(userId).collection('shopping').doc(barcode);
+  const doc = await ref.get();
+  if (!doc.exists) return res.status(404).json({ error: 'Item not found' });
+
+  await ref.update({ itemName, needed: parseInt(needed) });
+  res.json({ success: true });
+});
+
+// SERVE PWA
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
