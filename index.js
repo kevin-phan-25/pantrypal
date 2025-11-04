@@ -1,4 +1,4 @@
-// index.js – PantryPal AI + Firestore + PWA + Family Share + Low Stock Alerts
+// index.js – PantryPal AI + Firestore + PWA + Family Share + Low Stock + HEALTH CHECK
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import bodyParser from 'body-parser';
@@ -20,13 +20,20 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(fileUpload({ limits: { fileSize: 10 * 1024 * 1024 } }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// === HEALTH CHECK (Render) ===
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 // === Firebase Admin ===
 let credential;
 try {
   if (process.env.FIREBASE_CREDENTIALS) {
     credential = cert(JSON.parse(process.env.FIREBASE_CREDENTIALS));
+    console.log('Using FIREBASE_CREDENTIALS env var');
   } else if (fs.existsSync('./credentials.json')) {
     credential = cert('./credentials.json');
+    console.log('Using ./credentials.json');
   } else {
     throw new Error('No Firebase credentials');
   }
@@ -288,7 +295,9 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// === START SERVER (FIXED PORT BINDING) ===
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`PantryPal running on port ${PORT}`);
+  console.log(`Health check: http://0.0.0.0:${PORT}/health`);
 });
