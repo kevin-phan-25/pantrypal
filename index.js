@@ -1,4 +1,4 @@
-// index.js – PantryPal AI + Firestore + PWA + Google Auth
+// index.js – PantryPal AI + Firestore + PWA + Family Share + Low Stock Alerts
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import bodyParser from 'body-parser';
@@ -25,10 +25,8 @@ let credential;
 try {
   if (process.env.FIREBASE_CREDENTIALS) {
     credential = cert(JSON.parse(process.env.FIREBASE_CREDENTIALS));
-    console.log('Using FIREBASE_CREDENTIALS env var');
   } else if (fs.existsSync('./credentials.json')) {
     credential = cert('./credentials.json');
-    console.log('Using ./credentials.json');
   } else {
     throw new Error('No Firebase credentials');
   }
@@ -42,7 +40,7 @@ try {
 const auth = getAuth();
 const db = getFirestore();
 
-// === Google Cloud Vision Client (Render Secret File) ===
+// === Google Cloud Vision Client ===
 let visionClient;
 try {
   const keyPath = process.env.GCLOUD_KEY_PATH || '/etc/secrets/gcloud-key.json';
@@ -54,10 +52,7 @@ try {
   }
 } catch (err) {
   console.error('Vision API init failed:', err.message);
-  // Graceful fallback – disable AI scan
-  visionClient = {
-    textDetection: async () => [{ textAnnotations: [{ description: '' }] }]
-  };
+  visionClient = { textDetection: async () => [{ textAnnotations: [{ description: '' }] }] };
 }
 
 // === Auth Middleware ===
@@ -78,12 +73,9 @@ async function checkAuth(req, res, next) {
   }
 }
 
-// === AI SCAN (Improved) ===
+// === AI SCAN ===
 app.post('/scan', checkAuth, async (req, res) => {
-  if (!req.files?.image) {
-    console.error('No image uploaded');
-    return res.status(400).json({ error: 'No image uploaded' });
-  }
+  if (!req.files?.image) return res.status(400).json({ error: 'No image uploaded' });
 
   try {
     const [result] = await visionClient.textDetection({ image: { content: req.files.image.data } });
@@ -93,8 +85,6 @@ app.post('/scan', checkAuth, async (req, res) => {
     const expMatch = lines.find(l => /\d{4}-\d{2}-\d{2}/.test(l));
     const expirationDate = expMatch || '';
     const barcodeMatch = lines.find(l => /^\d{8,}$/.test(l)) || req.body.barcode || '';
-
-    console.log('AI Scan Result:', { itemName, expirationDate, barcodeMatch, fullText: text.slice(0, 200) });
 
     if (barcodeMatch) {
       const ref = db.collection('users').doc(req.user.uid).collection('items').doc(barcodeMatch);
@@ -118,9 +108,7 @@ app.post('/scan', checkAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('AI Scan Error:', err);
-    res.status(500).json({ 
-      error: 'Failed to process image. Is the Google Cloud Vision API key configured?' 
-    });
+    res.status(500).json({ error: 'Vision API not configured' });
   }
 });
 
@@ -129,6 +117,7 @@ app.post('/add', checkAuth, async (req, res) => {
   const { barcode, quantity = 1, expiration = '', name } = req.body;
   const userId = req.user.uid;
   if (!barcode) return res.status(400).json({ error: 'barcode required' });
+
   const ref = db.collection('users').doc(userId).collection('items').doc(barcode);
   const doc = await ref.get();
   if (doc.exists) {
@@ -152,6 +141,7 @@ app.post('/add-to-shopping', checkAuth, async (req, res) => {
   const { barcode, itemName, needed = 1 } = req.body;
   const userId = req.user.uid;
   if (!barcode || !itemName) return res.status(400).json({ error: 'barcode and itemName required' });
+
   const ref = db.collection('users').doc(userId).collection('shopping').doc(barcode);
   const doc = await ref.get();
   if (doc.exists) {
@@ -179,7 +169,13 @@ app.get('/shopping', checkAuth, async (req, res) => {
 // === REMOVE FROM INVENTORY ===
 app.post('/remove', checkAuth, async (req, res) => {
   const { barcode } = req.body;
-  await db.collection('users').doc(req.user.uid).collection('items').doc(barcode).delete();
+  const userId = req.user.uid;
+  await db.collection('users').doc(userId).collection('items').doc(barcode).delete();
+  await db.collection('users').doc(userId).collection('audit').add({
+    action: 'remove',
+    barcode,
+    timestamp: FieldValue.serverTimestamp()
+  });
   res.json({ success: true });
 });
 
@@ -190,7 +186,7 @@ app.post('/remove-from-shopping', checkAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-// === PRODUCT INFO (Open Food Facts) ===
+// === PRODUCT INFO ===
 app.get('/product-info/:barcode', checkAuth, async (req, res) => {
   const { barcode } = req.params;
   try {
@@ -206,38 +202,30 @@ app.get('/product-info/:barcode', checkAuth, async (req, res) => {
       res.json({ name: barcode, image: null });
     }
   } catch (err) {
-    console.error('OFF API error:', err);
     res.json({ name: barcode, image: null });
   }
 });
 
-// === USER INFO (scan count + pro status) ===
+// === USER INFO ===
 app.get('/user-info', checkAuth, async (req, res) => {
   const snap = await db.collection('users').doc(req.user.uid).get();
   const data = snap.data();
-  res.json({ scans: data.scans || 0, isPro: !!data.isPro });
+  res.json({ scans: data.scans || 0, isPro: !!data.isPro, familyCode: data.familyCode });
 });
 
-// === RECORD SCAN (free limit 10) ===
+// === RECORD SCAN ===
 app.post('/record-scan', checkAuth, async (req, res) => {
   const userRef = db.collection('users').doc(req.user.uid);
   const snap = await userRef.get();
   const data = snap.data();
-
-  if (data.isPro) {
-    return res.json({ allowed: true });
-  }
-
+  if (data.isPro) return res.json({ allowed: true });
   const newCount = (data.scans || 0) + 1;
-  if (newCount > 10) {
-    return res.json({ allowed: false, message: 'Free limit reached (10 scans). Upgrade to Pro!' });
-  }
-
+  if (newCount > 10) return res.json({ allowed: false, message: 'Free limit reached' });
   await userRef.update({ scans: newCount });
   res.json({ allowed: true });
 });
 
-// === EXPORT INVENTORY CSV ===
+// === EXPORT CSV ===
 app.get('/export-csv', checkAuth, async (req, res) => {
   const snapshot = await db.collection('users').doc(req.user.uid).collection('items').get();
   const items = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
@@ -245,10 +233,54 @@ app.get('/export-csv', checkAuth, async (req, res) => {
     ['Barcode', 'Name', 'Quantity', 'Expiration'],
     ...items.map(i => [i.barcode, i.name || i.barcode, i.quantity, i.expiration || ''])
   ].map(row => row.join(',')).join('\n');
-
   res.set('Content-Type', 'text/csv');
   res.set('Content-Disposition', 'attachment; filename="pantrypal-inventory.csv"');
   res.send(csv);
+});
+
+// === FAMILY: CREATE CODE ===
+app.post('/create-family', checkAuth, async (req, res) => {
+  const userId = req.user.uid;
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const batch = db.batch();
+  batch.update(db.collection('users').doc(userId), { familyCode: code, familyRole: 'owner' });
+  batch.set(db.collection('families').doc(code), { owner: userId, name: 'My Family', members: [userId] });
+  await batch.commit();
+  res.json({ code });
+});
+
+// === FAMILY: JOIN ===
+app.post('/join-family', checkAuth, async (req, res) => {
+  const { code } = req.body;
+  const userId = req.user.uid;
+  if (!code) {
+    await db.collection('users').doc(userId).update({ familyCode: FieldValue.delete(), familyRole: FieldValue.delete() });
+    return res.json({ success: true });
+  }
+  const familySnap = await db.collection('families').doc(code).get();
+  if (!familySnap.exists) return res.status(400).json({ error: 'Invalid code' });
+  const isPro = (await db.collection('users').doc(userId).get()).data().isPro;
+  const role = isPro ? 'editor' : 'viewer';
+  const batch = db.batch();
+  batch.update(db.collection('users').doc(userId), { familyCode: code, familyRole: role });
+  batch.update(familySnap.ref, { members: FieldValue.arrayUnion(userId) });
+  await batch.commit();
+  res.json({ role });
+});
+
+// === FAMILY: GET SHARED DATA ===
+app.get('/shared', checkAuth, async (req, res) => {
+  const userSnap = await db.collection('users').doc(req.user.uid).get();
+  const { familyCode, familyRole } = userSnap.data() || {};
+  if (!familyCode) return res.json({ inventory: [], shopping: [], role: null });
+  const ownerId = (await db.collection('families').doc(familyCode).get()).data().owner;
+  const invSnap = await db.collection('users').doc(ownerId).collection('items').get();
+  const shopSnap = await db.collection('users').doc(ownerId).collection('shopping').get();
+  res.json({
+    inventory: invSnap.docs.map(d => ({ barcode: d.id, ...d.data() })),
+    shopping: shopSnap.docs.map(d => ({ barcode: d.id, ...d.data() })),
+    role: familyRole
+  });
 });
 
 // === SERVE PWA ===
