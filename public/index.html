@@ -14,7 +14,6 @@
     .icon { @apply w-5 h-5 inline-block; }
     .tab { @apply hidden; }
     .tab.active { @apply block; }
-    #scanner-container { position: relative; width: 100%; max-width: 500px; margin: 0 auto; }
     #scanner-overlay::after {
       content: '';
       position: absolute;
@@ -228,7 +227,9 @@
         document.getElementById('app').classList.remove('hidden');
         const u = await api('/user-info');
         isPro = u?.isPro || false;
-        loadInventory(); loadShopping(); loadScanCount(); loadFamily();
+        await loadInventory();   // <-- separate calls
+        await loadShopping();    // <-- separate calls
+        loadScanCount(); loadFamily();
       } else {
         document.getElementById('auth-section').classList.remove('hidden');
         document.getElementById('app').classList.add('hidden');
@@ -393,7 +394,7 @@
       }
     };
 
-    // === INVENTORY & SHOPPING LIST ===
+    // === INVENTORY LIST (only in Inventory tab) ===
     async function loadInventory() {
       const d = await api('/inventory');
       const low = d?.items?.filter(i => i.quantity <= 2) || [];
@@ -408,6 +409,7 @@
       document.getElementById('inventoryList').innerHTML = await renderItems(d?.items || [], false);
     }
 
+    // === SHOPPING LIST (only in Shopping tab) ===
     async function loadShopping() {
       const d = await api('/shopping');
       document.getElementById('shoppingList').innerHTML = await renderItems(d?.list || [], true);
@@ -442,6 +444,7 @@
       return rows.join('');
     }
 
+    // Edit / Remove
     window.editItem = async barcode => {
       if (!isPro) return alert('Pro required');
       editingItem = barcode;
@@ -482,6 +485,7 @@
       }
     };
 
+    // Add to Inventory
     document.getElementById('addToInventory').onclick = async () => {
       const barcode = document.getElementById('invBarcode').value.trim();
       const qty = +document.getElementById('invQty').value;
@@ -499,6 +503,7 @@
       loadInventory();
     };
 
+    // Add to Shopping
     document.getElementById('addToShopping').onclick = async () => {
       const barcode = document.getElementById('shopBarcode').value.trim();
       const name = document.getElementById('shopName').value.trim();
@@ -516,6 +521,7 @@
       loadShopping();
     };
 
+    // Export CSV
     document.getElementById('exportCsv').onclick = () => {
       const a = document.createElement('a');
       a.href = '/export-csv';
@@ -523,12 +529,14 @@
       a.click();
     };
 
+    // Scan Count
     async function loadScanCount() {
       const d = await api('/user-info');
       const el = document.getElementById('scanCounter');
       el.innerHTML = d?.isPro ? 'Unlimited scans (Pro)' : `Free scans: ${d?.scans||0}/10`;
     }
 
+    // Family
     let hasSeenJoinPrompt = localStorage.getItem('hasSeenJoinPrompt') === 'true';
     async function loadFamily() {
       const d = await api('/shared');
@@ -548,8 +556,7 @@
         document.getElementById('addToInventory').disabled = true;
         document.getElementById('addToShopping').disabled = true;
       }
-      document.getElementById('inventoryList').innerHTML = await renderItems(d.inventory, false);
-      document.getElementById('shoppingList').innerHTML = await renderItems(d.shopping, true);
+      // **Do NOT render inventory/shopping here** – they are loaded in their own tabs
     }
 
     document.getElementById('leaveFamily').onclick = async () => {
