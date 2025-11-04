@@ -112,9 +112,8 @@
       <button class="tab-btn flex-1 py-3 font-medium text-center transition" data-tab="shopping">Shopping List</button>
     </div>
 
-    <!-- ==== INVENTORY TAB ==== -->
+    <!-- INVENTORY TAB -->
     <section id="inventory" class="tab active bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <!-- Add / Edit Form -->
       <h3 class="text-lg font-semibold mb-3">Add / Edit Item</h3>
       <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <div class="grid grid-cols-2 gap-2">
@@ -126,14 +125,11 @@
         <span id="inventoryBtnText">Add to Inventory</span>
       </button>
       <button id="exportCsv" class="mt-3 w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">Export Inventory (CSV)</button>
-
-      <!-- List -->
       <div id="inventoryList" class="mt-5 space-y-2"></div>
     </section>
 
-    <!-- ==== SHOPPING TAB ==== -->
+    <!-- SHOPPING TAB -->
     <section id="shopping" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <!-- Add / Edit Form -->
       <h3 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h3>
       <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
@@ -142,8 +138,6 @@
         <svg class="icon"><use href="#heroicons-plus"/></svg>
         <span id="shoppingBtnText">Add to List</span>
       </button>
-
-      <!-- List -->
       <div id="shoppingList" class="mt-5 space-y-2"></div>
     </section>
 
@@ -177,7 +171,7 @@
     </div>
   </main>
 
-  <!-- Firebase -->
+  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.js"></script>
@@ -198,8 +192,17 @@
 
   <!-- App Logic -->
   <script>
-    const firebaseConfig = { /* … same as before … */ };
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
+      measurementId: "G-P641JW4KS4"
+    };
     firebase.initializeApp(firebaseConfig);
+
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
     ui.start('#firebaseui-auth-container', {
       signInFlow: 'popup',
@@ -245,13 +248,14 @@
       return res.json();
     }
 
-    /* Dark mode, tabs, scanner, voice, AI-scan – unchanged (same code as previous version) */
+    // Dark Mode
     document.getElementById('darkModeBtn').onclick = () => {
       document.documentElement.classList.toggle('dark');
       localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
     };
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
+    // Tabs
     document.querySelectorAll('.tab-btn').forEach(b => {
       b.onclick = () => {
         document.querySelectorAll('.tab-btn,.tab').forEach(e => e.classList.remove('active'));
@@ -260,7 +264,7 @@
       };
     });
 
-    /* ---------- SCANNER ---------- */
+    // Scanner
     document.getElementById('startScanner').onclick = async () => {
       const modal = document.getElementById('scannerModal');
       const video = document.getElementById('scanner-video');
@@ -290,7 +294,7 @@
       alert(`Scanned: ${code}`);
     }
 
-    /* ---------- VOICE ---------- */
+    // Voice
     const voiceBtn = document.getElementById('voiceBtn');
     const voiceResult = document.getElementById('voiceResult');
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -318,7 +322,7 @@
       recognition.onend = ()=>{listening=false;voiceBtn.classList.remove('bg-red-600');};
     } else { voiceBtn.disabled=true; voiceBtn.innerHTML='<span>Mic not supported</span>'; }
 
-    /* ---------- AI SCAN ---------- */
+    // AI Scan
     document.getElementById('scanBtn').onclick = async () => {
       const file = document.getElementById('scanImage').files[0];
       if (!file) return alert('Select an image');
@@ -332,7 +336,7 @@
       if (d.record?.barcode) document.getElementById('invBarcode').value = d.record.barcode;
     };
 
-    /* ---------- INVENTORY ---------- */
+    // Inventory
     async function loadInventory() {
       const d = await api('/inventory');
       const low = d?.items?.filter(i=>i.quantity<=2)||[];
@@ -346,7 +350,7 @@
       document.getElementById('inventoryList').innerHTML = await renderItems(d?.items||[], false);
     }
 
-    /* ---------- SHOPPING ---------- */
+    // Shopping
     async function loadShopping() {
       const d = await api('/shopping');
       document.getElementById('shoppingList').innerHTML = await renderItems(d?.list||[], true);
@@ -462,7 +466,6 @@
         document.getElementById('addToInventory').disabled=true;
         document.getElementById('addToShopping').disabled=true;
       }
-      // **NO list rendering here** – each tab loads its own list
     }
     document.getElementById('leaveFamily').onclick = async () => {
       if(confirm('Leave family?')){
