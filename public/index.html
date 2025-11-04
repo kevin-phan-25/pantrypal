@@ -28,6 +28,9 @@
     .pulse { animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
     .low-stock { @apply bg-yellow-100 dark:bg-yellow-900 border-l-4 border-yellow-500 p-2 text-sm; }
+    .placeholder-img {
+      @apply w-10 h-10 rounded object-cover bg-gray-200 border border-gray-300;
+    }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
@@ -190,41 +193,19 @@
       appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
       measurementId: "G-P641JW4KS4"
     };
-
     firebase.initializeApp(firebaseConfig);
 
-    // === Firebase UI – Only enabled providers ===
+    // === Firebase UI ===
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
     ui.start('#firebaseui-auth-container', {
       signInFlow: 'popup',
       signInOptions: [
-        // Google
         firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-
-        // Apple
-        {
-          provider: 'apple.com',
-          fullLabel: 'Continue with Apple'
-        },
-
-        // Email/Password
-        {
-          provider: firebase.auth.EmailAuthProvider.PROVIDER_ID,
-          requireDisplayName: false,
-          fullLabel: 'Continue with Email'
-        },
-
-        // Phone
-        {
-          provider: firebase.auth.PhoneAuthProvider.PROVIDER_ID,
-          recaptchaParameters: { size: 'invisible' },
-          defaultCountry: 'US',
-          fullLabel: 'Continue with Phone'
-        }
+        { provider: 'apple.com', fullLabel: 'Continue with Apple' },
+        { provider: firebase.auth.EmailAuthProvider.PROVIDER_ID, requireDisplayName: false, fullLabel: 'Continue with Email' },
+        { provider: firebase.auth.PhoneAuthProvider.PROVIDER_ID, recaptchaParameters: { size: 'invisible' }, defaultCountry: 'US', fullLabel: 'Continue with Phone' }
       ],
-      callbacks: {
-        signInSuccessWithAuthResult: () => false
-      }
+      callbacks: { signInSuccessWithAuthResult: () => false }
     });
 
     let currentUser = null;
@@ -294,29 +275,47 @@
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 5000);
       }
-      list.innerHTML = renderItems(data?.items || [], false);
+      list.innerHTML = await renderItems(data?.items || [], false);
     }
 
     async function loadShopping() {
       const data = await api('/shopping');
-      document.getElementById('shoppingList').innerHTML = renderItems(data?.list || [], true);
+      document.getElementById('shoppingList').innerHTML = await renderItems(data?.list || [], true);
     }
 
-    function renderItems(items, readonly) {
+    // === Render Items with Real Product Images + No Flicker ===
+    async function renderItems(items, readonly) {
       if (!items.length) return '<p class="text-center text-gray-500">Empty</p>';
-      return items.map(i => `
-        <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${i.quantity <= 2 ? 'low-stock' : ''}">
-          <div class="flex items-center gap-3">
-            <img src="${i.image || 'icon-192.png'}" class="w-10 h-10 rounded object-cover" onerror="this.src='icon-192.png'"/>
-            <div>
-              <strong>${i.name || i.itemName}</strong><br>
-              <span class="text-sm text-gray-600">${i.quantity || i.needed} ${i.expiration ? '| Exp: ' + i.expiration : ''}</span>
-              ${i.quantity <= 2 ? '<span class="text-red-600 text-xs ml-2">Low stock!</span>' : ''}
+
+      const rows = await Promise.all(items.map(async i => {
+        let imgSrc = 'icon-192.png'; // default fallback
+        if (i.barcode) {
+          const info = await api(`/product-info/${i.barcode}`);
+          if (info?.image) imgSrc = info.image;
+        }
+
+        return `
+          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${i.quantity <= 2 ? 'low-stock' : ''}">
+            <div class="flex items-center gap-3">
+              <img 
+                src="${imgSrc}" 
+                alt="${i.name || i.itemName}" 
+                class="w-10 h-10 rounded object-cover bg-gray-200 border border-gray-300"
+                loading="lazy"
+                onerror="this.src='icon-192.png'; this.onerror=null;"
+              />
+              <div>
+                <strong>${i.name || i.itemName}</strong><br>
+                <span class="text-sm text-gray-600">${i.quantity || i.needed} ${i.expiration ? '| Exp: ' + i.expiration : ''}</span>
+                ${i.quantity <= 2 ? '<span class="text-red-600 text-xs ml-2">Low stock!</span>' : ''}
+              </div>
             </div>
+            ${readonly ? '' : `<button onclick="removeItem('${i.barcode}')" class="text-red-600 text-sm">Remove</button>`}
           </div>
-          ${readonly ? '' : `<button onclick="removeItem('${i.barcode}')" class="text-red-600 text-sm">Remove</button>`}
-        </div>
-      `).join('');
+        `;
+      }));
+
+      return rows.join('');
     }
 
     window.removeItem = async barcode => {
@@ -384,8 +383,8 @@
         document.getElementById('addToInventory').disabled = true;
         document.getElementById('addToShopping').disabled = true;
       }
-      document.getElementById('inventoryList').innerHTML = renderItems(data.inventory, data.role === 'viewer');
-      document.getElementById('shoppingList').innerHTML = renderItems(data.shopping, true);
+      document.getElementById('inventoryList').innerHTML = await renderItems(data.inventory, data.role === 'viewer');
+      document.getElementById('shoppingList').innerHTML = await renderItems(data.shopping, true);
     }
 
     document.getElementById('leaveFamily').onclick = async () => {
@@ -395,7 +394,6 @@
       }
     };
 
-    // Show family modal if not joined
     setTimeout(() => {
       if (currentUser && !familyCode) {
         document.getElementById('familyModal').classList.remove('hidden');
