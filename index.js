@@ -1,4 +1,4 @@
-// index.js – PantryPal AI + Firestore + PWA + Google Auth (NO PUSH)
+// index.js – PantryPal AI + Firestore + PWA + Google Auth
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import bodyParser from 'body-parser';
@@ -41,7 +41,24 @@ try {
 
 const auth = getAuth();
 const db = getFirestore();
-const visionClient = new vision.ImageAnnotatorClient();
+
+// === Google Cloud Vision Client (Render Secret File) ===
+let visionClient;
+try {
+  const keyPath = process.env.GCLOUD_KEY_PATH || '/etc/secrets/gcloud-key.json';
+  if (fs.existsSync(keyPath)) {
+    console.log('Using Vision API key from:', keyPath);
+    visionClient = new vision.ImageAnnotatorClient({ keyFilename: keyPath });
+  } else {
+    throw new Error('Vision API key file not found');
+  }
+} catch (err) {
+  console.error('Vision API init failed:', err.message);
+  // Graceful fallback – disable AI scan
+  visionClient = {
+    textDetection: async () => [{ textAnnotations: [{ description: '' }] }]
+  };
+}
 
 // === Auth Middleware ===
 async function checkAuth(req, res, next) {
@@ -61,7 +78,7 @@ async function checkAuth(req, res, next) {
   }
 }
 
-// === AI SCAN (Improved for Image Upload) ===
+// === AI SCAN (Improved) ===
 app.post('/scan', checkAuth, async (req, res) => {
   if (!req.files?.image) {
     console.error('No image uploaded');
@@ -77,7 +94,7 @@ app.post('/scan', checkAuth, async (req, res) => {
     const expirationDate = expMatch || '';
     const barcodeMatch = lines.find(l => /^\d{8,}$/.test(l)) || req.body.barcode || '';
 
-    console.log('AI Scan Result:', { itemName, expirationDate, barcodeMatch, fullText: text });
+    console.log('AI Scan Result:', { itemName, expirationDate, barcodeMatch, fullText: text.slice(0, 200) });
 
     if (barcodeMatch) {
       const ref = db.collection('users').doc(req.user.uid).collection('items').doc(barcodeMatch);
@@ -101,7 +118,9 @@ app.post('/scan', checkAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('AI Scan Error:', err);
-    res.status(500).json({ error: 'Failed to process image: ' + err.message });
+    res.status(500).json({ 
+      error: 'Failed to process image. Is the Google Cloud Vision API key configured?' 
+    });
   }
 });
 
