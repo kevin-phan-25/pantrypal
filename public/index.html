@@ -84,10 +84,10 @@
 
     <!-- Voice -->
     <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
-      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+      <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
         <svg class="icon"><use href="#heroicons-microphone"/></svg>
         Voice Commands
-      </h3>
+      </h2>
       <button id="voiceBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition">
         <svg class="icon"><use href="#heroicons-microphone"/></svg>
         <span>Hold to Speak</span>
@@ -97,10 +97,10 @@
 
     <!-- AI Scan -->
     <section class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
-      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+      <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
         <svg class="icon"><use href="#heroicons-sparkles"/></svg>
         AI Scan Product
-      </h3>
+      </h2>
       <input type="file" id="scanImage" accept="image/*" class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
       <button id="scanBtn" class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
         <svg class="icon"><use href="#heroicons-magnifying-glass"/></svg>
@@ -119,7 +119,7 @@
 
     <!-- Inventory -->
     <section id="inventory" class="tab active bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <h3 class="text-lg font-semibold mb-3">Add / Edit Item</h3>
+      <h2 class="text-lg font-semibold mb-3">Add / Edit Item</h2>
       <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <div class="grid grid-cols-2 gap-2">
         <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
@@ -137,7 +137,7 @@
 
     <!-- Shopping -->
     <section id="shopping" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <h3 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h3>
+      <h2 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h2>
       <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3"/>
@@ -170,7 +170,7 @@
   <!-- Icons -->
   <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
     <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></symbol>
-    <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 0111.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
+    <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
     <symbol id="heroicons-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></symbol>
     <symbol id="heroicons-magnifying-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></symbol>
     <symbol id="heroicons-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></symbol>
@@ -270,7 +270,7 @@
       document.getElementById('shoppingList').innerHTML = await renderItems(d?.list || [], true);
     }
 
-    async function renderItems(items, isShopping) {
+    async function renderItems(items, readonly) {
       if (!items.length) return '<p class="text-center text-gray-500">Empty</p>';
       const rows = await Promise.all(items.map(async i => {
         let img = 'icon-192.png';
@@ -279,51 +279,39 @@
           if (p?.image) img = p.image;
         }
         return `
-          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${i.quantity <= 2 ? 'low-stock' : ''}">
             <div class="flex items-center gap-3">
               <img src="${img}" alt="${i.name||i.itemName}" class="w-10 h-10 rounded object-cover bg-gray-200 border" loading="lazy" onerror="this.src='icon-192.png';this.onerror=null;">
               <div>
                 <strong>${i.name||i.itemName}</strong><br>
                 <span class="text-sm text-gray-600">${i.quantity||i.needed} ${i.expiration ? '| Exp: '+i.expiration : ''}</span>
+                ${i.quantity <= 2 ? '<span class="text-red-600 text-xs ml-2">Low!</span>' : ''}
               </div>
             </div>
             <div class="flex gap-2">
-              <button onclick="editItem('${i.barcode}', ${isShopping})" class="text-blue-600 text-sm">Edit</button>
-              <button onclick="removeItem('${i.barcode}', ${isShopping})" class="text-red-600 text-sm">Remove</button>
+              <button onclick="editItem('${i.barcode}', false)" class="text-blue-600 text-sm">Edit</button>
+              <button onclick="removeItem('${i.barcode}', false)" class="text-red-600 text-sm">Remove</button>
             </div>
           </div>`;
       }));
       return rows.join('');
     }
 
-    window.editItem = async (barcode, isShopping) => {
+    window.editItem = async barcode => {
       if (!isPro) return alert('Pro required to edit');
       editingItem = barcode;
-      const data = isShopping ? await api('/shopping') : await api('/inventory');
-      const itm = (isShopping ? data.list : data.items).find(x => x.barcode === barcode);
+      const data = await api('/inventory');
+      const itm = data.items.find(x => x.barcode === barcode);
       if (!itm) return;
-
-      if (isShopping) {
-        document.getElementById('shopBarcode').value = itm.barcode;
-        document.getElementById('shopName').value = itm.itemName;
-        document.getElementById('shopNeeded').value = itm.needed;
-        document.querySelector('[data-tab="shopping"]').click();
-        document.getElementById('shoppingBtnText').textContent = 'Update Item';
-      } else {
-        document.getElementById('invBarcode').value = itm.barcode;
-        document.getElementById('invQty').value = itm.quantity;
-        document.getElementById('invExp').value = itm.expiration || '';
-        document.querySelector('[data-tab="inventory"]').click();
-        document.getElementById('inventoryBtnText').textContent = 'Update Item';
-      }
+      document.getElementById('invBarcode').value = itm.barcode;
+      document.getElementById('invQty').value = itm.quantity;
+      document.getElementById('invExp').value = itm.expiration || '';
+      document.querySelector('[data-tab="inventory"]').click();
+      document.getElementById('inventoryBtnText').textContent = 'Update Item';
     };
 
-    window.removeItem = async (barcode, isShopping) => {
-      if (!confirm('Remove?')) return;
-      if (isShopping) {
-        await api('/remove-from-shopping', { method: 'POST', body: JSON.stringify({ barcode }) });
-        loadShopping();
-      } else {
+    window.removeItem = async barcode => {
+      if (confirm('Remove?')) {
         await api('/remove', { method: 'POST', body: JSON.stringify({ barcode }) });
         loadInventory();
       }
@@ -347,6 +335,32 @@
       loadInventory();
     };
 
+    // Shopping List Edit + Remove
+    async function loadShopping() {
+      const d = await api('/shopping');
+      document.getElementById('shoppingList').innerHTML = await renderItems(d?.list || [], true);
+    }
+
+    window.editShopping = async barcode => {
+      if (!isPro) return alert('Pro required to edit');
+      editingItem = barcode;
+      const data = await api('/shopping');
+      const itm = data.list.find(x => x.barcode === barcode);
+      if (!itm) return;
+      document.getElementById('shopBarcode').value = itm.barcode;
+      document.getElementById('shopName').value = itm.itemName;
+      document.getElementById('shopNeeded').value = itm.needed;
+      document.querySelector('[data-tab="shopping"]').click();
+      document.getElementById('shoppingBtnText').textContent = 'Update Item';
+    };
+
+    window.removeShopping = async barcode => {
+      if (confirm('Remove?')) {
+        await api('/remove-from-shopping', { method: 'POST', body: JSON.stringify({ barcode }) });
+        loadShopping();
+      }
+    };
+
     document.getElementById('addToShopping').onclick = async () => {
       const barcode = document.getElementById('shopBarcode').value.trim();
       const name = document.getElementById('shopName').value.trim();
@@ -365,6 +379,7 @@
       loadShopping();
     };
 
+    // Export CSV
     document.getElementById('exportCsv').onclick = () => {
       const a = document.createElement('a');
       a.href = '/export-csv';
@@ -372,12 +387,14 @@
       a.click();
     };
 
+    // Scan Count
     async function loadScanCount() {
       const d = await api('/user-info');
       const el = document.getElementById('scanCounter');
       el.innerHTML = d?.isPro ? 'Unlimited scans (Pro)' : `Free scans: ${d?.scans||0}/10`;
     }
 
+    // Family
     let hasSeenJoinPrompt = localStorage.getItem('hasSeenJoinPrompt') === 'true';
     async function loadFamily() {
       const d = await api('/shared');
@@ -422,6 +439,8 @@
       document.getElementById('familyModal').classList.add('hidden');
       localStorage.setItem('hasSeenJoinPrompt', 'true');
     };
+
+    // Your existing AI scan, voice, scanner code stays the same
   </script>
 </body>
 </html>
