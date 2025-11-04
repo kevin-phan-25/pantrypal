@@ -28,9 +28,7 @@
     .pulse { animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
     .low-stock { @apply bg-yellow-100 dark:bg-yellow-900 border-l-4 border-yellow-500 p-2 text-sm; }
-    .placeholder-img {
-      @apply w-10 h-10 rounded object-cover bg-gray-200 border border-gray-300;
-    }
+    .placeholder-img { @apply w-10 h-10 rounded object-cover bg-gray-200 border border-gray-300; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
@@ -64,7 +62,7 @@
     <!-- User + Family -->
     <div class="flex flex-col gap-2">
       <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
-        <p class="font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
+        <p class="font-medium"><span class="font-bold"> ujUser:</span> <span id="userEmail"></span></p>
         <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1 rounded transition">
           Sign Out
         </button>
@@ -121,7 +119,7 @@
 
     <!-- Inventory -->
     <section id="inventory" class="tab active bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <h3 class="text-lg font-semibold mb-3">Add to Inventory</h3>
+      <h3 class="text-lg font-semibold mb-3">Add / Edit Item</h3>
       <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <div class="grid grid-cols-2 gap-2">
         <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
@@ -129,7 +127,7 @@
       </div>
       <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
         <svg class="icon"><use href="#heroicons-plus"/></svg>
-        Add to Inventory
+        <span id="inventoryBtnText">Add to Inventory</span>
       </button>
       <button id="exportCsv" class="mt-3 w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">
         Export Inventory (CSV)
@@ -139,13 +137,13 @@
 
     <!-- Shopping -->
     <section id="shopping" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <h2 class="text-lg font-semibold mb-3">Add to Shopping List</h2>
+      <h2 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h2>
       <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3"/>
       <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
         <svg class="icon"><use href="#heroicons-plus"/></svg>
-        Add to List
+        <span id="shoppingBtnText">Add to List</span>
       </button>
       <div id="shoppingList" class="mt-5 space-y-2"></div>
     </section>
@@ -195,7 +193,6 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    // === Firebase UI ===
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
     ui.start('#firebaseui-auth-container', {
       signInFlow: 'popup',
@@ -210,7 +207,8 @@
 
     let currentUser = null;
     let idToken = null;
-    let familyCode = null;
+    let isPro = false;
+    let editingItem = null;
 
     firebase.auth().onAuthStateChanged(async user => {
       if (user) {
@@ -219,6 +217,10 @@
         document.getElementById('userEmail').textContent = user.email || user.phoneNumber || 'User';
         document.getElementById('auth-section').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
+
+        const userData = await api('/user-info');
+        isPro = userData?.isPro || false;
+
         loadInventory();
         loadShopping();
         loadScanCount();
@@ -231,7 +233,6 @@
 
     document.getElementById('signOutBtn').onclick = () => firebase.auth().signOut();
 
-    // === API Helper ===
     async function api(path, opts = {}) {
       if (!idToken) return alert('Not signed in');
       const res = await fetch(path, {
@@ -246,14 +247,12 @@
       return res.json();
     }
 
-    // === Dark Mode ===
     document.getElementById('darkModeBtn').onclick = () => {
       document.documentElement.classList.toggle('dark');
       localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
     };
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-    // === Tab Switching ===
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.onclick = () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -263,7 +262,6 @@
       };
     });
 
-    // === Load Data ===
     async function loadInventory() {
       const data = await api('/inventory');
       const list = document.getElementById('inventoryList');
@@ -272,6 +270,7 @@
         const toast = document.createElement('div');
         toast.className = 'fixed bottom-6 left-6 bg-red-600 text-white p-3 rounded-lg shadow-lg z-50';
         toast.textContent = `${low.length} item(s) low! Time to restock.`;
+        toast.onclick = () => toast.remove();
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 5000);
       }
@@ -283,40 +282,60 @@
       document.getElementById('shoppingList').innerHTML = await renderItems(data?.list || [], true);
     }
 
-    // === Render Items with Real Product Images + No Flicker ===
     async function renderItems(items, readonly) {
       if (!items.length) return '<p class="text-center text-gray-500">Empty</p>';
 
       const rows = await Promise.all(items.map(async i => {
-        let imgSrc = 'icon-192.png'; // default fallback
+        let imgSrc = 'icon-192.png';
         if (i.barcode) {
           const info = await api(`/product-info/${i.barcode}`);
-          if (info?.image) imgSrc = info.image;
+          if (info?.image) imgSrc =,on info.image;
         }
 
         return `
           <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${i.quantity <= 2 ? 'low-stock' : ''}">
             <div class="flex items-center gap-3">
-              <img 
-                src="${imgSrc}" 
-                alt="${i.name || i.itemName}" 
-                class="w-10 h-10 rounded object-cover bg-gray-200 border border-gray-300"
-                loading="lazy"
-                onerror="this.src='icon-192.png'; this.onerror=null;"
-              />
+              <img src="${imgSrc}" alt="${i.name || i.itemName}" class="w-10 h-10 rounded object-cover bg-gray-200 border" loading="lazy" onerror="this.src='icon-192.png'; this.onerror=null;"/>
               <div>
                 <strong>${i.name || i.itemName}</strong><br>
                 <span class="text-sm text-gray-600">${i.quantity || i.needed} ${i.expiration ? '| Exp: ' + i.expiration : ''}</span>
                 ${i.quantity <= 2 ? '<span class="text-red-600 text-xs ml-2">Low stock!</span>' : ''}
               </div>
             </div>
-            ${readonly ? '' : `<button onclick="removeItem('${i.barcode}')" class="text-red-600 text-sm">Remove</button>`}
+            ${readonly ? '' : `
+              <div class="flex gap-2">
+                <button onclick="editItem('${i.barcode}', false)" class="text-blue-600 text-sm">Edit</button>
+                <button onclick="removeItem('${i.barcode}')" class="text-red-600 text-sm">Remove</button>
+              </div>
+            `}
           </div>
         `;
       }));
 
       return rows.join('');
     }
+
+    window.editItem = async (barcode, isShopping = false) => {
+      if (!isPro) return alert('Pro required to edit');
+      editingItem = barcode;
+      const data = isShopping ? await api('/shopping') : await api('/inventory');
+      const item = (isShopping ? data.list : data.items).find(i => i.barcode === barcode);
+      if (!item) return;
+
+      if (isShopping) {
+        document.getElementById('shopBarcode').value = item.barcode;
+        document.getElementById('shopName').value = item.itemName;
+        document.getElementById('shopNeeded').value = item.needed;
+        document.querySelector('[data-tab="shopping"]').click();
+        document.getElementById('shoppingBtnText').textContent = 'Update Item';
+      } else {
+        document.getElementById('invBarcode').value = item.barcode;
+        document.getElementById('invQty').value = item.quantity;
+        document.getElementById('invExp').value = item.expiration || '';
+        document.querySelector('[data-tab="inventory"]').click();
+        document.getElementById('inventoryBtnText').textContent = 'Update Item';
+      }
+    };
 
     window.removeItem = async barcode => {
       if (confirm('Remove?')) {
@@ -325,33 +344,46 @@
       }
     };
 
-    // === Add to Inventory ===
     document.getElementById('addToInventory').onclick = async () => {
       const barcode = document.getElementById('invBarcode').value.trim();
       const qty = parseInt(document.getElementById('invQty').value);
       const exp = document.getElementById('invExp').value;
-      if (!barcode) return alert('Enter barcode');
-      await api('/add', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
+
+      if (editingItem) {
+        await api('/update-item', { method: 'POST', body: JSON.stringify({ barcode: editingItem, quantity: qty, expiration: exp }) });
+        editingItem = null;
+        document.getElementById('inventoryBtnText').textContent = 'Add to73 Inventory';
+      } else {
+        if (!barcode) return alert('Enter barcode');
+        await api('/add', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
+      }
+
       document.getElementById('invBarcode').value = '';
       document.getElementById('invQty').value = 1;
       document.getElementById('invExp').value = '';
       loadInventory();
     };
 
-    // === Add to Shopping ===
     document.getElementById('addToShopping').onclick = async () => {
       const barcode = document.getElementById('shopBarcode').value.trim();
       const name = document.getElementById('shopName').value.trim();
       const needed = parseInt(document.getElementById('shopNeeded').value);
-      if (!barcode || !name) return alert('Fill barcode and name');
-      await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ barcode, itemName: name, needed }) });
+
+      if (editingItem) {
+        await api('/update-shopping', { method: 'POST', body: JSON.stringify({ barcode: editingItem, itemName: name, needed }) });
+        editingItem = null;
+        document.getElementById('shoppingBtnText').textContent = 'Add to List';
+      } else {
+        if (!barcode || !name) return alert('Fill barcode and name');
+        await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ barcode, itemName: name, needed }) });
+      }
+
       document.getElementById('shopBarcode').value = '';
       document.getElementById('shopName').value = '';
       document.getElementById('shopNeeded').value = 1;
       loadShopping();
     };
 
-    // === Export CSV ===
     document.getElementById('exportCsv').onclick = () => {
       const link = document.createElement('a');
       link.href = '/export-csv';
@@ -359,7 +391,6 @@
       link.click();
     };
 
-    // === Scan Count ===
     async function loadScanCount() {
       const data = await api('/user-info');
       const el = document.getElementById('scanCounter');
@@ -370,19 +401,29 @@
       }
     }
 
-    // === Family ===
+    let hasSeenJoinPrompt = localStorage.getItem('hasSeenJoinPrompt') === 'true';
     async function loadFamily() {
       const data = await api('/shared');
+      const familySection = document.getElementById('familySection');
+
       if (!data.role) {
-        document.getElementById('familySection').classList.add('hidden');
+        familySection.classList.add('hidden');
+        if (!hasSeenJoinPrompt && currentUser) {
+          document.getElementById('familyModal').classList.remove('hidden');
+          localStorage.setItem('hasSeenJoinPrompt', 'true');
+          hasSeenJoinPrompt = true;
+        }
         return;
       }
-      document.getElementById('familySection').classList.remove('hidden');
+
+      familySection.classList.remove('hidden');
       document.getElementById('familyRole').textContent = data.role;
+
       if (data.role === 'viewer') {
         document.getElementById('addToInventory').disabled = true;
         document.getElementById('addToShopping').disabled = true;
       }
+
       document.getElementById('inventoryList').innerHTML = await renderItems(data.inventory, data.role === 'viewer');
       document.getElementById('shoppingList').innerHTML = await renderItems(data.shopping, true);
     }
@@ -390,29 +431,27 @@
     document.getElementById('leaveFamily').onclick = async () => {
       if (confirm('Leave family?')) {
         await api('/join-family', { method: 'POST', body: JSON.stringify({ code: '' }) });
+        localStorage.removeItem('hasSeenJoinPrompt');
         location.reload();
       }
     };
 
-    setTimeout(() => {
-      if (currentUser && !familyCode) {
-        document.getElementById('familyModal').classList.remove('hidden');
-      }
-    }, 2000);
-
     document.getElementById('joinFamilyBtn').onclick = async () => {
       const code = document.getElementById('familyCodeInput').value.trim().toUpperCase();
+      if (!code) return alert('Enter a 6-digit code');
       await api('/join-family', { method: 'POST', body: JSON.stringify({ code }) });
       document.getElementById('familyModal').classList.add('hidden');
+      localStorage.setItem('hasSeenJoinPrompt', 'true');
       loadFamily();
     };
 
     document.getElementById('cancelFamilyBtn').onclick = () => {
       document.getElementById('familyModal').classList.add('hidden');
+      localStorage.setItem('hasSeenJoinPrompt', 'true');
     };
 
-    // === AI Scan, Voice, Scanner – (keep your existing code below) ===
-    // ... [your existing AI scan, voice, scanner logic]
+    // Keep your AI scan, voice, scanner logic below
+    // ... [your existing code]
   </script>
 </body>
 </html>
