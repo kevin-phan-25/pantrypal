@@ -62,7 +62,7 @@
     <!-- User + Family -->
     <div class="flex flex-col gap-2">
       <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
-        <p class="font-medium"><span class="font-bold"> ujUser:</span> <span id="userEmail"></span></p>
+        <p class="font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
         <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1 rounded transition">
           Sign Out
         </button>
@@ -113,8 +113,8 @@
 
     <!-- Tabs -->
     <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden">
-      <button class="tab-btn flex-1 py-3 font-medium text-center transition active" data-tab="inventory">Inventory</button>
-      <button class="tab-btn flex-1 py-3 font-medium text-center transition" data-tab="shopping">Shopping List</button>
+      <button class="tab-btn flex-1 py-3 font-semibold text-center transition active" data-tab="inventory">Inventory</button>
+      <button class="tab-btn flex-1 py-3 font-semibold text-center transition" data-tab="shopping">Shopping List</button>
     </div>
 
     <!-- Inventory -->
@@ -125,7 +125,7 @@
         <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
         <input type="date" id="invExp" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
       </div>
-      <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
+      <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg transition flex items-center justify-center gap-2">
         <svg class="icon"><use href="#heroicons-plus"/></svg>
         <span id="inventoryBtnText">Add to Inventory</span>
       </button>
@@ -137,11 +137,11 @@
 
     <!-- Shopping -->
     <section id="shopping" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <h2 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h2>
+      <h3 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h3>
       <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3"/>
-      <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
+      <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg transition flex items-center justify-center gap-2">
         <svg class="icon"><use href="#heroicons-plus"/></svg>
         <span id="shoppingBtnText">Add to List</span>
       </button>
@@ -169,289 +169,4 @@
 
   <!-- Icons -->
   <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
-    <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></symbol>
-    <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
-    <symbol id="heroicons-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></symbol>
-    <symbol id="heroicons-magnifying-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></symbol>
-    <symbol id="heroicons-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></symbol>
-    <symbol id="heroicons-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></symbol>
-    <symbol id="heroicons-microphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8a1 1 0 01-1-1v-1a5 5 0 1110 0v1a1 1 0 01-1 1h-4"/></symbol>
-    <symbol id="heroicons-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></symbol>
-    <symbol id="heroicons-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></symbol>
-  </svg>
-
-  <!-- App Logic -->
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-      authDomain: "pantrypal-6e410.firebaseapp.com",
-      projectId: "pantrypal-6e410",
-      storageBucket: "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
-      measurementId: "G-P641JW4KS4"
-    };
-    firebase.initializeApp(firebaseConfig);
-
-    const ui = new firebaseui.auth.AuthUI(firebase.auth());
-    ui.start('#firebaseui-auth-container', {
-      signInFlow: 'popup',
-      signInOptions: [
-        firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-        { provider: 'apple.com', fullLabel: 'Continue with Apple' },
-        { provider: firebase.auth.EmailAuthProvider.PROVIDER_ID, requireDisplayName: false, fullLabel: 'Continue with Email' },
-        { provider: firebase.auth.PhoneAuthProvider.PROVIDER_ID, recaptchaParameters: { size: 'invisible' }, defaultCountry: 'US', fullLabel: 'Continue with Phone' }
-      ],
-      callbacks: { signInSuccessWithAuthResult: () => false }
-    });
-
-    let currentUser = null;
-    let idToken = null;
-    let isPro = false;
-    let editingItem = null;
-
-    firebase.auth().onAuthStateChanged(async user => {
-      if (user) {
-        currentUser = user;
-        idToken = await user.getIdToken();
-        document.getElementById('userEmail').textContent = user.email || user.phoneNumber || 'User';
-        document.getElementById('auth-section').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-
-        const userData = await api('/user-info');
-        isPro = userData?.isPro || false;
-
-        loadInventory();
-        loadShopping();
-        loadScanCount();
-        loadFamily();
-      } else {
-        document.getElementById('auth-section').classList.remove('hidden');
-        document.getElementById('app').classList.add('hidden');
-      }
-    });
-
-    document.getElementById('signOutBtn').onclick = () => firebase.auth().signOut();
-
-    async function api(path, opts = {}) {
-      if (!idToken) return alert('Not signed in');
-      const res = await fetch(path, {
-        ...opts,
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json',
-          ...opts.headers
-        }
-      });
-      if (!res.ok) { const err = await res.text(); alert('API Error: ' + err); return null; }
-      return res.json();
-    }
-
-    document.getElementById('darkModeBtn').onclick = () => {
-      document.documentElement.classList.toggle('dark');
-      localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-    };
-    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
-
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.onclick = () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.tab).classList.add('active');
-      };
-    });
-
-    async function loadInventory() {
-      const data = await api('/inventory');
-      const list = document.getElementById('inventoryList');
-      const low = data?.items?.filter(i => i.quantity <= 2) || [];
-      if (low.length) {
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-6 left-6 bg-red-600 text-white p-3 rounded-lg shadow-lg z-50';
-        toast.textContent = `${low.length} item(s) low! Time to restock.`;
-        toast.onclick = () => toast.remove();
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 5000);
-      }
-      list.innerHTML = await renderItems(data?.items || [], false);
-    }
-
-    async function loadShopping() {
-      const data = await api('/shopping');
-      document.getElementById('shoppingList').innerHTML = await renderItems(data?.list || [], true);
-    }
-
-    async function renderItems(items, readonly) {
-      if (!items.length) return '<p class="text-center text-gray-500">Empty</p>';
-
-      const rows = await Promise.all(items.map(async i => {
-        let imgSrc = 'icon-192.png';
-        if (i.barcode) {
-          const info = await api(`/product-info/${i.barcode}`);
-          if (info?.image) imgSrc =,on info.image;
-        }
-
-        return `
-          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${i.quantity <= 2 ? 'low-stock' : ''}">
-            <div class="flex items-center gap-3">
-              <img src="${imgSrc}" alt="${i.name || i.itemName}" class="w-10 h-10 rounded object-cover bg-gray-200 border" loading="lazy" onerror="this.src='icon-192.png'; this.onerror=null;"/>
-              <div>
-                <strong>${i.name || i.itemName}</strong><br>
-                <span class="text-sm text-gray-600">${i.quantity || i.needed} ${i.expiration ? '| Exp: ' + i.expiration : ''}</span>
-                ${i.quantity <= 2 ? '<span class="text-red-600 text-xs ml-2">Low stock!</span>' : ''}
-              </div>
-            </div>
-            ${readonly ? '' : `
-              <div class="flex gap-2">
-                <button onclick="editItem('${i.barcode}', false)" class="text-blue-600 text-sm">Edit</button>
-                <button onclick="removeItem('${i.barcode}')" class="text-red-600 text-sm">Remove</button>
-              </div>
-            `}
-          </div>
-        `;
-      }));
-
-      return rows.join('');
-    }
-
-    window.editItem = async (barcode, isShopping = false) => {
-      if (!isPro) return alert('Pro required to edit');
-      editingItem = barcode;
-      const data = isShopping ? await api('/shopping') : await api('/inventory');
-      const item = (isShopping ? data.list : data.items).find(i => i.barcode === barcode);
-      if (!item) return;
-
-      if (isShopping) {
-        document.getElementById('shopBarcode').value = item.barcode;
-        document.getElementById('shopName').value = item.itemName;
-        document.getElementById('shopNeeded').value = item.needed;
-        document.querySelector('[data-tab="shopping"]').click();
-        document.getElementById('shoppingBtnText').textContent = 'Update Item';
-      } else {
-        document.getElementById('invBarcode').value = item.barcode;
-        document.getElementById('invQty').value = item.quantity;
-        document.getElementById('invExp').value = item.expiration || '';
-        document.querySelector('[data-tab="inventory"]').click();
-        document.getElementById('inventoryBtnText').textContent = 'Update Item';
-      }
-    };
-
-    window.removeItem = async barcode => {
-      if (confirm('Remove?')) {
-        await api('/remove', { method: 'POST', body: JSON.stringify({ barcode }) });
-        loadInventory();
-      }
-    };
-
-    document.getElementById('addToInventory').onclick = async () => {
-      const barcode = document.getElementById('invBarcode').value.trim();
-      const qty = parseInt(document.getElementById('invQty').value);
-      const exp = document.getElementById('invExp').value;
-
-      if (editingItem) {
-        await api('/update-item', { method: 'POST', body: JSON.stringify({ barcode: editingItem, quantity: qty, expiration: exp }) });
-        editingItem = null;
-        document.getElementById('inventoryBtnText').textContent = 'Add to73 Inventory';
-      } else {
-        if (!barcode) return alert('Enter barcode');
-        await api('/add', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
-      }
-
-      document.getElementById('invBarcode').value = '';
-      document.getElementById('invQty').value = 1;
-      document.getElementById('invExp').value = '';
-      loadInventory();
-    };
-
-    document.getElementById('addToShopping').onclick = async () => {
-      const barcode = document.getElementById('shopBarcode').value.trim();
-      const name = document.getElementById('shopName').value.trim();
-      const needed = parseInt(document.getElementById('shopNeeded').value);
-
-      if (editingItem) {
-        await api('/update-shopping', { method: 'POST', body: JSON.stringify({ barcode: editingItem, itemName: name, needed }) });
-        editingItem = null;
-        document.getElementById('shoppingBtnText').textContent = 'Add to List';
-      } else {
-        if (!barcode || !name) return alert('Fill barcode and name');
-        await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ barcode, itemName: name, needed }) });
-      }
-
-      document.getElementById('shopBarcode').value = '';
-      document.getElementById('shopName').value = '';
-      document.getElementById('shopNeeded').value = 1;
-      loadShopping();
-    };
-
-    document.getElementById('exportCsv').onclick = () => {
-      const link = document.createElement('a');
-      link.href = '/export-csv';
-      link.download = 'pantrypal-inventory.csv';
-      link.click();
-    };
-
-    async function loadScanCount() {
-      const data = await api('/user-info');
-      const el = document.getElementById('scanCounter');
-      if (data?.isPro) {
-        el.innerHTML = 'Unlimited scans (Pro)';
-      } else {
-        el.innerHTML = `Free scans: ${data?.scans || 0}/10`;
-      }
-    }
-
-    let hasSeenJoinPrompt = localStorage.getItem('hasSeenJoinPrompt') === 'true';
-    async function loadFamily() {
-      const data = await api('/shared');
-      const familySection = document.getElementById('familySection');
-
-      if (!data.role) {
-        familySection.classList.add('hidden');
-        if (!hasSeenJoinPrompt && currentUser) {
-          document.getElementById('familyModal').classList.remove('hidden');
-          localStorage.setItem('hasSeenJoinPrompt', 'true');
-          hasSeenJoinPrompt = true;
-        }
-        return;
-      }
-
-      familySection.classList.remove('hidden');
-      document.getElementById('familyRole').textContent = data.role;
-
-      if (data.role === 'viewer') {
-        document.getElementById('addToInventory').disabled = true;
-        document.getElementById('addToShopping').disabled = true;
-      }
-
-      document.getElementById('inventoryList').innerHTML = await renderItems(data.inventory, data.role === 'viewer');
-      document.getElementById('shoppingList').innerHTML = await renderItems(data.shopping, true);
-    }
-
-    document.getElementById('leaveFamily').onclick = async () => {
-      if (confirm('Leave family?')) {
-        await api('/join-family', { method: 'POST', body: JSON.stringify({ code: '' }) });
-        localStorage.removeItem('hasSeenJoinPrompt');
-        location.reload();
-      }
-    };
-
-    document.getElementById('joinFamilyBtn').onclick = async () => {
-      const code = document.getElementById('familyCodeInput').value.trim().toUpperCase();
-      if (!code) return alert('Enter a 6-digit code');
-      await api('/join-family', { method: 'POST', body: JSON.stringify({ code }) });
-      document.getElementById('familyModal').classList.add('hidden');
-      localStorage.setItem('hasSeenJoinPrompt', 'true');
-      loadFamily();
-    };
-
-    document.getElementById('cancelFamilyBtn').onclick = () => {
-      document.getElementById('familyModal').classList.add('hidden');
-      localStorage.setItem('hasSeenJoinPrompt', 'true');
-    };
-
-    // Keep your AI scan, voice, scanner logic below
-    // ... [your existing code]
-  </script>
-</body>
-</html>
+    <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a
