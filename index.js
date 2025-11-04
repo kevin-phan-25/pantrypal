@@ -1,4 +1,4 @@
-// index.js – PantryPal AI + Firestore + PWA + Family Share + Low Stock + HEALTH CHECK
+// index.js – FINAL PRODUCTION VERSION
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import bodyParser from 'body-parser';
@@ -20,12 +20,12 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(fileUpload({ limits: { fileSize: 10 * 1024 * 1024 } }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// === HEALTH CHECK (Render) ===
+// HEALTH CHECK (Render)
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
-// === Firebase Admin ===
+// Firebase Admin
 let credential;
 try {
   if (process.env.FIREBASE_CREDENTIALS) {
@@ -47,7 +47,7 @@ try {
 const auth = getAuth();
 const db = getFirestore();
 
-// === Google Cloud Vision Client ===
+// Vision Client
 let visionClient;
 try {
   const keyPath = process.env.GCLOUD_KEY_PATH || '/etc/secrets/gcloud-key.json';
@@ -62,7 +62,7 @@ try {
   visionClient = { textDetection: async () => [{ textAnnotations: [{ description: '' }] }] };
 }
 
-// === Auth Middleware ===
+// Auth Middleware
 async function checkAuth(req, res, next) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'No token' });
@@ -80,10 +80,9 @@ async function checkAuth(req, res, next) {
   }
 }
 
-// === AI SCAN ===
+// === ROUTES (unchanged) ===
 app.post('/scan', checkAuth, async (req, res) => {
   if (!req.files?.image) return res.status(400).json({ error: 'No image uploaded' });
-
   try {
     const [result] = await visionClient.textDetection({ image: { content: req.files.image.data } });
     const text = result.textAnnotations?.[0]?.description || '';
@@ -109,46 +108,31 @@ app.post('/scan', checkAuth, async (req, res) => {
       }
     }
 
-    res.json({
-      success: true,
-      record: { itemName, expirationDate, barcode: barcodeMatch, detectedText: text }
-    });
+    res.json({ success: true, record: { itemName, expirationDate, barcode: barcodeMatch, detectedText: text } });
   } catch (err) {
     console.error('AI Scan Error:', err);
     res.status(500).json({ error: 'Vision API not configured' });
   }
 });
 
-// === ADD TO INVENTORY ===
 app.post('/add', checkAuth, async (req, res) => {
   const { barcode, quantity = 1, expiration = '', name } = req.body;
   const userId = req.user.uid;
   if (!barcode) return res.status(400).json({ error: 'barcode required' });
-
   const ref = db.collection('users').doc(userId).collection('items').doc(barcode);
   const doc = await ref.get();
   if (doc.exists) {
-    await ref.update({
-      quantity: FieldValue.increment(parseInt(quantity)),
-      expiration: expiration || doc.data().expiration
-    });
+    await ref.update({ quantity: FieldValue.increment(parseInt(quantity)), expiration: expiration || doc.data().expiration });
   } else {
-    await ref.set({
-      name: name || barcode,
-      quantity: parseInt(quantity),
-      expiration,
-      addedAt: FieldValue.serverTimestamp()
-    });
+    await ref.set({ name: name || barcode, quantity: parseInt(quantity), expiration, addedAt: FieldValue.serverTimestamp() });
   }
   res.json({ success: true });
 });
 
-// === ADD TO SHOPPING LIST ===
 app.post('/add-to-shopping', checkAuth, async (req, res) => {
   const { barcode, itemName, needed = 1 } = req.body;
   const userId = req.user.uid;
   if (!barcode || !itemName) return res.status(400).json({ error: 'barcode and itemName required' });
-
   const ref = db.collection('users').doc(userId).collection('shopping').doc(barcode);
   const doc = await ref.get();
   if (doc.exists) {
@@ -159,41 +143,32 @@ app.post('/add-to-shopping', checkAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-// === GET INVENTORY ===
 app.get('/inventory', checkAuth, async (req, res) => {
   const snapshot = await db.collection('users').doc(req.user.uid).collection('items').get();
   const items = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
   res.json({ items });
 });
 
-// === GET SHOPPING LIST ===
 app.get('/shopping', checkAuth, async (req, res) => {
   const snapshot = await db.collection('users').doc(req.user.uid).collection('shopping').get();
   const list = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
   res.json({ list });
 });
 
-// === REMOVE FROM INVENTORY ===
 app.post('/remove', checkAuth, async (req, res) => {
   const { barcode } = req.body;
   const userId = req.user.uid;
   await db.collection('users').doc(userId).collection('items').doc(barcode).delete();
-  await db.collection('users').doc(userId).collection('audit').add({
-    action: 'remove',
-    barcode,
-    timestamp: FieldValue.serverTimestamp()
-  });
+  await db.collection('users').doc(userId).collection('audit').add({ action: 'remove', barcode, timestamp: FieldValue.serverTimestamp() });
   res.json({ success: true });
 });
 
-// === REMOVE FROM SHOPPING ===
 app.post('/remove-from-shopping', checkAuth, async (req, res) => {
   const { barcode } = req.body;
   await db.collection('users').doc(req.user.uid).collection('shopping').doc(barcode).delete();
   res.json({ success: true });
 });
 
-// === PRODUCT INFO ===
 app.get('/product-info/:barcode', checkAuth, async (req, res) => {
   const { barcode } = req.params;
   try {
@@ -201,10 +176,7 @@ app.get('/product-info/:barcode', checkAuth, async (req, res) => {
     const data = await response.json();
     if (data.status === 1) {
       const p = data.product;
-      res.json({
-        name: p.product_name || p.generic_name || barcode,
-        image: p.image_front_thumb_url || p.image_small_url || null
-      });
+      res.json({ name: p.product_name || p.generic_name || barcode, image: p.image_front_thumb_url || p.image_small_url || null });
     } else {
       res.json({ name: barcode, image: null });
     }
@@ -213,14 +185,12 @@ app.get('/product-info/:barcode', checkAuth, async (req, res) => {
   }
 });
 
-// === USER INFO ===
 app.get('/user-info', checkAuth, async (req, res) => {
   const snap = await db.collection('users').doc(req.user.uid).get();
   const data = snap.data();
   res.json({ scans: data.scans || 0, isPro: !!data.isPro, familyCode: data.familyCode });
 });
 
-// === RECORD SCAN ===
 app.post('/record-scan', checkAuth, async (req, res) => {
   const userRef = db.collection('users').doc(req.user.uid);
   const snap = await userRef.get();
@@ -232,7 +202,6 @@ app.post('/record-scan', checkAuth, async (req, res) => {
   res.json({ allowed: true });
 });
 
-// === EXPORT CSV ===
 app.get('/export-csv', checkAuth, async (req, res) => {
   const snapshot = await db.collection('users').doc(req.user.uid).collection('items').get();
   const items = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
@@ -245,7 +214,6 @@ app.get('/export-csv', checkAuth, async (req, res) => {
   res.send(csv);
 });
 
-// === FAMILY: CREATE CODE ===
 app.post('/create-family', checkAuth, async (req, res) => {
   const userId = req.user.uid;
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -256,7 +224,6 @@ app.post('/create-family', checkAuth, async (req, res) => {
   res.json({ code });
 });
 
-// === FAMILY: JOIN ===
 app.post('/join-family', checkAuth, async (req, res) => {
   const { code } = req.body;
   const userId = req.user.uid;
@@ -275,7 +242,6 @@ app.post('/join-family', checkAuth, async (req, res) => {
   res.json({ role });
 });
 
-// === FAMILY: GET SHARED DATA ===
 app.get('/shared', checkAuth, async (req, res) => {
   const userSnap = await db.collection('users').doc(req.user.uid).get();
   const { familyCode, familyRole } = userSnap.data() || {};
@@ -290,14 +256,13 @@ app.get('/shared', checkAuth, async (req, res) => {
   });
 });
 
-// === SERVE PWA ===
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// === START SERVER (FIXED PORT BINDING) ===
+// START SERVER
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`PantryPal running on port ${PORT}`);
-  console.log(`Health check: http://0.0.0.0:${PORT}/health`);
+  console.log(`PantryPal LIVE on port ${PORT}`);
+  console.log(`Health: http://0.0.0.0:${PORT}/health`);
 });
