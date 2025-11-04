@@ -14,6 +14,7 @@
     .icon { @apply w-5 h-5 inline-block; }
     .tab { @apply hidden; }
     .tab.active { @apply block; }
+    #scanner-container { position: relative; width: 100%; max-width: 500px; margin: 0 auto; }
     #scanner-overlay::after {
       content: '';
       position: absolute;
@@ -28,7 +29,7 @@
     .pulse { animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
     .low-stock { @apply bg-yellow-100 dark:bg-yellow-900 border-l-4 border-yellow-500 p-2 text-sm; }
-    .placeholder-img { @apply w-10 h-10 rounded object-cover bg-gray-200 border border-gray-300; }
+    .placeholder { @apply w-10 h-10 rounded object-cover bg-gray-200 border border-gray-300; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
@@ -52,31 +53,26 @@
   <section id="auth-section" class="max-w-md mx-auto mt-12 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
     <h2 class="text-xl font-semibold text-center mb-4">Welcome to PantryPal!</h2>
     <div id="firebaseui-auth-container"></div>
-    <p class="text-center text-xs text-gray-500 mt-3">
-      Sign in with Google, Apple, Email, or Phone
-    </p>
+    <p class="text-center text-xs text-gray-500 mt-3">Sign in with Google, Apple, Email, or Phone</p>
   </section>
 
   <!-- Main App -->
   <main id="app" class="hidden max-w-3xl mx-auto p-4 space-y-6">
+
     <!-- User + Family -->
     <div class="flex flex-col gap-2">
       <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
         <p class="font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
-        <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1 rounded transition">
-          Sign Out
-        </button>
+        <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1 rounded transition">Sign Out</button>
       </div>
       <div id="familySection" class="bg-indigo-50 dark:bg-indigo-900 p-3 rounded-lg text-sm hidden">
         <p>Family: <span id="familyName">My Family</span> | Role: <span id="familyRole"></span></p>
         <button id="leaveFamily" class="text-red-600 underline text-xs">Leave</button>
       </div>
-      <div id="scanCounter" class="bg-blue-50 dark:bg-blue-900 p-3 rounded-lg text-center text-sm">
-        Loading...
-      </div>
+      <div id="scanCounter" class="bg-blue-50 dark:bg-blue-900 p-3 rounded-lg text-center text-sm">Loading...</div>
     </div>
 
-    <!-- Scanner -->
+    <!-- Scanner Button -->
     <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md">
       <svg class="icon"><use href="#heroicons-camera"/></svg>
       Start Scanner (QR + Barcode)
@@ -84,10 +80,10 @@
 
     <!-- Voice -->
     <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
-      <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
         <svg class="icon"><use href="#heroicons-microphone"/></svg>
         Voice Commands
-      </h2>
+      </h3>
       <button id="voiceBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition">
         <svg class="icon"><use href="#heroicons-microphone"/></svg>
         <span>Hold to Speak</span>
@@ -97,10 +93,10 @@
 
     <!-- AI Scan -->
     <section class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
-      <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
         <svg class="icon"><use href="#heroicons-sparkles"/></svg>
         AI Scan Product
-      </h2>
+      </h3>
       <input type="file" id="scanImage" accept="image/*" class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
       <button id="scanBtn" class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
         <svg class="icon"><use href="#heroicons-magnifying-glass"/></svg>
@@ -117,9 +113,9 @@
       <button class="tab-btn flex-1 py-3 font-medium text-center transition" data-tab="shopping">Shopping List</button>
     </div>
 
-    <!-- Inventory -->
+    <!-- Inventory Tab -->
     <section id="inventory" class="tab active bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <h2 class="text-lg font-semibold mb-3">Add / Edit Item</h2>
+      <h3 class="text-lg font-semibold mb-3">Add / Edit Item</h3>
       <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <div class="grid grid-cols-2 gap-2">
         <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
@@ -129,15 +125,13 @@
         <svg class="icon"><use href="#heroicons-plus"/></svg>
         <span id="inventoryBtnText">Add to Inventory</span>
       </button>
-      <button id="exportCsv" class="mt-3 w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">
-        Export Inventory (CSV)
-      </button>
+      <button id="exportCsv" class="mt-3 w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">Export Inventory (CSV)</button>
       <div id="inventoryList" class="mt-5 space-y-2"></div>
     </section>
 
-    <!-- Shopping -->
+    <!-- Shopping Tab -->
     <section id="shopping" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <h2 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h2>
+      <h3 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h3>
       <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3"/>
@@ -147,6 +141,23 @@
       </button>
       <div id="shoppingList" class="mt-5 space-y-2"></div>
     </section>
+
+    <!-- Scanner Modal -->
+    <div id="scannerModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 hidden">
+      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl w-full max-w-lg">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-lg font-bold">Scan QR / Barcode</h3>
+          <button id="closeScanner" class="text-gray-600 hover:text-gray-800">
+            <svg class="w-6 h-6"><use href="#heroicons-x"/></svg>
+          </button>
+        </div>
+        <div id="scanner-container" class="relative">
+          <div id="scanner-overlay"></div>
+          <video id="scanner-video" class="w-full rounded-lg" autoplay playsinline></video>
+        </div>
+        <p class="text-center mt-2 text-sm text-gray-600" id="scannerStatus">Point camera at barcode...</p>
+      </div>
+    </div>
 
     <!-- Family Modal -->
     <div id="familyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
@@ -206,6 +217,7 @@
     });
 
     let currentUser = null, idToken = null, isPro = false, editingItem = null;
+    let scannerActive = false, recognition = null;
 
     firebase.auth().onAuthStateChanged(async user => {
       if (user) {
@@ -214,10 +226,8 @@
         document.getElementById('userEmail').textContent = user.email || user.phoneNumber || 'User';
         document.getElementById('auth-section').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
-
         const u = await api('/user-info');
         isPro = u?.isPro || false;
-
         loadInventory(); loadShopping(); loadScanCount(); loadFamily();
       } else {
         document.getElementById('auth-section').classList.remove('hidden');
@@ -237,12 +247,14 @@
       return res.json();
     }
 
+    // Dark Mode
     document.getElementById('darkModeBtn').onclick = () => {
       document.documentElement.classList.toggle('dark');
       localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
     };
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
+    // Tabs
     document.querySelectorAll('.tab-btn').forEach(b => {
       b.onclick = () => {
         document.querySelectorAll('.tab-btn,.tab').forEach(e => e.classList.remove('active'));
@@ -251,6 +263,137 @@
       };
     });
 
+    // === SCANNER (ZXing) ===
+    document.getElementById('startScanner').onclick = async () => {
+      const modal = document.getElementById('scannerModal');
+      const video = document.getElementById('scanner-video');
+      const status = document.getElementById('scannerStatus');
+      modal.classList.remove('hidden');
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream;
+        scannerActive = true;
+
+        const codeReader = new ZXing.BrowserMultiFormatReader();
+        codeReader.decodeFromVideoDevice(null, 'scanner-video', (result, err) => {
+          if (result && scannerActive) {
+            handleScannedCode(result.getText());
+            closeScanner();
+          }
+          if (err && !(err instanceof ZXing.NotFoundException)) console.error(err);
+        });
+      } catch (err) {
+        status.textContent = 'Camera access denied';
+        console.error(err);
+      }
+    };
+
+    document.getElementById('closeScanner').onclick = closeScanner;
+    function closeScanner() {
+      const modal = document.getElementById('scannerModal');
+      const video = document.getElementById('scanner-video');
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(t => t.stop());
+      }
+      modal.classList.add('hidden');
+      scannerActive = false;
+    }
+
+    function handleScannedCode(code) {
+      document.getElementById('invBarcode').value = code;
+      document.getElementById('shopBarcode').value = code;
+      alert(`Scanned: ${code}`);
+    }
+
+    // === VOICE COMMAND ===
+    const voiceBtn = document.getElementById('voiceBtn');
+    const voiceResult = document.getElementById('voiceResult');
+
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      let isListening = false;
+      voiceBtn.addEventListener('mousedown', startVoice);
+      voiceBtn.addEventListener('touchstart', startVoice);
+      voiceBtn.addEventListener('mouseup', stopVoice);
+      voiceBtn.addEventListener('touchend', stopVoice);
+
+      function startVoice(e) {
+        e.preventDefault();
+        if (isListening) return;
+        recognition.start();
+        isListening = true;
+        voiceBtn.classList.add('bg-red-600');
+        voiceResult.classList.add('hidden');
+      }
+
+      function stopVoice() {
+        if (!isListening) return;
+        recognition.stop();
+        isListening = false;
+        voiceBtn.classList.remove('bg-red-600');
+      }
+
+      recognition.onresult = e => {
+        const text = e.results[0][0].transcript.trim();
+        voiceResult.textContent = `You said: "${text}"`;
+        voiceResult.classList.remove('hidden');
+        handleVoiceCommand(text);
+      };
+
+      recognition.onerror = () => {
+        voiceResult.textContent = 'Voice error. Try again.';
+        voiceResult.classList.remove('hidden');
+        stopVoice();
+      };
+    } else {
+      voiceBtn.disabled = true;
+      voiceBtn.innerHTML = '<span>Mic not supported</span>';
+    }
+
+    function handleVoiceCommand(text) {
+      const lower = text.toLowerCase();
+      if (lower.includes('add') && lower.includes('pepsi')) {
+        document.getElementById('shopName').value = 'Pepsi';
+        document.getElementById('shopNeeded').value = 5;
+        document.getElementById('addToShopping').click();
+      }
+    }
+
+    // === AI SCAN ===
+    document.getElementById('scanBtn').onclick = async () => {
+      const file = document.getElementById('scanImage').files[0];
+      if (!file) return alert('Select an image');
+      const form = new FormData();
+      form.append('image', file);
+
+      const res = await fetch('/scan', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` },
+        body: form
+      });
+
+      const data = await res.json();
+      const result = document.getElementById('scanResult');
+      const text = document.getElementById('scanText');
+      if (data.success) {
+        text.textContent = JSON.stringify(data.record, null, 2);
+        result.classList.remove('hidden');
+        if (data.record.barcode) {
+          document.getElementById('invBarcode').value = data.record.barcode;
+        }
+      } else {
+        text.textContent = data.error || 'Scan failed';
+        result.classList.remove('hidden');
+      }
+    };
+
+    // === INVENTORY & SHOPPING LIST ===
     async function loadInventory() {
       const d = await api('/inventory');
       const low = d?.items?.filter(i => i.quantity <= 2) || [];
@@ -270,7 +413,7 @@
       document.getElementById('shoppingList').innerHTML = await renderItems(d?.list || [], true);
     }
 
-    async function renderItems(items, readonly) {
+    async function renderItems(items, isShopping) {
       if (!items.length) return '<p class="text-center text-gray-500">Empty</p>';
       const rows = await Promise.all(items.map(async i => {
         let img = 'icon-192.png';
@@ -278,6 +421,8 @@
           const p = await api(`/product-info/${i.barcode}`);
           if (p?.image) img = p.image;
         }
+        const editFn = isShopping ? `editShopping('${i.barcode}')` : `editItem('${i.barcode}')`;
+        const removeFn = isShopping ? `removeShopping('${i.barcode}')` : `removeItem('${i.barcode}')`;
         return `
           <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${i.quantity <= 2 ? 'low-stock' : ''}">
             <div class="flex items-center gap-3">
@@ -289,8 +434,8 @@
               </div>
             </div>
             <div class="flex gap-2">
-              <button onclick="editItem('${i.barcode}', false)" class="text-blue-600 text-sm">Edit</button>
-              <button onclick="removeItem('${i.barcode}', false)" class="text-red-600 text-sm">Remove</button>
+              <button onclick="${editFn}" class="text-blue-600 text-sm">Edit</button>
+              <button onclick="${removeFn}" class="text-red-600 text-sm">Remove</button>
             </div>
           </div>`;
       }));
@@ -298,7 +443,7 @@
     }
 
     window.editItem = async barcode => {
-      if (!isPro) return alert('Pro required to edit');
+      if (!isPro) return alert('Pro required');
       editingItem = barcode;
       const data = await api('/inventory');
       const itm = data.items.find(x => x.barcode === barcode);
@@ -310,39 +455,8 @@
       document.getElementById('inventoryBtnText').textContent = 'Update Item';
     };
 
-    window.removeItem = async barcode => {
-      if (confirm('Remove?')) {
-        await api('/remove', { method: 'POST', body: JSON.stringify({ barcode }) });
-        loadInventory();
-      }
-    };
-
-    document.getElementById('addToInventory').onclick = async () => {
-      const barcode = document.getElementById('invBarcode').value.trim();
-      const qty = +document.getElementById('invQty').value;
-      const exp = document.getElementById('invExp').value;
-      if (editingItem) {
-        await api('/update-item', { method: 'POST', body: JSON.stringify({ barcode: editingItem, quantity: qty, expiration: exp }) });
-        editingItem = null;
-        document.getElementById('inventoryBtnText').textContent = 'Add to Inventory';
-      } else {
-        if (!barcode) return alert('Enter barcode');
-        await api('/add', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
-      }
-      document.getElementById('invBarcode').value = '';
-      document.getElementById('invQty').value = 1;
-      document.getElementById('invExp').value = '';
-      loadInventory();
-    };
-
-    // Shopping List Edit + Remove
-    async function loadShopping() {
-      const d = await api('/shopping');
-      document.getElementById('shoppingList').innerHTML = await renderItems(d?.list || [], true);
-    }
-
     window.editShopping = async barcode => {
-      if (!isPro) return alert('Pro required to edit');
+      if (!isPro) return alert('Pro required');
       editingItem = barcode;
       const data = await api('/shopping');
       const itm = data.list.find(x => x.barcode === barcode);
@@ -354,11 +468,35 @@
       document.getElementById('shoppingBtnText').textContent = 'Update Item';
     };
 
+    window.removeItem = async barcode => {
+      if (confirm('Remove?')) {
+        await api('/remove', { method: 'POST', body: JSON.stringify({ barcode }) });
+        loadInventory();
+      }
+    };
+
     window.removeShopping = async barcode => {
       if (confirm('Remove?')) {
         await api('/remove-from-shopping', { method: 'POST', body: JSON.stringify({ barcode }) });
         loadShopping();
       }
+    };
+
+    document.getElementById('addToInventory').onclick = async () => {
+      const barcode = document.getElementById('invBarcode').value.trim();
+      const qty = +document.getElementById('invQty').value;
+      const exp = document.getElementById('invExp').value;
+      if (editingItem) {
+        await api('/update-item', { method: 'POST', body: JSON.stringify({ barcode: editingItem, quantity: qty, expiration: exp }) });
+        editingItem = null;
+        document.getElementById('inventoryBtnText').textContent = 'Add to Inventory';
+      } else if (barcode) {
+        await api('/add', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
+      }
+      document.getElementById('invBarcode').value = '';
+      document.getElementById('invQty').value = 1;
+      document.getElementById('invExp').value = '';
+      loadInventory();
     };
 
     document.getElementById('addToShopping').onclick = async () => {
@@ -369,8 +507,7 @@
         await api('/update-shopping', { method: 'POST', body: JSON.stringify({ barcode: editingItem, itemName: name, needed }) });
         editingItem = null;
         document.getElementById('shoppingBtnText').textContent = 'Add to List';
-      } else {
-        if (!barcode || !name) return alert('Fill barcode & name');
+      } else if (barcode && name) {
         await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ barcode, itemName: name, needed }) });
       }
       document.getElementById('shopBarcode').value = '';
@@ -379,7 +516,6 @@
       loadShopping();
     };
 
-    // Export CSV
     document.getElementById('exportCsv').onclick = () => {
       const a = document.createElement('a');
       a.href = '/export-csv';
@@ -387,14 +523,12 @@
       a.click();
     };
 
-    // Scan Count
     async function loadScanCount() {
       const d = await api('/user-info');
       const el = document.getElementById('scanCounter');
       el.innerHTML = d?.isPro ? 'Unlimited scans (Pro)' : `Free scans: ${d?.scans||0}/10`;
     }
 
-    // Family
     let hasSeenJoinPrompt = localStorage.getItem('hasSeenJoinPrompt') === 'true';
     async function loadFamily() {
       const d = await api('/shared');
@@ -439,8 +573,6 @@
       document.getElementById('familyModal').classList.add('hidden');
       localStorage.setItem('hasSeenJoinPrompt', 'true');
     };
-
-    // Your existing AI scan, voice, scanner code stays the same
   </script>
 </body>
 </html>
