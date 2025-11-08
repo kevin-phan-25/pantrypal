@@ -31,7 +31,6 @@
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
-
   <!-- Header -->
   <header class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 shadow-md">
     <div class="max-w-3xl mx-auto px-4 flex justify-between items-center">
@@ -57,7 +56,6 @@
 
   <!-- Main App -->
   <main id="app" class="hidden max-w-3xl mx-auto p-4 space-y-6">
-
     <!-- User + Family -->
     <div class="flex flex-col gap-2">
       <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
@@ -164,7 +162,7 @@
         <h3 class="text-lg font-bold mb-3">Join Family</h3>
         <input type="text" id="familyCodeInput" placeholder="Enter 6-digit code" class="w-full p-3 border rounded-lg mb-3"/>
         <div class="flex gap-2">
-          <button id="joinFamilyBtn" class="flex-1 bg-blue-600 text-white py-2 rounded-lg">Join</button>
+          <button id="joinFamilyModalBtn" class="flex-1 bg-blue-600 text-white py-2 rounded-lg">Join</button>
           <button id="cancelFamilyBtn" class="flex-1 bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
         </div>
       </div>
@@ -201,43 +199,17 @@
       measurementId: "G-P641JW4KS4"
     };
     firebase.initializeApp(firebaseConfig);
-
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
     ui.start('#firebaseui-auth-container', {
       signInFlow: 'popup',
-      signInOptions: [
-        'google.com',
-        'apple.com',
-        'emailLink',
-        'password',
-        'phone'
-      ],
+      signInOptions: ['google.com','apple.com','emailLink','password','phone'],
       callbacks: { signInSuccessWithAuthResult: () => false }
     });
 
     let currentUser = null, idToken = null, isPro = false, editingItem = null;
     let scannerActive = false, recognition = null;
 
-    firebase.auth().onAuthStateChanged(async user => {
-      if (user) {
-        currentUser = user;
-        idToken = await user.getIdToken();
-        document.getElementById('userEmail').textContent = user.email || user.phoneNumber || 'User';
-        document.getElementById('auth-section').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-        const u = await api('/user-info');
-        isPro = u?.isPro || false;
-        await loadInventory();
-        await loadShopping();
-        loadScanCount(); loadFamily();
-      } else {
-        document.getElementById('auth-section').classList.remove('hidden');
-        document.getElementById('app').classList.add('hidden');
-      }
-    });
-
-    document.getElementById('signOutBtn').onclick = () => firebase.auth().signOut();
-
+    const $ = s => document.querySelector(s);
     async function api(path, opts = {}) {
       if (!idToken) return alert('Not signed in');
       const res = await fetch(path, {
@@ -248,8 +220,31 @@
       return res.json();
     }
 
+    // Auth
+    firebase.auth().onAuthStateChanged(async user => {
+      if (user) {
+        currentUser = user;
+        idToken = await user.getIdToken();
+        $('#userEmail').textContent = user.email || user.phoneNumber || 'User';
+        $('#auth-section').classList.add('hidden');
+        $('#app').classList.remove('hidden');
+
+        const u = await api('/user-info');
+        isPro = u?.isPro ?? false;
+
+        await loadInventory();
+        await loadShopping();
+        loadScanCount();
+        loadFamily();
+      } else {
+        $('#auth-section').classList.remove('hidden');
+        $('#app').classList.add('hidden');
+      }
+    });
+    $('#signOutBtn').onclick = () => firebase.auth().signOut();
+
     // Dark Mode
-    document.getElementById('darkModeBtn').onclick = () => {
+    $('#darkModeBtn').onclick = () => {
       document.documentElement.classList.toggle('dark');
       localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
     };
@@ -260,145 +255,119 @@
       b.onclick = () => {
         document.querySelectorAll('.tab-btn,.tab').forEach(e => e.classList.remove('active'));
         b.classList.add('active');
-        document.getElementById(b.dataset.tab).classList.add('active');
+        $(`#${b.dataset.tab}`).classList.add('active');
       };
     });
 
-    // Scanner (ZXing + Quagga fallback)
-    document.getElementById('startScanner').onclick = async () => {
-      const modal = document.getElementById('scannerModal');
-      const video = document.getElementById('scanner-video');
-      const status = document.getElementById('scannerStatus');
-      modal.classList.remove('hidden');
-      status.textContent = 'Starting camera...';
-
+    // Scanner
+    $('#startScanner').onclick = async () => {
+      const modal = $('#scannerModal'), video = $('#scanner-video'), status = $('#scannerStatus');
+      modal.classList.remove('hidden'); status.textContent = 'Requesting camera…';
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        video.srcObject = stream;
-        scannerActive = true;
+        video.srcObject = stream; scannerActive = true;
+        await new Promise(r => video.onloadedmetadata = r);
 
-        // Try ZXing first
         const codeReader = new ZXing.BrowserMultiFormatReader();
         codeReader.decodeFromVideoDevice(null, 'scanner-video', (result, err) => {
-          if (result && scannerActive) {
-            handleScannedCode(result.getText());
-            closeScanner();
-          }
-          if (err && !(err instanceof ZXing.NotFoundException)) {
-            console.warn('ZXing error, trying Quagga...');
-            startQuagga();
-          }
+          if (result && scannerActive) { handleScannedCode(result.getText()); closeScanner(); }
+          if (err && !(err instanceof ZXing.NotFoundException)) startQuagga(stream);
         });
-      } catch (e) {
-        status.textContent = 'Camera access denied';
-        console.error(e);
-      }
+      } catch (e) { status.textContent = 'Camera denied'; console.error(e); }
     };
 
-    function startQuagga() {
+    function startQuagga(stream) {
       Quagga.init({
-        inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#scanner-video') },
-        decoder: { readers: ["code_128_reader", "ean_reader", "ean_8_reader", "upc_reader"] }
-      }, err => {
-        if (err) { console.error(err); return; }
-        Quagga.start();
-      });
-
-      Quagga.onDetected(data => {
-        if (scannerActive) {
-          handleScannedCode(data.codeResult.code);
-          Quagga.stop();
-          closeScanner();
-        }
+        inputStream: { name: "Live", type: "LiveStream", target: $('#scanner-video') },
+        decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","upc_reader"] }
+      }, err => { if (err) return console.error(err); Quagga.start(); });
+      Quagga.onDetected(d => {
+        if (scannerActive) { handleScannedCode(d.codeResult.code); Quagga.stop(); closeScanner(); }
       });
     }
 
-    document.getElementById('closeScanner').onclick = closeScanner;
+    $('#closeScanner').onclick = closeScanner;
     function closeScanner() {
-      const video = document.getElementById('scanner-video');
-      if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+      const v = $('#scanner-video');
+      if (v.srcObject) v.srcObject.getTracks().forEach(t => t.stop());
       if (typeof Quagga !== 'undefined') Quagga.stop();
-      document.getElementById('scannerModal').classList.add('hidden');
+      $('#scannerModal').classList.add('hidden');
       scannerActive = false;
     }
 
     function handleScannedCode(code) {
-      document.getElementById('invBarcode').value = code;
-      document.getElementById('shopBarcode').value = code;
+      $('#invBarcode').value = code;
+      $('#shopBarcode').value = code;
       alert(`Scanned: ${code}`);
     }
 
     // Voice
-    const voiceBtn = document.getElementById('voiceBtn');
-    const voiceResult = document.getElementById('voiceResult');
+    const voiceBtn = $('#voiceBtn'), voiceResult = $('#voiceResult');
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SR(); recognition.continuous = false; recognition.interimResults = false; recognition.lang = 'en-US';
       let listening = false;
-
-      const startListening = () => {
+      const start = () => {
         if (listening) return;
-        recognition.start();
-        listening = true;
+        recognition.start(); listening = true;
         voiceBtn.classList.add('bg-red-600');
+        voiceBtn.innerHTML = `<svg class="icon"><use href="#heroicons-microphone"/></svg> Speak now…`;
         voiceResult.classList.add('hidden');
       };
-      const stopListening = () => {
+      const stop = () => {
         if (!listening) return;
-        recognition.stop();
-        listening = false;
+        recognition.stop(); listening = false;
         voiceBtn.classList.remove('bg-red-600');
+        voiceBtn.innerHTML = `<svg class="icon"><use href="#heroicons-microphone"/></svg> Hold to Speak`;
       };
+      voiceBtn.addEventListener('pointerdown', start);
+      voiceBtn.addEventListener('pointerup', stop);
+      voiceBtn.addEventListener('pointerleave', stop);
 
-      voiceBtn.addEventListener('mousedown', startListening);
-      voiceBtn.addEventListener('touchstart', startListening);
-      voiceBtn.addEventListener('mouseup', stopListening);
-      voiceBtn.addEventListener('touchend', stopListening);
-      voiceBtn.addEventListener('mouseleave', stopListening);
-
-      recognition.onresult = ev => {
-        const txt = ev.results[0][0].transcript.trim();
-        voiceResult.textContent = `You said: "${txt}"`;
-        voiceResult.classList.remove('hidden');
-        if (txt.toLowerCase().includes('add') && txt.toLowerCase().includes('pepsi')) {
-          document.getElementById('shopName').value = 'Pepsi';
-          document.getElementById('shopNeeded').value = 5;
-          document.getElementById('addToShopping').click();
+      recognition.onresult = e => {
+        const txt = e.results[0][0].transcript.trim().toLowerCase();
+        voiceResult.textContent = `Heard: "${txt}"`; voiceResult.classList.remove('hidden');
+        const m = txt.match(/add\s+(.+?)(?:\s+(\d+))?/);
+        if (m) {
+          $('#shopName').value = m[1].trim();
+          $('#shopNeeded').value = m[2] ? parseInt(m[2]) : 1;
+          $('#addToShopping').click();
         }
       };
-      recognition.onerror = () => { voiceResult.textContent = 'Voice error'; voiceResult.classList.remove('hidden'); };
-      recognition.onend = () => { listening = false; voiceBtn.classList.remove('bg-red-600'); };
+      recognition.onerror = () => { voiceResult.textContent = 'Voice error'; voiceResult.classList.remove('hidden'); stop(); };
+      recognition.onend = stop;
     } else {
-      voiceBtn.disabled = true;
-      voiceBtn.innerHTML = '<span>Mic not supported</span>';
+      voiceBtn.disabled = true; voiceBtn.innerHTML = '<span>Mic not supported</span>';
     }
 
     // AI Scan
-    document.getElementById('scanBtn').onclick = async () => {
-      const file = document.getElementById('scanImage').files[0];
-      if (!file) return alert('Select an image');
+    $('#scanBtn').onclick = async () => {
+      const file = $('#scanImage').files[0];
+      if (!file) return alert('Pick an image');
+      if (!isPro) {
+        const rec = await api('/record-scan', {method:'POST'});
+        if (!rec?.allowed) return alert(rec.message || 'Free limit reached');
+      }
       const fd = new FormData(); fd.append('image', file);
-      const r = await fetch('/scan', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` }, body: fd });
+      const r = await fetch('/scan', { method:'POST', headers:{'Authorization':`Bearer ${idToken}`}, body:fd });
       const d = await r.json();
-      const res = document.getElementById('scanResult');
-      const txt = document.getElementById('scanText');
+      const resDiv = $('#scanResult'), txt = $('#scanText');
       txt.textContent = d.success ? JSON.stringify(d.record, null, 2) : (d.error || 'Failed');
-      res.classList.remove('hidden');
-      if (d.record?.barcode) document.getElementById('invBarcode').value = d.record.barcode;
+      resDiv.classList.remove('hidden');
+      if (d.record?.barcode) $('#invBarcode').value = d.record.barcode;
+      loadScanCount();
     };
 
-    // Inventory & Shopping (unchanged from last working version)
+    // Inventory & Shopping
     async function loadInventory() {
       const d = await api('/inventory');
-      document.getElementById('inventoryList').innerHTML = await renderItems(d?.items || [], false);
+      $('#inventoryList').innerHTML = await renderItems(d?.items||[], false);
     }
     async function loadShopping() {
       const d = await api('/shopping');
-      document.getElementById('shoppingList').innerHTML = await renderItems(d?.list || [], true);
+      $('#shoppingList').innerHTML = await renderItems(d?.list||[], true);
     }
+
     async function renderItems(items, isShopping) {
       if (!items.length) return '<p class="text-center text-gray-500">Empty</p>';
       const rows = await Promise.all(items.map(async i => {
@@ -408,15 +377,16 @@
           if (p?.image) img = p.image;
         }
         const editFn = isShopping ? `editShopping('${i.barcode}')` : `editItem('${i.barcode}')`;
-        const delFn = isShopping ? `removeShopping('${i.barcode}')` : `removeItem('${i.barcode}')`;
+        const delFn  = isShopping ? `removeShopping('${i.barcode}')` : `removeItem('${i.barcode}')`;
+        const low = (i.quantity ?? i.needed) <= 2 ? 'low-stock' : '';
         return `
-          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${i.quantity <= 2 ? 'low-stock' : ''}">
+          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${low}">
             <div class="flex items-center gap-3">
               <img src="${img}" alt="${i.name||i.itemName}" class="w-10 h-10 rounded object-cover bg-gray-200 border" loading="lazy" onerror="this.src='icon-192.png';">
               <div>
                 <strong>${i.name||i.itemName}</strong><br>
                 <span class="text-sm text-gray-600">${i.quantity||i.needed} ${i.expiration ? '| Exp: '+i.expiration : ''}</span>
-                ${i.quantity <= 2 ? '<span class="text-red-600 text-xs ml-2">Low!</span>' : ''}
+                ${(i.quantity??i.needed)<=2 ? '<span class="text-red-600 text-xs ml-2">Low!</span>' : ''}
               </div>
             </div>
             <div class="flex gap-2">
@@ -428,21 +398,109 @@
       return rows.join('');
     }
 
-    window.editItem = async barcode => { /* ... same as before ... */ };
-    window.editShopping = async barcode => { /* ... same as before ... */ };
-    window.removeItem = async barcode => { if(confirm('Remove?')){await api('/remove',{method:'POST',body:JSON.stringify({barcode})});loadInventory();} };
-    window.removeShopping = async barcode => { if(confirm('Remove?')){await api('/remove-from-shopping',{method:'POST',body:JSON.stringify({barcode})});loadShopping();} };
+    window.editItem = async barcode => {
+      const d = await api('/inventory');
+      const itm = d.items.find(x=>x.barcode===barcode);
+      if (!itm) return;
+      $('#invBarcode').value = barcode;
+      $('#invQty').value = itm.quantity;
+      $('#invExp').value = itm.expiration||'';
+      editingItem = {barcode, isShopping:false};
+      $('#inventoryBtnText').textContent = 'Update Inventory';
+    };
+    window.editShopping = async barcode => {
+      const d = await api('/shopping');
+      const itm = d.list.find(x=>x.barcode===barcode);
+      if (!itm) return;
+      $('#shopBarcode').value = barcode;
+      $('#shopName').value = itm.itemName;
+      $('#shopNeeded').value = itm.needed;
+      editingItem = {barcode, isShopping:true};
+      $('#shoppingBtnText').textContent = 'Update List';
+    };
 
-    document.getElementById('addToInventory').onclick = async () => { /* ... same ... */ };
-    document.getElementById('addToShopping').onclick = async () => { /* ... same ... */ };
-    document.getElementById('exportCsv').onclick = () => { const a=document.createElement('a'); a.href='/export-csv'; a.download='pantrypal-inventory.csv'; a.click(); };
-    async function loadScanCount(){ const d=await api('/user-info'); document.getElementById('scanCounter').innerHTML = d?.isPro ? 'Unlimited scans (Pro)' : `Free scans: ${d?.scans||0}/10`; }
+    $('#addToInventory').onclick = async () => {
+      const barcode = $('#invBarcode').value.trim();
+      const qty = parseInt($('#invQty').value)||1;
+      const exp = $('#invExp').value;
+      if (!barcode) return alert('Barcode required');
+      await api('/add', {method:'POST', body:JSON.stringify({barcode, quantity:qty, expiration:exp})});
+      $('#invBarcode').value=''; $('#invQty').value=1; $('#invExp').value='';
+      $('#inventoryBtnText').textContent = 'Add to Inventory';
+      editingItem = null;
+      loadInventory();
+    };
+    $('#addToShopping').onclick = async () => {
+      const barcode = $('#shopBarcode').value.trim();
+      const name = $('#shopName').value.trim();
+      const needed = parseInt($('#shopNeeded').value)||1;
+      if (!barcode || !name) return alert('Barcode & name required');
+      await api('/add-to-shopping', {method:'POST', body:JSON.stringify({barcode, itemName:name, needed})});
+      $('#shopBarcode').value=''; $('#shopName').value=''; $('#shopNeeded').value=1;
+      $('#shoppingBtnText').textContent = 'Add to List';
+      editingItem = null;
+      loadShopping();
+    };
 
-    let hasSeenJoinPrompt = localStorage.getItem('hasSeenJoinPrompt')==='true';
-    async function loadFamily(){ /* ... same as before ... */ }
-    document.getElementById('leaveFamily').onclick = async () => { if(confirm('Leave family?')){await api('/join-family',{method:'POST',body:JSON.stringify({code:''})});location.reload();} };
-    document.getElementById('joinFamilyBtn').onclick = async () => { const code=document.getElementById('familyCodeInput').value.trim().toUpperCase(); if(!code) return alert('Enter code'); await api('/join-family',{method:'POST',body:JSON.stringify({code})}); document.getElementById('familyModal').classList.add('hidden'); loadFamily(); };
-    document.getElementById('cancelFamilyBtn').onclick = () => { document.getElementById('familyModal').classList.add('hidden'); localStorage.setItem('hasSeenJoinPrompt','true'); };
+    window.removeItem = async barcode => { if(confirm('Delete?')) { await api('/remove',{method:'POST',body:JSON.stringify({barcode})}); loadInventory(); }};
+    window.removeShopping = async barcode => { if(confirm('Delete?')) { await api('/remove-from-shopping',{method:'POST',body:JSON.stringify({barcode})}); loadShopping(); }};
+
+    $('#exportCsv').onclick = () => { const a=document.createElement('a'); a.href='/export-csv'; a.download='pantrypal-inventory.csv'; a.click(); };
+
+    async function loadScanCount(){
+      const d = await api('/user-info');
+      $('#scanCounter').innerHTML = d?.isPro ? 'Unlimited scans (Pro)' : `Free scans: ${d?.scans||0}/10`;
+    }
+
+    // Family UI
+    const familyHTML = `
+      <div class="flex gap-2 mt-2">
+        <button id="createFamilyBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm">Create Family</button>
+        <button id="joinFamilyBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg text-sm">Join Family</button>
+      </div>`;
+    $('#familySection').insertAdjacentHTML('beforeend', familyHTML);
+
+    $('#createFamilyBtn').onclick = async () => {
+      const res = await api('/create-family', {method:'POST'});
+      if (res?.code) prompt('Share this code:', res.code);
+      loadFamily();
+    };
+    $('#joinFamilyBtn').onclick = () => $('#familyModal').classList.remove('hidden');
+
+    async function loadFamily(){
+      const u = await api('/user-info');
+      const shared = await api('/shared');
+      const sec = $('#familySection');
+      if (u?.familyCode) {
+        sec.classList.remove('hidden');
+        $('#familyName').textContent = 'My Family';
+        $('#familyRole').textContent = u.familyRole || 'member';
+        if (shared?.role && shared.role !== 'owner') {
+          $('#inventoryList').innerHTML = await renderItems(shared.inventory||[], false);
+          $('#shoppingList').innerHTML = await renderItems(shared.shopping||[], true);
+        }
+      } else sec.classList.add('hidden');
+    }
+
+    $('#leaveFamily').onclick = async () => {
+      if(confirm('Leave family?')) {
+        await api('/join-family',{method:'POST',body:JSON.stringify({code:''})});
+        location.reload();
+      }
+    };
+    $('#joinFamilyModalBtn').onclick = async () => {
+      const code = $('#familyCodeInput').value.trim().toUpperCase();
+      if(!code) return alert('Enter code');
+      await api('/join-family',{method:'POST',body:JSON.stringify({code})});
+      $('#familyModal').classList.add('hidden');
+      loadFamily();
+    };
+    $('#cancelFamilyBtn').onclick = () => {
+      $('#familyModal').classList.add('hidden');
+      localStorage.setItem('hasSeenJoinPrompt','true');
+    };
+
+    loadFamily();
   </script>
 </body>
 </html>
