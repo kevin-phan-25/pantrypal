@@ -25,9 +25,30 @@
       box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
       pointer-events: none;
     }
-    .pulse { animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-    .low-stock { @apply bg-yellow-100 dark:bg-yellow-900 border-l-4 border-yellow-500 p-2 text-sm; }
+    /* Pulse Animation */
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .pulse { animation: pulse 2s infinite; }
+
+    /* Low Stock Warning */
+    .low-stock {
+      @apply bg-red-50 dark:bg-red-900 border-l-4 border-red-500 p-3 rounded-lg shadow-sm;
+    }
+    .low-stock span { @apply text-red-600 font-bold; }
+
+    /* Loading Spinner */
+    .spinner {
+      width: 24px; height: 24px;
+      border: 3px solid #e5e7eb;
+      border-top: 3px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
@@ -69,8 +90,8 @@
       <div id="scanCounter" class="bg-blue-50 dark:bg-blue-900 p-3 rounded-lg text-center text-sm">Loading...</div>
     </div>
 
-    <!-- Scanner Button -->
-    <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md">
+    <!-- Scanner Button (with pulse) -->
+    <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md pulse">
       <svg class="icon"><use href="#heroicons-camera"/></svg>
       Start Scanner (QR + Barcode)
     </button>
@@ -88,17 +109,22 @@
       <div id="voiceResult" class="mt-4 text-center text-sm text-green-600 hidden"></div>
     </div>
 
-    <!-- AI Scan -->
+    <!-- AI Scan (with PRO badge) -->
     <section class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
       <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
         <svg class="icon"><use href="#heroicons-sparkles"/></svg>
         AI Scan Product
+        <span class="bg-yellow-400 text-xs px-2 py-1 rounded-full text-black font-bold ml-2">PRO</span>
       </h3>
       <input type="file" id="scanImage" accept="image/*" capture="environment" class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
       <button id="scanBtn" class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
         <svg class="icon"><use href="#heroicons-magnifying-glass"/></svg>
         Scan with AI
       </button>
+      <div id="scanLoading" class="hidden text-center mt-4">
+        <div class="spinner inline-block"></div>
+        <p class="text-sm mt-2 text-gray-600">Analyzing product...</p>
+      </div>
       <div id="scanResult" class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hidden">
         <pre id="scanText" class="text-xs overflow-x-auto"></pre>
       </div>
@@ -118,11 +144,11 @@
         <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
         <input type="date" id="invExp" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
       </div>
-      <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg transition flex items-center justify-center gap-2">
-        <svg class="icon"><use href="#heroicons-plus"/></svg>
-        <span id="inventoryBtnText">Add to Inventory</span>
+      <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 text-2xl">
+        <svg class="w-8 h-8"><use href="#heroicons-plus"/></svg>
+        <span id="inventoryBtnText" class="text-lg">Add to Inventory</span>
       </button>
-      <button id="exportCsv" class="mt-3 w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">Export Inventory (CSV)</button>
+      <button id="exportCsv" class="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition">Export Inventory (CSV)</button>
       <div id="inventoryList" class="mt-5 space-y-2"></div>
     </section>
 
@@ -132,9 +158,9 @@
       <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3"/>
-      <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg transition flex items-center justify-center gap-2">
-        <svg class="icon"><use href="#heroicons-plus"/></svg>
-        <span id="shoppingBtnText">Add to List</span>
+      <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 text-2xl">
+        <svg class="w-8 h-8"><use href="#heroicons-plus"/></svg>
+        <span id="shoppingBtnText" class="text-lg">Add to List</span>
       </button>
       <div id="shoppingList" class="mt-5 space-y-2"></div>
     </section>
@@ -208,8 +234,8 @@
 
     let currentUser = null, idToken = null, isPro = false, editingItem = null;
     let scannerActive = false, recognition = null;
-
     const $ = s => document.querySelector(s);
+
     async function api(path, opts = {}) {
       if (!idToken) return alert('Not signed in');
       const res = await fetch(path, {
@@ -228,10 +254,8 @@
         $('#userEmail').textContent = user.email || user.phoneNumber || 'User';
         $('#auth-section').classList.add('hidden');
         $('#app').classList.remove('hidden');
-
         const u = await api('/user-info');
         isPro = u?.isPro ?? false;
-
         await loadInventory();
         await loadShopping();
         loadScanCount();
@@ -241,6 +265,7 @@
         $('#app').classList.add('hidden');
       }
     });
+
     $('#signOutBtn').onclick = () => firebase.auth().signOut();
 
     // Dark Mode
@@ -267,7 +292,6 @@
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         video.srcObject = stream; scannerActive = true;
         await new Promise(r => video.onloadedmetadata = r);
-
         const codeReader = new ZXing.BrowserMultiFormatReader();
         codeReader.decodeFromVideoDevice(null, 'scanner-video', (result, err) => {
           if (result && scannerActive) { handleScannedCode(result.getText()); closeScanner(); }
@@ -323,7 +347,6 @@
       voiceBtn.addEventListener('pointerdown', start);
       voiceBtn.addEventListener('pointerup', stop);
       voiceBtn.addEventListener('pointerleave', stop);
-
       recognition.onresult = e => {
         const txt = e.results[0][0].transcript.trim().toLowerCase();
         voiceResult.textContent = `Heard: "${txt}"`; voiceResult.classList.remove('hidden');
@@ -340,7 +363,7 @@
       voiceBtn.disabled = true; voiceBtn.innerHTML = '<span>Mic not supported</span>';
     }
 
-    // AI Scan
+    // AI Scan with Loading
     $('#scanBtn').onclick = async () => {
       const file = $('#scanImage').files[0];
       if (!file) return alert('Pick an image');
@@ -349,13 +372,22 @@
         if (!rec?.allowed) return alert(rec.message || 'Free limit reached');
       }
       const fd = new FormData(); fd.append('image', file);
-      const r = await fetch('/scan', { method:'POST', headers:{'Authorization':`Bearer ${idToken}`}, body:fd });
-      const d = await r.json();
-      const resDiv = $('#scanResult'), txt = $('#scanText');
-      txt.textContent = d.success ? JSON.stringify(d.record, null, 2) : (d.error || 'Failed');
-      resDiv.classList.remove('hidden');
-      if (d.record?.barcode) $('#invBarcode').value = d.record.barcode;
-      loadScanCount();
+      $('#scanLoading').classList.remove('hidden');
+      $('#scanResult').classList.add('hidden');
+      try {
+        const r = await fetch('/scan', { method:'POST', headers:{'Authorization':`Bearer ${idToken}`}, body:fd });
+        const d = await r.json();
+        const resDiv = $('#scanResult'), txt = $('#scanText');
+        txt.textContent = d.success ? JSON.stringify(d.record, null, 2) : (d.error || 'Failed');
+        resDiv.classList.remove('hidden');
+        if (d.record?.barcode) $('#invBarcode').value = d.record.barcode;
+      } catch (err) {
+        $('#scanText').textContent = 'Network error. Try again.';
+        $('#scanResult').classList.remove('hidden');
+      } finally {
+        $('#scanLoading').classList.add('hidden');
+        loadScanCount();
+      }
     };
 
     // Inventory & Shopping
@@ -367,7 +399,6 @@
       const d = await api('/shopping');
       $('#shoppingList').innerHTML = await renderItems(d?.list||[], true);
     }
-
     async function renderItems(items, isShopping) {
       if (!items.length) return '<p class="text-center text-gray-500">Empty</p>';
       const rows = await Promise.all(items.map(async i => {
@@ -377,16 +408,16 @@
           if (p?.image) img = p.image;
         }
         const editFn = isShopping ? `editShopping('${i.barcode}')` : `editItem('${i.barcode}')`;
-        const delFn  = isShopping ? `removeShopping('${i.barcode}')` : `removeItem('${i.barcode}')`;
+        const delFn = isShopping ? `removeShopping('${i.barcode}')` : `removeItem('${i.barcode}')`;
         const low = (i.quantity ?? i.needed) <= 2 ? 'low-stock' : '';
         return `
-          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${low}">
+          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow ${low}">
             <div class="flex items-center gap-3">
               <img src="${img}" alt="${i.name||i.itemName}" class="w-10 h-10 rounded object-cover bg-gray-200 border" loading="lazy" onerror="this.src='icon-192.png';">
               <div>
                 <strong>${i.name||i.itemName}</strong><br>
                 <span class="text-sm text-gray-600">${i.quantity||i.needed} ${i.expiration ? '| Exp: '+i.expiration : ''}</span>
-                ${(i.quantity??i.needed)<=2 ? '<span class="text-red-600 text-xs ml-2">Low!</span>' : ''}
+                ${(i.quantity??i.needed)<=2 ? '<span class="text-red-600 text-xs ml-2 font-bold">Low!</span>' : ''}
               </div>
             </div>
             <div class="flex gap-2">
@@ -430,6 +461,7 @@
       editingItem = null;
       loadInventory();
     };
+
     $('#addToShopping').onclick = async () => {
       const barcode = $('#shopBarcode').value.trim();
       const name = $('#shopName').value.trim();
@@ -444,7 +476,6 @@
 
     window.removeItem = async barcode => { if(confirm('Delete?')) { await api('/remove',{method:'POST',body:JSON.stringify({barcode})}); loadInventory(); }};
     window.removeShopping = async barcode => { if(confirm('Delete?')) { await api('/remove-from-shopping',{method:'POST',body:JSON.stringify({barcode})}); loadShopping(); }};
-
     $('#exportCsv').onclick = () => { const a=document.createElement('a'); a.href='/export-csv'; a.download='pantrypal-inventory.csv'; a.click(); };
 
     async function loadScanCount(){
@@ -488,6 +519,7 @@
         location.reload();
       }
     };
+
     $('#joinFamilyModalBtn').onclick = async () => {
       const code = $('#familyCodeInput').value.trim().toUpperCase();
       if(!code) return alert('Enter code');
@@ -495,6 +527,7 @@
       $('#familyModal').classList.add('hidden');
       loadFamily();
     };
+
     $('#cancelFamilyBtn').onclick = () => {
       $('#familyModal').classList.add('hidden');
       localStorage.setItem('hasSeenJoinPrompt','true');
