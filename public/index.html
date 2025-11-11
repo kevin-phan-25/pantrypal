@@ -28,15 +28,11 @@
     .spinner { width:24px;height:24px;border:3px solid #e5e7eb;border-top:3px solid #3b82f6;border-radius:50%;animation:spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .animate-listen { animation: pulse 1.5s infinite; }
-
-    /* RESPONSIVE TABS */
     .tab-btn {
       @apply px-3 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 font-medium transition rounded-t-lg flex-1 min-w-0;
     }
     .tab-btn:hover { @apply bg-gray-100 dark:bg-gray-700; }
     .tab-btn.active { @apply bg-blue-600 text-white; }
-
-    /* MEAL GRID */
     .meal-day {
       @apply bg-white dark:bg-gray-800 p-2 sm:p-3 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 min-h-24 sm:min-h-28 flex flex-col;
     }
@@ -62,12 +58,10 @@
       @apply bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-medium hover:shadow;
     }
   </style>
-
   <!-- Web Push Notifications -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
-
     const firebaseConfig = {
       apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
       authDomain: "pantrypal-6e410.firebaseapp.com",
@@ -76,10 +70,8 @@
       messagingSenderId: "592127259891",
       appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
     };
-
     const app = initializeApp(firebaseConfig);
     const messaging = getMessaging(app);
-
     window.requestPushPermission = async () => {
       try {
         const token = await getToken(messaging, { vapidKey: "BKPcrxsEbkHtmRSMPZeMXjm-cUn4jT_58dMPZ5ZiSja0_-4oWDsy2CkxSrsDKNZPJG4uNZG7v4Q5I2DAedOtZSs" });
@@ -89,7 +81,6 @@
         }
       } catch (err) { console.log('Push denied:', err); }
     };
-
     onMessage(messaging, (payload) => {
       new Notification(payload.notification.title, { body: payload.notification.body, icon: '/icon-192.png' });
     });
@@ -121,7 +112,6 @@
 
   <!-- Main App -->
   <main id="app" class="hidden max-w-4xl mx-auto p-4 space-y-6">
-    <!-- User + Push -->
     <div class="flex flex-col gap-2">
       <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
         <p class="font-medium text-sm"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
@@ -133,13 +123,11 @@
       </div>
     </div>
 
-    <!-- Scanner Button -->
     <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md pulse text-sm sm:text-base">
       <svg class="icon"><use href="#heroicons-camera"/></svg>
       Start Scanner
     </button>
 
-    <!-- Voice -->
     <div class="bg-white dark:bg-gray-800 p-4 sm:p-5 rounded-xl shadow">
       <h3 class="text-base sm:text-lg font-semibold mb-3 flex items-center gap-2">
         <svg class="icon"><use href="#heroicons-microphone"/></svg>
@@ -152,17 +140,14 @@
       <div id="voiceResult" class="mt-4 text-center text-xs hidden"></div>
     </div>
 
-    <!-- TAB BAR -->
     <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-x-auto scrollbar-hide">
       <button class="tab-btn active" data-tab="inventory">Inventory</button>
       <button class="tab-btn" data-tab="shopping">Shopping</button>
       <button class="tab-btn" data-tab="meals">Meals</button>
     </div>
 
-    <!-- SWIPEABLE CONTENT -->
     <div id="tabContainer" class="relative overflow-hidden rounded-b-xl shadow bg-white dark:bg-gray-800">
       <div id="tabSlider" class="flex tab-content" style="width: 300%; transform: translateX(0%);">
-        <!-- INVENTORY -->
         <section id="inventory" class="w-full p-4 sm:p-5">
           <h3 class="text-base sm:text-lg font-semibold mb-3">Add Item</h3>
           <input type="text" id="invBarcode" placeholder="Barcode / QR" class="w-full p-3 border rounded-lg mb-2 text-sm"/>
@@ -176,7 +161,6 @@
           <div id="inventoryList" class="mt-5 space-y-2"></div>
         </section>
 
-        <!-- SHOPPING -->
         <section id="shopping" class="w-full p-4 sm:p-5">
           <h3 class="text-base sm:text-lg font-semibold mb-3">Shopping List</h3>
           <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border rounded-lg mb-2 text-sm"/>
@@ -187,34 +171,23 @@
           <div id="shoppingList" class="mt-5 space-y-2"></div>
         </section>
 
-        <!-- MEALS -->
         <section id="meals" class="w-full p-4 sm:p-5">
           <h3 class="text-base sm:text-lg font-semibold mb-4">Meal Plan</h3>
-
-          <!-- Recipe Search -->
           <div class="mb-4">
             <input type="text" id="recipeSearch" placeholder="Search recipes..." class="w-full p-3 border rounded-lg text-sm"/>
             <button id="searchRecipes" class="mt-2 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm">Find Recipes</button>
           </div>
           <div id="recipeResults" class="space-y-3 mb-6 max-h-48 overflow-y-auto"></div>
-
-          <!-- Templates -->
           <div class="flex gap-2 mb-4 flex-wrap">
             <button class="template-btn" onclick="applyTemplate('breakfast')">Breakfast</button>
             <button class="template-btn" onclick="applyTemplate('lunch')">Lunch</button>
             <button class="template-btn" onclick="applyTemplate('dinner')">Dinner</button>
             <button class="template-btn" onclick="applyTemplate('snacks')">Snacks</button>
           </div>
-
-          <!-- Week Header -->
           <div class="grid grid-cols-7 gap-1 sm:gap-2 text-center text-xs font-bold text-gray-600 dark:text-gray-300 mb-2">
             <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
           </div>
-
-          <!-- Meal Grid -->
           <div id="mealGrid" class="grid grid-cols-7 gap-2 sm:gap-3"></div>
-
-          <!-- Actions -->
           <div class="mt-6 flex flex-col gap-2 max-w-md mx-auto">
             <button id="addToShoppingFromMeals" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl transition shadow-md text-sm">
               Add All Meals to Shopping
@@ -223,8 +196,6 @@
               Analyze Nutrition
             </button>
           </div>
-
-          <!-- Nutrition Summary -->
           <div id="nutritionSummary" class="mt-4 p-3 bg-green-50 dark:bg-green-900 rounded-lg hidden text-xs">
             <h4 class="font-bold mb-1">Daily Nutrition</h4>
             <div>Calories: <span id="calories">0</span></div>
@@ -251,10 +222,25 @@
 
   <!-- App Logic -->
   <script>
-    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
+    // BULLETPROOF API BASE — WORKS ON RENDER + LOCALHOST
+    const API_BASE = window.location.origin;
+    console.log('API_BASE →', API_BASE);
+
+    const firebaseConfig = { 
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", 
+      authDomain: "pantrypal-6e410.firebaseapp.com", 
+      projectId: "pantrypal-6e410", 
+      storageBucket: "pantrypal-6e410.firebasestorage.app", 
+      messagingSenderId: "592127259891", 
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" 
+    };
     firebase.initializeApp(firebaseConfig);
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
-    ui.start('#firebaseui-auth-container', { signInFlow: 'popup', signInOptions: ['google.com','apple.com','emailLink','password','phone'], callbacks: { signInSuccessWithAuthResult: () => false } });
+    ui.start('#firebaseui-auth-container', { 
+      signInFlow: 'popup', 
+      signInOptions: ['google.com','apple.com','emailLink','password','phone'], 
+      callbacks: { signInSuccessWithAuthResult: () => false } 
+    });
 
     let currentUser = null, idToken = null;
     const $ = s => document.querySelector(s);
@@ -269,7 +255,14 @@
     async function api(path, opts = {}) {
       if (!idToken) return null;
       try {
-        const res = await fetch(path, { ...opts, headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json', ...opts.headers } });
+        const res = await fetch(API_BASE + path, { 
+          ...opts, 
+          headers: { 
+            'Authorization': `Bearer ${idToken}`, 
+            'Content-Type': 'application/json', 
+            ...opts.headers 
+          } 
+        });
         if (!res.ok) throw new Error();
         return await res.json();
       } catch { return null; }
@@ -284,21 +277,21 @@
         $('#app').classList.remove('hidden');
         await loadMeals();
         if (Notification.permission === 'default') $('#pushBanner').classList.remove('hidden');
+        $('#enablePush').onclick = requestPushPermission;
       } else {
         $('#auth-section').classList.remove('hidden');
         $('#app').classList.add('hidden');
       }
     });
+
     $('#signOutBtn').onclick = () => firebase.auth().signOut();
 
-    // DARK MODE
     $('#darkModeBtn').onclick = () => {
       document.documentElement.classList.toggle('dark');
       localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
     };
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-    // TABS
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabSlider = $('#tabSlider');
     let currentTab = 0;
@@ -309,13 +302,11 @@
     }
     tabButtons.forEach((b, i) => b.onclick = () => switchTab(i));
 
-    // MEALS
     async function loadMeals() {
       const data = await api('/meals') || { meals: {} };
       const grid = $('#mealGrid');
       grid.innerHTML = '';
       const today = new Date().getDay();
-
       days.forEach((day, i) => {
         const div = document.createElement('div');
         div.className = 'meal-day';
@@ -335,6 +326,23 @@
         new Sortable(zone, { group: 'meals', animation: 150, onEnd: saveMeals });
         grid.appendChild(div);
       });
+
+      // RE-ATTACH DRAG & DROP AFTER GRID IS BUILT
+      document.querySelectorAll('.meal-dropzone').forEach(zone => {
+        zone.ondragover = e => e.preventDefault();
+        zone.ondrop = e => {
+          e.preventDefault();
+          const name = e.dataTransfer.getData('text/plain');
+          if (name) {
+            const item = document.createElement('div');
+            item.className = 'meal-item';
+            item.textContent = name;
+            item.dataset.id = Date.now();
+            zone.appendChild(item);
+            saveMeals();
+          }
+        };
+      });
     }
 
     async function saveMeals() {
@@ -346,72 +354,60 @@
       await api('/save-meals', { method: 'POST', body: JSON.stringify({ meals }) });
     }
 
-    // DRAG RECIPES
     $('#searchRecipes').onclick = async () => {
       const q = $('#recipeSearch').value.trim();
       if (!q) return;
-      const res = await fetch(`/recipes?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
       const container = $('#recipeResults');
+      container.innerHTML = '<p class="text-xs">Searching...</p>';
+      // Mock results
+      const mock = [
+        { name: "Vegan Buddha Bowl", image: "https://via.placeholder.com/50" },
+        { name: "Chicken Stir Fry", image: "https://via.placeholder.com/50" }
+      ];
       container.innerHTML = '';
-      data.recipes?.forEach(r => {
+      mock.forEach(r => {
         const card = document.createElement('div');
         card.className = 'recipe-card';
         card.draggable = true;
-        card.dataset.recipe = r.name;
         card.innerHTML = `<div class="flex gap-2"><img src="${r.image}" class="w-12 h-12 rounded"><div><h4 class="font-bold text-xs">${r.name}</h4></div></div>`;
         card.ondragstart = e => e.dataTransfer.setData('text/plain', r.name);
         container.appendChild(card);
       });
     };
 
-    document.querySelectorAll('.meal-dropzone').forEach(zone => {
-      zone.ondragover = e => e.preventDefault();
-      zone.ondrop = e => {
-        e.preventDefault();
-        const name = e.dataTransfer.getData('text/plain');
-        if (name) {
-          const item = document.createElement('div');
-          item.className = 'meal-item';
-          item.textContent = name;
-          item.dataset.id = Date.now();
-          zone.appendChild(item);
-          saveMeals();
-        }
-      };
-    });
-
-    // TEMPLATES
     window.applyTemplate = type => {
       const items = templates[type];
-      const zone = document.querySelector('.meal-dropzone');
-      if (zone) {
+      const zone = document.querySelector(`.meal-dropzone[data-day="Sun"]`) || document.querySelector('.meal-dropzone');
+      if (zone && items) {
         items.forEach(name => {
           const item = document.createElement('div');
           item.className = 'meal-item';
           item.textContent = name;
-          item.dataset.id = Date.now();
+          item.dataset.id = Date.now() + Math.random();
           zone.appendChild(item);
         });
         saveMeals();
       }
     };
 
-    // ACTIONS
     $('#addToShoppingFromMeals').onclick = async () => {
       const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
-      for (const name of meals) await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed: 1 }) });
-      alert('Meals added!');
+      for (const name of meals) {
+        await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed: 1 }) });
+      }
+      alert('Meals added to shopping!');
     };
 
     $('#analyzeNutrition').onclick = async () => {
       const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
-      if (!meals.length) return alert('No meals');
-      const res = await api('/analyze-meal', { method: 'POST', body: JSON.stringify({ meals }) });
-      if (res?.total) {
-        $('#calories').textContent = res.total.calories;
-        $('#calorieBar').style.width = `${Math.min(100, res.total.calories / 20)}%`;
+      if (!meals.length) return alert('No meals planned');
+      const res = await api('/nutrition', { method: 'POST', body: JSON.stringify({ text: meals.join(' + ') }) });
+      if (res?.calories) {
+        $('#calories').textContent = Math.round(res.calories);
+        $('#calorieBar').style.width = `${Math.min(100, res.calories / 20)}%`;
         $('#nutritionSummary').classList.remove('hidden');
+      } else {
+        alert('Analysis failed');
       }
     };
 
