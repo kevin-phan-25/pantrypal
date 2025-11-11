@@ -25,48 +25,41 @@
     }
     @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
     .pulse { animation: pulse 2s infinite; }
-    .low-stock { @apply bg-red-50 dark:bg-red-900 border-l-4 border-red-500 p-3 rounded-lg shadow-sm; }
-    .low-stock span { @apply text-red-600 font-bold; }
     .spinner { width:24px;height:24px;border:3px solid #e5e7eb;border-top:3px solid #3b82f6;border-radius:50%;animation:spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .animate-listen { animation: pulse 1.5s infinite; }
 
+    /* RESPONSIVE TABS */
     .tab-btn {
-      @apply px-3 py-2 text-sm text-gray-600 dark:text-gray-300 font-medium transition rounded-t-lg;
+      @apply px-3 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 font-medium transition rounded-t-lg flex-1 min-w-0;
     }
     .tab-btn:hover { @apply bg-gray-100 dark:bg-gray-700; }
     .tab-btn.active { @apply bg-blue-600 text-white; }
 
+    /* MEAL GRID */
     .meal-day {
-      @apply bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 min-h-28 flex flex-col;
+      @apply bg-white dark:bg-gray-800 p-2 sm:p-3 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 min-h-24 sm:min-h-28 flex flex-col;
     }
     .meal-day-header {
       @apply text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1;
     }
     .meal-dropzone {
-      @apply flex-1 min-h-16;
+      @apply flex-1 min-h-12 sm:min-h-16 overflow-y-auto;
     }
     .meal-item {
-      @apply bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs cursor-move mb-1 hover:shadow;
+      @apply bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs cursor-move mb-1 hover:shadow transition;
     }
-    .expiry-alert {
-      @apply bg-red-100 border border-red-300 text-red-800 px-2 py-1 rounded-full text-xs font-bold;
-    }
-    .price-table {
-      @apply w-full border-collapse border border-gray-300 text-xs;
-    }
-    .price-table td, .price-table th {
-      @apply border border-gray-300 p-1;
-    }
-    .price-lowest { @apply bg-green-100 font-bold; }
     .recipe-card {
-      @apply bg-white dark:bg-gray-800 p-3 rounded-lg shadow hover:shadow-md transition cursor-pointer;
+      @apply bg-white dark:bg-gray-800 p-3 rounded-lg shadow hover:shadow-md transition cursor-grab active:cursor-grabbing;
     }
     .nutrition-bar {
       @apply h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden;
     }
     .nutrition-fill {
       @apply h-full transition-all duration-500;
+    }
+    .template-btn {
+      @apply bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-medium hover:shadow;
     }
   </style>
 
@@ -89,43 +82,29 @@
 
     window.requestPushPermission = async () => {
       try {
-        const token = await getToken(messaging, {
-          vapidKey: "BKPcrxsEbkHtmRSMPZeMXjm-cUn4jT_58dMPZ5ZiSja0_-4oWDsy2CkxSrsDKNZPJG4uNZG7v4Q5I2DAedOtZSs"
-        });
+        const token = await getToken(messaging, { vapidKey: "BKPcrxsEbkHtmRSMPZeMXjm-cUn4jT_58dMPZ5ZiSja0_-4oWDsy2CkxSrsDKNZPJG4uNZG7v4Q5I2DAedOtZSs" });
         if (token && firebase.auth().currentUser) {
           const idToken = await firebase.auth().currentUser.getIdToken();
-          await fetch('/save-token', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify({ token })
-          });
+          await fetch('/save-token', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }, body: JSON.stringify({ token }) });
         }
-      } catch (err) {
-        console.log('Push permission denied:', err);
-      }
+      } catch (err) { console.log('Push denied:', err); }
     };
 
     onMessage(messaging, (payload) => {
-      new Notification(payload.notification.title, {
-        body: payload.notification.body,
-        icon: '/icon-192.png'
-      });
+      new Notification(payload.notification.title, { body: payload.notification.body, icon: '/icon-192.png' });
     });
   </script>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
   <!-- Header -->
-  <header class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 shadow-md">
+  <header class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 shadow-md sticky top-0 z-40">
     <div class="max-w-4xl mx-auto px-4 flex justify-between items-center">
       <div class="text-center flex-1">
-        <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
+        <h1 class="text-xl sm:text-2xl font-bold flex items-center justify-center gap-2">
           <svg class="icon"><use href="#heroicons-home"/></svg>
           PantryPal
         </h1>
-        <p class="text-sm opacity-90">Voice • QR • AI • Recipes • Nutrition</p>
+        <p class="text-xs sm:text-sm opacity-90">Voice • QR • AI • Recipes • Nutrition</p>
       </div>
       <button id="darkModeBtn" class="p-2 rounded-full hover:bg-blue-700 transition">
         <svg class="icon"><use href="#heroicons-moon"/></svg>
@@ -142,173 +121,116 @@
 
   <!-- Main App -->
   <main id="app" class="hidden max-w-4xl mx-auto p-4 space-y-6">
-    <!-- User + Family -->
+    <!-- User + Push -->
     <div class="flex flex-col gap-2">
       <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
-        <p class="font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
-        <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1 rounded transition">Sign Out</button>
+        <p class="font-medium text-sm"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
+        <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded transition">Sign Out</button>
       </div>
-      <div id="familySection" class="bg-indigo-50 dark:bg-indigo-900 p-3 rounded-lg text-sm hidden">
-        <p>Family: <span id="familyName">My Family</span> | Role: <span id="familyRole"></span></p>
-        <button id="leaveFamily" class="text-red-600 underline text-xs">Leave</button>
-      </div>
-      <div id="scanCounter" class="bg-blue-50 dark:bg-blue-900 p-3 rounded-lg text-center text-sm">Loading...</div>
-      <div id="pushBanner" class="bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded-lg text-sm hidden">
+      <div id="pushBanner" class="bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded-lg text-xs hidden">
         Enable notifications to get expiration alerts!
         <button id="enablePush" class="text-blue-600 underline text-xs ml-2">Enable Now</button>
       </div>
     </div>
 
     <!-- Scanner Button -->
-    <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md pulse">
+    <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md pulse text-sm sm:text-base">
       <svg class="icon"><use href="#heroicons-camera"/></svg>
-      Start Scanner (QR + Barcode)
+      Start Scanner
     </button>
 
     <!-- Voice -->
-    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
-      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+    <div class="bg-white dark:bg-gray-800 p-4 sm:p-5 rounded-xl shadow">
+      <h3 class="text-base sm:text-lg font-semibold mb-3 flex items-center gap-2">
         <svg class="icon"><use href="#heroicons-microphone"/></svg>
         Voice Commands
       </h3>
-      <button id="voiceBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition">
+      <button id="voiceBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition text-sm">
         <svg class="icon"><use href="#heroicons-microphone"/></svg>
         <span>Hold to Speak</span>
       </button>
-      <div id="voiceResult" class="mt-4 text-center text-sm hidden"></div>
+      <div id="voiceResult" class="mt-4 text-center text-xs hidden"></div>
     </div>
-
-    <!-- AI Scan (PRO) -->
-    <section class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
-      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
-        <svg class="icon"><use href="#heroicons-sparkles"/></svg>
-        AI Scan Product
-        <span class="bg-yellow-400 text-xs px-2 py-1 rounded-full text-black font-bold ml-2">PRO</span>
-      </h3>
-      <input type="file" id="scanImage" accept="image/*" capture="environment" class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-      <button id="scanBtn" class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
-        <svg class="icon"><use href="#heroicons-magnifying-glass"/></svg>
-        Scan with AI
-      </button>
-      <div id="scanLoading" class="hidden text-center mt-4">
-        <div class="spinner inline-block"></div>
-        <p class="text-sm mt-2 text-gray-600">Analyzing product...</p>
-      </div>
-      <div id="scanResult" class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hidden">
-        <pre id="scanText" class="text-xs overflow-x-auto"></pre>
-      </div>
-    </section>
 
     <!-- TAB BAR -->
-    <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden">
-      <button class="tab-btn flex-1 active" data-tab="inventory">Inventory</button>
-      <button class="tab-btn flex-1" data-tab="shopping">Shopping</button>
-      <button class="tab-btn flex-1" data-tab="meals">Meals</button>
+    <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-x-auto scrollbar-hide">
+      <button class="tab-btn active" data-tab="inventory">Inventory</button>
+      <button class="tab-btn" data-tab="shopping">Shopping</button>
+      <button class="tab-btn" data-tab="meals">Meals</button>
     </div>
 
-    <!-- SWIPEABLE TAB CONTENT -->
+    <!-- SWIPEABLE CONTENT -->
     <div id="tabContainer" class="relative overflow-hidden rounded-b-xl shadow bg-white dark:bg-gray-800">
       <div id="tabSlider" class="flex tab-content" style="width: 300%; transform: translateX(0%);">
-        <!-- INVENTORY TAB -->
-        <section id="inventory" class="w-full p-5 relative">
-          <h3 class="text-lg font-semibold mb-3">Add / Edit Item</h3>
-          <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
+        <!-- INVENTORY -->
+        <section id="inventory" class="w-full p-4 sm:p-5">
+          <h3 class="text-base sm:text-lg font-semibold mb-3">Add Item</h3>
+          <input type="text" id="invBarcode" placeholder="Barcode / QR" class="w-full p-3 border rounded-lg mb-2 text-sm"/>
           <div class="grid grid-cols-2 gap-2">
-            <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
-            <input type="date" id="invExp" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
+            <input type="number" id="invQty" value="1" min="1" class="p-3 border rounded-lg text-sm"/>
+            <input type="date" id="invExp" class="p-3 border rounded-lg text-sm"/>
           </div>
-          <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 text-2xl">
-            <svg class="w-8 h-8"><use href="#heroicons-plus"/></svg>
-            <span id="inventoryBtnText" class="text-lg">Add to Inventory</span>
+          <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl transition text-sm">
+            Add to Inventory
           </button>
-          <button id="exportCsv" class="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition">Export Inventory (CSV)</button>
           <div id="inventoryList" class="mt-5 space-y-2"></div>
         </section>
 
-        <!-- SHOPPING TAB -->
-        <section id="shopping" class="w-full p-5 relative">
-          <h3 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h3>
-          <input type="text" id="shopBarcode" placeholder="Barcode (optional)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
-          <input type="text" id="shopName" placeholder="Item Name (required)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
-          <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3"/>
-          <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 text-2xl">
-            <svg class="w-8 h-8"><use href="#heroicons-plus"/></svg>
-            <span id="shoppingBtnText" class="text-lg">Add to List</span>
+        <!-- SHOPPING -->
+        <section id="shopping" class="w-full p-4 sm:p-5">
+          <h3 class="text-base sm:text-lg font-semibold mb-3">Shopping List</h3>
+          <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border rounded-lg mb-2 text-sm"/>
+          <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border rounded-lg mb-3 text-sm"/>
+          <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl transition text-sm">
+            Add to List
           </button>
           <div id="shoppingList" class="mt-5 space-y-2"></div>
         </section>
 
-        <!-- MEALS TAB -->
-        <section id="meals" class="w-full p-5">
-          <h3 class="text-lg font-semibold mb-4">Meal Plan</h3>
+        <!-- MEALS -->
+        <section id="meals" class="w-full p-4 sm:p-5">
+          <h3 class="text-base sm:text-lg font-semibold mb-4">Meal Plan</h3>
 
           <!-- Recipe Search -->
           <div class="mb-4">
-            <input type="text" id="recipeSearch" placeholder="Search recipes (e.g., pasta)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
-            <button id="searchRecipes" class="mt-2 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg">Find Recipes</button>
+            <input type="text" id="recipeSearch" placeholder="Search recipes..." class="w-full p-3 border rounded-lg text-sm"/>
+            <button id="searchRecipes" class="mt-2 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm">Find Recipes</button>
           </div>
-          <div id="recipeResults" class="space-y-3 mb-6"></div>
+          <div id="recipeResults" class="space-y-3 mb-6 max-h-48 overflow-y-auto"></div>
 
-          <!-- SINGLE HEADER -->
-          <div class="grid grid-cols-7 gap-2 text-center text-xs font-bold text-gray-600 dark:text-gray-300 mb-2">
+          <!-- Templates -->
+          <div class="flex gap-2 mb-4 flex-wrap">
+            <button class="template-btn" onclick="applyTemplate('breakfast')">Breakfast</button>
+            <button class="template-btn" onclick="applyTemplate('lunch')">Lunch</button>
+            <button class="template-btn" onclick="applyTemplate('dinner')">Dinner</button>
+            <button class="template-btn" onclick="applyTemplate('snacks')">Snacks</button>
+          </div>
+
+          <!-- Week Header -->
+          <div class="grid grid-cols-7 gap-1 sm:gap-2 text-center text-xs font-bold text-gray-600 dark:text-gray-300 mb-2">
             <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
           </div>
 
-          <!-- MEAL GRID -->
-          <div id="mealGrid" class="grid grid-cols-7 gap-3"></div>
+          <!-- Meal Grid -->
+          <div id="mealGrid" class="grid grid-cols-7 gap-2 sm:gap-3"></div>
 
-          <!-- Nutrition + Buttons -->
-          <div id="nutritionSummary" class="mt-6 p-4 bg-green-50 dark:bg-green-900 rounded-lg hidden">
-            <h4 class="font-bold text-sm mb-2">Daily Nutrition</h4>
-            <div class="space-y-2">
-              <div><span>Calories:</span> <span id="calories">0</span></div>
-              <div class="nutrition-bar"><div id="calorieBar" class="nutrition-fill bg-green-500 w-0"></div></div>
-            </div>
-          </div>
-
+          <!-- Actions -->
           <div class="mt-6 flex flex-col gap-2 max-w-md mx-auto">
-            <button id="addToShoppingFromMeals" class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-xl transition shadow-md">
+            <button id="addToShoppingFromMeals" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl transition shadow-md text-sm">
               Add All Meals to Shopping
             </button>
-            <button id="analyzeNutrition" class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">
+            <button id="analyzeNutrition" class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm">
               Analyze Nutrition
             </button>
           </div>
+
+          <!-- Nutrition Summary -->
+          <div id="nutritionSummary" class="mt-4 p-3 bg-green-50 dark:bg-green-900 rounded-lg hidden text-xs">
+            <h4 class="font-bold mb-1">Daily Nutrition</h4>
+            <div>Calories: <span id="calories">0</span></div>
+            <div class="nutrition-bar mt-1"><div id="calorieBar" class="nutrition-fill bg-green-500 w-0"></div></div>
+          </div>
         </section>
-      </div>
-    </div>
-
-    <!-- Scanner Modal -->
-    <div id="scannerModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 hidden">
-      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl w-full max-w-lg">
-        <div class="flex justify-between items-center mb-3">
-          <h3 class="text-lg font-bold">Scan QR / Barcode</h3>
-          <button id="closeScanner" class="text-gray-600 hover:text-gray-800">
-            <svg class="w-6 h-6"><use href="#heroicons-x"/></svg>
-          </button>
-        </div>
-        <div class="relative">
-          <div id="scanner-overlay"></div>
-          <video id="scanner-video" class="w-full rounded-lg" autoplay playsinline></video>
-        </div>
-        <p class="text-center mt-2 text-sm text-gray-600" id="scannerStatus">Point camera at barcode...</p>
-        <div class="flex justify-center mt-3 gap-3">
-          <button id="captureBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2">
-            <svg class="w-5 h-5"><use href="#heroicons-camera"/></svg> Capture
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Family Modal -->
-    <div id="familyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-sm w-full">
-        <h3 class="text-lg font-bold mb-3">Join Family</h3>
-        <input type="text" id="familyCodeInput" placeholder="Enter 6-digit code" class="w-full p-3 border rounded-lg mb-3"/>
-        <div class="flex gap-2">
-          <button id="joinFamilyModalBtn" class="flex-1 bg-blue-600 text-white py-2 rounded-lg">Join</button>
-          <button id="cancelFamilyBtn" class="flex-1 bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
-        </div>
       </div>
     </div>
   </main>
@@ -323,86 +245,44 @@
   <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
     <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></symbol>
     <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
-    <symbol id="heroicons-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></symbol>
-    <symbol id="heroicons-magnifying-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></symbol>
-    <symbol id="heroicons-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></symbol>
-    <symbol id="heroicons-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></symbol>
     <symbol id="heroicons-microphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8a1 1 0 01-1-1v-1a5 5 0 1110 0v1a1 1 0 01-1 1h-4"/></symbol>
     <symbol id="heroicons-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></symbol>
   </svg>
 
   <!-- App Logic -->
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-      authDomain: "pantrypal-6e410.firebaseapp.com",
-      projectId: "pantrypal-6e410",
-      storageBucket: "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
     firebase.initializeApp(firebaseConfig);
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
-    ui.start('#firebaseui-auth-container', {
-      signInFlow: 'popup',
-      signInOptions: ['google.com','apple.com','emailLink','password','phone'],
-      callbacks: { signInSuccessWithAuthResult: () => false }
-    });
+    ui.start('#firebaseui-auth-container', { signInFlow: 'popup', signInOptions: ['google.com','apple.com','emailLink','password','phone'], callbacks: { signInSuccessWithAuthResult: () => false } });
 
-    let currentUser = null, idToken = null, isPro = false, editingItem = null;
-    let scannerActive = false, recognition = null, scannerInstance = null, scannerStream = null, lastScannedCode = null;
+    let currentUser = null, idToken = null;
     const $ = s => document.querySelector(s);
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    // OFFLINE CACHE
-    const CACHE_KEY = 'pantrypal-offline-v3';
-    async function cacheData(key, data) {
-      const cache = await caches.open(CACHE_KEY);
-      await cache.put(key, new Response(JSON.stringify(data)));
-    }
-    async function getCachedData(key) {
-      const cache = await caches.open(CACHE_KEY);
-      const res = await cache.match(key);
-      return res ? await res.json() : null;
-    }
+    const templates = {
+      breakfast: ['Oatmeal', 'Greek Yogurt', 'Smoothie'],
+      lunch: ['Turkey Sandwich', 'Salad Bowl', 'Quinoa Wrap'],
+      dinner: ['Grilled Chicken', 'Pasta', 'Stir Fry'],
+      snacks: ['Apple', 'Almonds', 'Hummus + Carrots']
+    };
 
     async function api(path, opts = {}) {
-      if (!idToken) return alert('Not signed in');
+      if (!idToken) return null;
       try {
-        const res = await fetch(path, {
-          ...opts,
-          headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json', ...opts.headers }
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        if (path.includes('/inventory') || path.includes('/shopping') || path.includes('/meals')) {
-          await cacheData(path, data);
-        }
-        return data;
-      } catch (err) {
-        console.warn('Offline:', err.message);
-        const cached = await getCachedData(path);
-        if (cached) {
-          $('#app').insertAdjacentHTML('afterbegin', '<div class="bg-yellow-100 p-2 text-center text-xs">Offline Mode</div>');
-          return cached;
-        }
-        return null;
-      }
+        const res = await fetch(path, { ...opts, headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json', ...opts.headers } });
+        if (!res.ok) throw new Error();
+        return await res.json();
+      } catch { return null; }
     }
 
-    // AUTH
     firebase.auth().onAuthStateChanged(async user => {
       if (user) {
         currentUser = user;
         idToken = await user.getIdToken();
-        $('#userEmail').textContent = user.email || user.phoneNumber || 'User';
+        $('#userEmail').textContent = user.email || 'User';
         $('#auth-section').classList.add('hidden');
         $('#app').classList.remove('hidden');
-        const u = await api('/user-info');
-        isPro = u?.isPro ?? false;
-        await Promise.all([loadInventory(), loadShopping(), loadMeals()]);
-        loadScanCount();
-        loadFamily();
+        await loadMeals();
         if (Notification.permission === 'default') $('#pushBanner').classList.remove('hidden');
       } else {
         $('#auth-section').classList.remove('hidden');
@@ -418,33 +298,18 @@
     };
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-    // TAB SWITCHING
+    // TABS
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabSlider = $('#tabSlider');
     let currentTab = 0;
-    let startX = 0;
-    let isDragging = false;
-
-    function switchTab(index) {
-      currentTab = index;
-      tabButtons.forEach((b, i) => b.classList.toggle('active', i === index));
-      tabSlider.style.transform = `translateX(-${index * 33.33}%)`;
+    function switchTab(i) {
+      currentTab = i;
+      tabButtons.forEach((b, j) => b.classList.toggle('active', j === i));
+      tabSlider.style.transform = `translateX(-${i * 33.33}%)`;
     }
-    tabButtons.forEach((btn, i) => btn.addEventListener('click', () => switchTab(i)));
-    $('#tabContainer').addEventListener('touchstart', e => { startX = e.touches[0].clientX; isDragging = true; }, { passive: true });
-    $('#tabContainer').addEventListener('touchmove', e => {
-      if (!isDragging) return;
-      const diff = startX - e.touches[0].clientX;
-      if (Math.abs(diff) > 50) {
-        if (diff > 0 && currentTab < 2) switchTab(currentTab + 1);
-        else if (diff < 0 && currentTab > 0) switchTab(currentTab - 1);
-        isDragging = false;
-      }
-    }, { passive: true });
-    $('#tabContainer').addEventListener('touchend', () => isDragging = false);
-    switchTab(0);
+    tabButtons.forEach((b, i) => b.onclick = () => switchTab(i));
 
-    // MEAL PLANNING
+    // MEALS
     async function loadMeals() {
       const data = await api('/meals') || { meals: {} };
       const grid = $('#mealGrid');
@@ -455,9 +320,8 @@
         const div = document.createElement('div');
         div.className = 'meal-day';
         const isToday = i === today;
-        const headerClass = isToday ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-600 dark:text-gray-400';
         div.innerHTML = `
-          <div class="meal-day-header ${headerClass}">${day}</div>
+          <div class="meal-day-header ${isToday ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-600 dark:text-gray-400'}">${day}</div>
           <div class="meal-dropzone" data-day="${day}"></div>
         `;
         const zone = div.querySelector('.meal-dropzone');
@@ -475,23 +339,14 @@
 
     async function saveMeals() {
       const meals = {};
-      document.querySelectorAll('.meal-dropzone').forEach(zone => {
-        const day = zone.dataset.day;
-        meals[day] = Array.from(zone.children).map(el => ({ id: el.dataset.id, name: el.textContent }));
+      document.querySelectorAll('.meal-dropzone').forEach(z => {
+        const day = z.dataset.day;
+        meals[day] = Array.from(z.children).map(el => ({ id: el.dataset.id, name: el.textContent }));
       });
       await api('/save-meals', { method: 'POST', body: JSON.stringify({ meals }) });
     }
 
-    $('#addToShoppingFromMeals').onclick = async () => {
-      const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
-      for (const name of meals) {
-        await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed: 1 }) });
-      }
-      alert('Meals added to shopping!');
-      loadShopping();
-    };
-
-    // RECIPE SEARCH
+    // DRAG RECIPES
     $('#searchRecipes').onclick = async () => {
       const q = $('#recipeSearch').value.trim();
       if (!q) return;
@@ -499,42 +354,59 @@
       const data = await res.json();
       const container = $('#recipeResults');
       container.innerHTML = '';
-      if (!data.recipes?.length) {
-        container.innerHTML = '<p class="text-center text-gray-500">No recipes found</p>';
-        return;
-      }
-      data.recipes.forEach(r => {
+      data.recipes?.forEach(r => {
         const card = document.createElement('div');
         card.className = 'recipe-card';
-        card.innerHTML = `
-          <div class="flex gap-3">
-            <img src="${r.image}" alt="${r.name}" class="w-16 h-16 rounded object-cover">
-            <div>
-              <h4 class="font-bold text-sm">${r.name}</h4>
-              <button class="text-blue-600 text-xs underline" onclick="addRecipeToMeal('${r.name}')">Add to Plan</button>
-            </div>
-          </div>
-        `;
+        card.draggable = true;
+        card.dataset.recipe = r.name;
+        card.innerHTML = `<div class="flex gap-2"><img src="${r.image}" class="w-12 h-12 rounded"><div><h4 class="font-bold text-xs">${r.name}</h4></div></div>`;
+        card.ondragstart = e => e.dataTransfer.setData('text/plain', r.name);
         container.appendChild(card);
       });
     };
 
-    window.addRecipeToMeal = name => {
+    document.querySelectorAll('.meal-dropzone').forEach(zone => {
+      zone.ondragover = e => e.preventDefault();
+      zone.ondrop = e => {
+        e.preventDefault();
+        const name = e.dataTransfer.getData('text/plain');
+        if (name) {
+          const item = document.createElement('div');
+          item.className = 'meal-item';
+          item.textContent = name;
+          item.dataset.id = Date.now();
+          zone.appendChild(item);
+          saveMeals();
+        }
+      };
+    });
+
+    // TEMPLATES
+    window.applyTemplate = type => {
+      const items = templates[type];
       const zone = document.querySelector('.meal-dropzone');
       if (zone) {
-        const item = document.createElement('div');
-        item.className = 'meal-item';
-        item.textContent = name;
-        item.dataset.id = Date.now();
-        zone.appendChild(item);
+        items.forEach(name => {
+          const item = document.createElement('div');
+          item.className = 'meal-item';
+          item.textContent = name;
+          item.dataset.id = Date.now();
+          zone.appendChild(item);
+        });
         saveMeals();
       }
     };
 
-    // NUTRITION
+    // ACTIONS
+    $('#addToShoppingFromMeals').onclick = async () => {
+      const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
+      for (const name of meals) await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed: 1 }) });
+      alert('Meals added!');
+    };
+
     $('#analyzeNutrition').onclick = async () => {
       const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
-      if (!meals.length) return alert('No meals planned');
+      if (!meals.length) return alert('No meals');
       const res = await api('/analyze-meal', { method: 'POST', body: JSON.stringify({ meals }) });
       if (res?.total) {
         $('#calories').textContent = res.total.calories;
@@ -543,7 +415,7 @@
       }
     };
 
-    // INITIALIZE
+    // INIT
     loadMeals();
   </script>
 </body>
