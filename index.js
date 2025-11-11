@@ -69,8 +69,8 @@ try {
 }
 
 // === WEB PUSH CONFIG ===
-const publicVapidKey = 'BKg5kL2vY8f3d9pR7tW1qX4cV6bN8mZ0aS2eF4gH6jI8kL0nM2oP4qR6sT8uV0wX2yZ';
-const privateVapidKey = 'YOUR_PRIVATE_VAPID_KEY_HERE'; // ← Replace after running: npx web-push generate-vapid-keys
+const publicVapidKey = 'BKPcrxsEbkHtmRSMPZeMXjm-cUn4jT_58dMPZ5ZiSja0_-4oWDsy2CkxSrsDKNZPJG4uNZG7v4Q5I2DAedOtZSs';
+const privateVapidKey = 'cAbR7BWZHx4l4g3YhIymbgFdvrtytzP6u_VMqIGT160';
 
 webpush.setVapidDetails(
   'mailto:kevin@pantrypal.com',
