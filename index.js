@@ -4,6 +4,7 @@ const { ImageAnnotatorClient } = require('@google-cloud/vision');
 require('dotenv').config();
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
+const path = require('path'); // ADD THIS LINE
 
 // ———————— LOAD CREDENTIALS FROM ENV VAR (RELIABLE) ————————
 let serviceAccount;
@@ -31,42 +32,22 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(fileUpload());
 
-// Test route
-app.get('/', (req, res) => {
-  res.json({
-    message: 'PantryPal backend is LIVE!',
-    time: new Date().toISOString(),
-    status: 'ready',
-    developer: '@Kevin_Phan25',
-    time_est: new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
-  });
-});
-
-// ———————— API ROUTES (REQUIRED FOR FRONTEND) ————————
+// API ROUTES
 app.get('/meals', async (req, res) => {
-  res.json({ meals: {} }); // In real app: fetch from Firestore
+  res.json({ meals: {} });
 });
 
 app.post('/save-meals', async (req, res) => {
-  try {
-    console.log('Meals saved:', req.body);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  console.log('Meals saved:', req.body);
+  res.json({ success: true });
 });
 
 app.post('/add-to-shopping', async (req, res) => {
-  try {
-    console.log('Added to shopping:', req.body);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  console.log('Added to shopping:', req.body);
+  res.json({ success: true });
 });
 
 app.post('/nutrition', async (req, res) => {
-  // Mock response — replace with real Edamam API later
   res.json({
     calories: 1850,
     totalNutrients: {
@@ -77,14 +58,17 @@ app.post('/nutrition', async (req, res) => {
   });
 });
 
-// ———————— Start Server ————————
-const PORT = process.env.PORT || 3000;
-const BASE_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-
-app.listen(PORT, () => {
-  console.log(`PantryPal API running on port ${PORT}`);
-  console.log(`Backend: ${BASE_URL}`);  // ← NOW CORRECT
-  console.log(`Time (EST): ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}`);
+// ———————— SERVE THE UI AT ROOT ————————
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-module.exports = app;
+// Serve static files (icons, manifest, etc.)
+app.use(express.static(__dirname));
+
+// ———————— Start Server ————————
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`PantryPal running on port ${PORT}`);
+  console.log(`GO TO: https://pantrypal-zdi4.onrender.com`);
+});
