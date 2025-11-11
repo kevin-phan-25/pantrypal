@@ -31,18 +31,12 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .animate-listen { animation: pulse 1.5s infinite; }
 
-    /* === TAB STYLES === */
     .tab-btn {
       @apply px-3 py-2 text-sm text-gray-600 dark:text-gray-300 font-medium transition rounded-t-lg;
     }
-    .tab-btn:hover {
-      @apply bg-gray-100 dark:bg-gray-700;
-    }
-    .tab-btn.active {
-      @apply bg-blue-600 text-white;
-    }
+    .tab-btn:hover { @apply bg-gray-100 dark:bg-gray-700; }
+    .tab-btn.active { @apply bg-blue-600 text-white; }
 
-    /* === MEAL PLANNING === */
     .meal-day {
       @apply bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 min-h-28 flex flex-col;
     }
@@ -64,9 +58,7 @@
     .price-table td, .price-table th {
       @apply border border-gray-300 p-1;
     }
-    .price-lowest {
-      @apply bg-green-100 font-bold;
-    }
+    .price-lowest { @apply bg-green-100 font-bold; }
     .recipe-card {
       @apply bg-white dark:bg-gray-800 p-3 rounded-lg shadow hover:shadow-md transition cursor-pointer;
     }
@@ -248,7 +240,6 @@
 
         <!-- MEALS TAB -->
         <section id="meals" class="w-full p-5">
-          <!-- Title -->
           <h3 class="text-lg font-semibold mb-4">Meal Plan</h3>
 
           <!-- Recipe Search -->
@@ -258,15 +249,15 @@
           </div>
           <div id="recipeResults" class="space-y-3 mb-6"></div>
 
-          <!-- Week Header -->
+          <!-- SINGLE HEADER -->
           <div class="grid grid-cols-7 gap-2 text-center text-xs font-bold text-gray-600 dark:text-gray-300 mb-2">
             <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
           </div>
 
-          <!-- Meal Grid -->
+          <!-- MEAL GRID -->
           <div id="mealGrid" class="grid grid-cols-7 gap-3"></div>
 
-          <!-- Nutrition Summary -->
+          <!-- Nutrition + Buttons -->
           <div id="nutritionSummary" class="mt-6 p-4 bg-green-50 dark:bg-green-900 rounded-lg hidden">
             <h4 class="font-bold text-sm mb-2">Daily Nutrition</h4>
             <div class="space-y-2">
@@ -275,13 +266,14 @@
             </div>
           </div>
 
-          <!-- Action Button -->
-          <button id="addToShoppingFromMeals" class="mt-6 w-full max-w-md mx-auto block bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-xl transition shadow-md">
-            Add All Meals to Shopping
-          </button>
-          <button id="analyzeNutrition" class="mt-2 w-full max-w-md mx-auto block bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">
-            Analyze Nutrition
-          </button>
+          <div class="mt-6 flex flex-col gap-2 max-w-md mx-auto">
+            <button id="addToShoppingFromMeals" class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-xl transition shadow-md">
+              Add All Meals to Shopping
+            </button>
+            <button id="analyzeNutrition" class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">
+              Analyze Nutrition
+            </button>
+          </div>
         </section>
       </div>
     </div>
@@ -341,15 +333,13 @@
 
   <!-- App Logic -->
   <script>
-    // === CONFIG ===
     const firebaseConfig = {
       apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
       authDomain: "pantrypal-6e410.firebaseapp.com",
       projectId: "pantrypal-6e410",
       storageBucket: "pantrypal-6e410.firebasestorage.app",
       messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
-      measurementId: "G-P641JW4KS4"
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
     };
     firebase.initializeApp(firebaseConfig);
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
@@ -359,13 +349,12 @@
       callbacks: { signInSuccessWithAuthResult: () => false }
     });
 
-    // === GLOBALS ===
     let currentUser = null, idToken = null, isPro = false, editingItem = null;
     let scannerActive = false, recognition = null, scannerInstance = null, scannerStream = null, lastScannedCode = null;
     const $ = s => document.querySelector(s);
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-    // === OFFLINE CACHE ===
+    // OFFLINE CACHE
     const CACHE_KEY = 'pantrypal-offline-v3';
     async function cacheData(key, data) {
       const cache = await caches.open(CACHE_KEY);
@@ -377,7 +366,6 @@
       return res ? await res.json() : null;
     }
 
-    // === API HELPER ===
     async function api(path, opts = {}) {
       if (!idToken) return alert('Not signed in');
       try {
@@ -402,7 +390,7 @@
       }
     }
 
-    // === AUTH ===
+    // AUTH
     firebase.auth().onAuthStateChanged(async user => {
       if (user) {
         currentUser = user;
@@ -423,14 +411,14 @@
     });
     $('#signOutBtn').onclick = () => firebase.auth().signOut();
 
-    // === UI: Dark Mode ===
+    // DARK MODE
     $('#darkModeBtn').onclick = () => {
       document.documentElement.classList.toggle('dark');
       localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
     };
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-    // === TAB SWITCHING + SWIPE ===
+    // TAB SWITCHING
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabSlider = $('#tabSlider');
     let currentTab = 0;
@@ -456,7 +444,7 @@
     $('#tabContainer').addEventListener('touchend', () => isDragging = false);
     switchTab(0);
 
-    // === MEAL PLANNING ===
+    // MEAL PLANNING
     async function loadMeals() {
       const data = await api('/meals') || { meals: {} };
       const grid = $('#mealGrid');
@@ -503,7 +491,7 @@
       loadShopping();
     };
 
-    // === RECIPE SEARCH ===
+    // RECIPE SEARCH
     $('#searchRecipes').onclick = async () => {
       const q = $('#recipeSearch').value.trim();
       if (!q) return;
@@ -532,7 +520,7 @@
     };
 
     window.addRecipeToMeal = name => {
-      const zone = $('.meal-dropzone');
+      const zone = document.querySelector('.meal-dropzone');
       if (zone) {
         const item = document.createElement('div');
         item.className = 'meal-item';
@@ -543,7 +531,7 @@
       }
     };
 
-    // === NUTRITION ANALYSIS ===
+    // NUTRITION
     $('#analyzeNutrition').onclick = async () => {
       const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
       if (!meals.length) return alert('No meals planned');
@@ -555,10 +543,7 @@
       }
     };
 
-    // === SCANNER, VOICE, INVENTORY, SHOPPING (unchanged from working version) ===
-    // ... (Include your full working scanner, voice, inventory, shopping logic here)
-
-    // === INITIALIZE ===
+    // INITIALIZE
     loadMeals();
   </script>
 </body>
