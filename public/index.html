@@ -7,11 +7,11 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="icon" href="icon-192.png"/>
   <meta name="theme-color" content="#3b82f6"/>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com?v=20251111"></script>
   <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <style>
-    .icon { @apply w-5 h-5 inline-block; }
+    .icon { @apply w-6 h-6; }
     #scanner-overlay::after {
       content: '';
       position: absolute;
@@ -25,150 +25,150 @@
     }
     @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
     .pulse { animation: pulse 2s infinite; }
-    .spinner { width:24px;height:24px;border:3px solid #e5e7eb;border-top:3px solid #3b82f6;border-radius:50%;animation:spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* FIXED: TAB SPACING */
+    /* TABS — FIXED */
     .tab-bar {
-      @apply flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-x-auto;
+      @apply flex bg-white dark:bg-gray-800 border-b border-gray-300 dark:border-gray-700 rounded-t-xl overflow-x-auto shadow-md;
     }
     .tab-btn {
-      @apply px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 transition;
+      @apply px-8 py-4 text-lg font-semibold text-gray-700 dark:text-gray-200 transition-colors;
     }
     .tab-btn:hover { @apply bg-gray-100 dark:bg-gray-700; }
     .tab-btn.active { @apply bg-blue-600 text-white; }
 
     .meal-day {
-      @apply bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 min-h-32 flex flex-col;
+      @apply bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 min-h-40 flex flex-col;
     }
     .meal-day-header {
-      @apply text-xs font-bold text-gray-500 dark:text-gray-400 mb-2;
+      @apply text-sm font-bold text-gray-600 dark:text-gray-300 mb-3 text-center;
     }
     .meal-dropzone {
-      @apply flex-1 min-h-20 overflow-y-auto rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600;
+      @apply flex-1 min-h-28 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 p-3;
     }
     .meal-item {
-      @apply bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-2 rounded-lg text-sm cursor-move mb-2 hover:shadow-md transition;
+      @apply bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-4 py-3 rounded-xl text-sm font-medium cursor-move mb-3 shadow hover:shadow-xl transition;
     }
     .template-btn {
-      @apply bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-medium hover:shadow-lg transition;
+      @apply bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-full font-bold transition shadow-lg;
     }
     .voice-btn {
-      @apply bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 rounded-xl transition shadow-lg;
+      @apply bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white font-bold py-8 rounded-3xl transition shadow-2xl flex items-center justify-center gap-4 text-xl;
     }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen transition-colors duration-300">
+<body class="bg-gray-50 text-gray-900 min-h-screen transition-colors duration-300">
   <!-- Header -->
-  <header class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-5 shadow-lg sticky top-0 z-50">
-    <div class="max-w-4xl mx-auto px-4 flex justify-between items-center">
+  <header class="bg-gradient-to-r from-blue-500 to-blue-700 text-white py-6 shadow-2xl sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto px-6 flex justify-between items-center">
       <div class="text-center flex-1">
-        <h1 class="text-2xl sm:text-3xl font-bold flex items-center justify-center gap-3">
+        <h1 class="text-3xl font-bold flex items-center justify-center gap-3">
+          <svg class="icon"><use href="#icon-home"/></svg>
           PantryPal
         </h1>
-        <p class="text-sm opacity-90">Voice • QR • AI • Recipes • Nutrition</p>
+        <p class="text-sm opacity-90 mt-1">Voice • QR • AI • Recipes • Nutrition</p>
       </div>
-      <button id="darkModeBtn" class="p-3 rounded-full hover:bg-blue-700 transition">
-        Dark Mode
+      <button id="darkModeBtn" class="p-3 rounded-full hover:bg-white/20 transition">
+        <svg class="icon"><use href="#icon-moon"/></svg>
       </button>
     </div>
   </header>
 
   <!-- Auth -->
-  <section id="auth-section" class="max-w-md mx-auto mt-16 p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl">
-    <h2 class="text-2xl font-bold text-center mb-6">Welcome to PantryPal!</h2>
+  <section id="auth-section" class="max-w-md mx-auto mt-20 p-10 bg-white dark:bg-gray-800 rounded-3xl shadow-2xl">
+    <h2 class="text-3xl font-bold text-center mb-8">Welcome to PantryPal!</h2>
     <div id="firebaseui-auth-container"></div>
-    <p class="text-center text-sm text-gray-500 mt-4">Sign in with Google, Email, or Phone</p>
+    <p class="text-center text-sm text-gray-500 mt-6">Sign in with Google, Email, or Phone</p>
   </section>
 
   <!-- Main App -->
-  <main id="app" class="hidden max-w-4xl mx-auto p-6 space-y-8">
-    <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
-      <p class="font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
-      <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition">Sign Out</button>
+  <main id="app" class="hidden max-w-5xl mx-auto p-6 space-y-10">
+    <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-lg">
+      <p class="text-lg font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
+      <button id="signOutBtn" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold transition">Sign Out</button>
     </div>
 
-    <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 transition shadow-xl pulse text-lg">
+    <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-600 to-indigo-800 hover:from-indigo-700 hover:to-indigo-900 text-white font-bold py-6 rounded-3xl flex items-center justify-center gap-4 transition shadow-2xl pulse text-2xl">
       Start Scanner
     </button>
 
-    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
-      <h3 class="text-xl font-bold mb-4 flex items-center gap-3">
-        Voice Commands
-      </h3>
-      <button id="voiceBtn" class="voice-btn w-full flex items-center justify-center gap-3">
+    <div class="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-2xl">
+      <h3 class="text-2xl font-bold mb-6 text-center">Voice Commands</h3>
+      <button id="voiceBtn" class="voice-btn w-full">
+        <svg class="icon"><use href="#icon-mic"/></svg>
         <span>Hold to Speak</span>
       </button>
     </div>
 
-    <!-- TABS — FIXED SPACING -->
-    <div class="tab-bar shadow-lg">
+    <!-- TABS -->
+    <div class="tab-bar">
       <button class="tab-btn active" data-tab="inventory">Inventory</button>
       <button class="tab-btn" data-tab="shopping">Shopping</button>
       <button class="tab-btn" data-tab="meals">Meals</button>
     </div>
 
-    <div id="tabContainer" class="bg-white dark:bg-gray-800 rounded-b-2xl rounded-tr-2xl shadow-lg overflow-hidden">
-      <div id="tabSlider" class="flex" style="width: 300%; transform: translateX(0%);">
+    <div class="bg-white dark:bg-gray-800 rounded-b-3xl rounded-tr-3xl shadow-2xl overflow-hidden">
+      <div id="tabSlider" class="flex" style="width: 300%; transform: translateX(0%); transition: transform 0.4s ease;">
         <!-- INVENTORY -->
-        <section id="inventory" class="w-full p-6">
-          <h3 class="text-xl font-bold mb-4">Add Item</h3>
-          <input type="text" id="invBarcode" placeholder="Barcode / QR" class="w-full p-4 border rounded-xl mb-3 text-lg"/>
-          <div class="grid grid-cols-2 gap-4 mb-4">
-            <input type="number" id="invQty" value="1" min="1" class="p-4 border rounded-xl text-lg"/>
-            <input type="date" id="invExp" class="p-4 border rounded-xl text-lg"/>
+        <section id="inventory" class="w-full p-10">
+          <h3 class="text-2xl font-bold mb-6">Add Item</h3>
+          <input type="text" id="invBarcode" placeholder="Barcode / QR" class="w-full p-5 border-2 rounded-2xl text-lg mb-4"/>
+          <div class="grid grid-cols-2 gap-6 mb-6">
+            <input type="number" id="invQty" value="1" min="1" class="p-5 border-2 rounded-2xl text-lg"/>
+            <input type="date" id="invExp" class="p-5 border-2 rounded-2xl text-lg"/>
           </div>
-          <button id="addToInventory" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition shadow-lg">
+          <button id="addToInventory" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-5 rounded-2xl transition shadow-xl text-xl">
             Add to Inventory
           </button>
-          <div id="inventoryList" class="mt-6 space-y-3"></div>
+          <div id="inventoryList" class="mt-8 space-y-4"></div>
         </section>
 
         <!-- SHOPPING -->
-        <section id="shopping" class="w-full p-6">
-          <h3 class="text-xl font-bold mb-4">Shopping List</h3>
-          <input type="text" id="shopName" placeholder="Item Name" class="w-full p-4 border rounded-xl mb-3 text-lg"/>
-          <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-4 border rounded-xl mb-4 text-lg"/>
-          <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition shadow-lg">
+        <section id="shopping" class="w-full p-10">
+          <h3 class="text-2xl font-bold mb-6">Shopping List</h3>
+          <input type="text" id="shopName" placeholder="Item Name" class="w-full p-5 border-2 rounded-2xl text-lg mb-4"/>
+          <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-5 border-2 rounded-2xl text-lg mb-6"/>
+          <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-5 rounded-2xl transition shadow-xl text-xl">
             Add to List
           </button>
-          <div id="shoppingList" class="mt-6 space-y-3"></div>
+          <div id="shoppingList" class="mt-8 space-y-4"></div>
         </section>
 
         <!-- MEALS -->
-        <section id="meals" class="w-full p-6">
-          <h3 class="text-xl font-bold mb-6">Meal Plan</h3>
-          <div class="mb-6">
-            <input type="text" id="recipeSearch" placeholder="Search recipes..." class="w-full p-4 border rounded-xl text-lg"/>
-            <button id="searchRecipes" class="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition shadow-lg">Find Recipes</button>
+        <section id="meals" class="w-full p-10">
+          <h3 class="text-2xl font-bold mb-8 text-center">Meal Plan</h3>
+          <div class="mb-8">
+            <input type="text" id="recipeSearch" placeholder="Search recipes..." class="w-full p-5 border-2 rounded-2xl text-lg"/>
+            <button id="searchRecipes" class="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-5 rounded-2xl transition shadow-xl text-xl">Find Recipes</button>
           </div>
-          <div id="recipeResults" class="space-y-4 mb-8 max-h-64 overflow-y-auto"></div>
+          <div id="recipeResults" class="space-y-6 mb-10 max-h-80 overflow-y-auto"></div>
 
-          <div class="flex gap-3 mb-6 flex-wrap">
+          <div class="flex flex-wrap gap-4 justify-center mb-10">
             <button class="template-btn" onclick="applyTemplate('breakfast')">Breakfast</button>
             <button class="template-btn" onclick="applyTemplate('lunch')">Lunch</button>
             <button class="template-btn" onclick="applyTemplate('dinner')">Dinner</button>
             <button class="template-btn" onclick="applyTemplate('snacks')">Snacks</button>
           </div>
 
-          <div class="grid grid-cols-7 gap-3 text-center text-sm font-bold text-gray-600 dark:text-gray-300 mb-3">
+          <div class="grid grid-cols-7 gap-4 text-center text-sm font-bold text-gray-600 dark:text-gray-300 mb-6">
             <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
           </div>
-          <div id="mealGrid" class="grid grid-cols-7 gap-4"></div>
+          <div id="mealGrid" class="grid grid-cols-7 gap-6"></div>
 
-          <div class="mt-8 space-y-4">
-            <button id="addToShoppingFromMeals" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition shadow-lg">
+          <div class="mt-12 space-y-6">
+            <button id="addToShoppingFromMeals" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6 rounded-3xl transition shadow-2xl text-xl">
               Add All Meals to Shopping
             </button>
-            <button id="analyzeNutrition" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition shadow-lg">
+            <button id="analyzeNutrition" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-6 rounded-3xl transition shadow-2xl text-xl">
               Analyze Nutrition
             </button>
           </div>
 
-          <div id="nutritionSummary" class="mt-6 p-6 bg-green-50 dark:bg-green-900 rounded-2xl hidden">
-            <h4 class="font-bold text-lg mb-3">Daily Nutrition</h4>
-            <div class="text-2xl font-bold">Calories: <span id="calories">0</span></div>
-            <div class="nutrition-bar mt-3"><div id="calorieBar" class="nutrition-fill bg-green-500 w-0 h-4 rounded-full"></div></div>
+          <div id="nutritionSummary" class="mt-10 p-8 bg-green-100 dark:bg-green-900 rounded-3xl shadow-xl hidden text-center">
+            <h4 class="text-2xl font-bold mb-4">Daily Nutrition</h4>
+            <div class="text-4xl font-bold">Calories: <span id="calories">0</span></div>
+            <div class="h-8 bg-gray-300 dark:bg-gray-700 rounded-full mt-4 overflow-hidden">
+              <div id="calorieBar" class="h-full bg-green-500 w-0 transition-all duration-1000"></div>
+            </div>
           </div>
         </section>
       </div>
@@ -182,11 +182,18 @@
   <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.css" />
 
   <!-- Icons -->
-  <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
-    <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></symbol>
-    <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
-    <symbol id="heroicons-microphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8a1 1 0 01-1-1v-1a5 5 0 1110 0v1a1 1 0 01-1 1h-4"/></symbol>
-    <symbol id="heroicons-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></symbol>
+  <svg xmlns="http://www.w3.org/2000/svg" class="hidden" fill="currentColor">
+    <symbol id="icon-home" viewBox="0 0 24 24">
+      <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+    </symbol>
+    <symbol id="icon-moon" viewBox="0 0 24 24">
+      <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+    </symbol>
+    <symbol id="icon-mic" viewBox="0 0 24 24">
+      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3s-3 1.34-3 3v6c0 1.66 1.34 3 3 3z"/>
+      <path d="M19 11c0 3.87-3.13 7-7 7s-7-3.13-7-7"/>
+      <path d="M12 22v-4"/>
+    </symbol>
   </svg>
 
   <!-- App Logic -->
@@ -236,25 +243,23 @@
 
     $('#signOutBtn').onclick = () => firebase.auth().signOut();
 
-    // FIXED DARK MODE
+    // DARK MODE — FIXED
     $('#darkModeBtn').onclick = () => {
       const isDark = document.documentElement.classList.toggle('dark');
       localStorage.setItem('darkMode', isDark);
     };
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-    // TABS
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    const tabSlider = $('#tabSlider');
-    tabButtons.forEach((btn, i) => {
+    // TABS — FIXED
+    document.querySelectorAll('.tab-btn').forEach((btn, i) => {
       btn.onclick = () => {
-        tabButtons.forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        tabSlider.style.transform = `translateX(-${i * 33.333}%)`;
+        $('#tabSlider').style.transform = `translateX(-${i * 33.333}%)`;
       };
     });
 
-    // MEALS — FIXED DOUBLE ENTRIES
+    // MEALS — NO DUPLICATES
     async function loadMeals() {
       const data = await api('/meals') || { meals: {} };
       const grid = $('#mealGrid');
@@ -266,8 +271,8 @@
         div.className = 'meal-day';
         const isToday = i === today;
         div.innerHTML = `
-          <div class="meal-day-header ${isToday ? 'text-blue-600 dark:text-blue-400' : ''}">${day}</div>
-          <div class="meal-dropzone p-3" data-day="${day}"></div>
+          Meals for ${day}
+          <div class="meal-dropzone" data-day="${day}"></div>
         `;
         const zone = div.querySelector('.meal-dropzone');
         (data.meals[day] || []).forEach(m => {
@@ -277,11 +282,87 @@
           item.dataset.id = m.id;
           zone.appendChild(item);
         });
-        // ONLY ONE Sortable per zone
         new Sortable(zone, { group: 'meals', animation: 150, onEnd: saveMeals });
         grid.appendChild(div);
       });
 
-      // Drag & drop — attached ONCE
       document.querySelectorAll('.meal-dropzone').forEach(zone => {
         zone.ondragover = e => e.preventDefault();
+        zone.ondrop = e => {
+          e.preventDefault();
+          const name = e.dataTransfer.getData('text/plain');
+          if (name) {
+            const item = document.createElement('div');
+            item.className = 'meal-item';
+            item.textContent = name;
+            item.dataset.id = Date.now();
+            zone.appendChild(item);
+            saveMeals();
+          }
+        };
+      });
+    }
+
+    async function saveMeals() {
+      const meals = {};
+      document.querySelectorAll('.meal-dropzone').forEach(z => {
+        const day = z.dataset.day;
+        meals[day] = Array.from(z.children).map(el => ({ id: el.dataset.id, name: el.textContent }));
+      });
+      await api('/save-meals', { method: 'POST', body: JSON.stringify({ meals }) });
+    }
+
+    $('#searchRecipes').onclick = async () => {
+      const container = $('#recipeResults');
+      container.innerHTML = '<p class="text-center text-gray-500">Loading...</p>';
+      const mock = [
+        { name: "Vegan Buddha Bowl", image: "https://via.placeholder.com/80" },
+        { name: "Teriyaki Chicken", image: "https://via.placeholder.com/80" }
+      ];
+      container.innerHTML = '';
+      mock.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'bg-gray-100 dark:bg-gray-700 p-6 rounded-2xl shadow hover:shadow-2xl transition cursor-grab';
+        card.draggable = true;
+        card.innerHTML = `<img src="${r.image}" class="w-20 h-20 rounded-xl mx-auto mb-3"><p class="text-center font-bold">${r.name}</p>`;
+        card.ondragstart = e => e.dataTransfer.setData('text/plain', r.name);
+        container.appendChild(card);
+      });
+    };
+
+    window.applyTemplate = type => {
+      const items = templates[type];
+      const zone = document.querySelector('.meal-dropzone') || document.querySelector(`[data-day="Sun"]`);
+      if (zone && items) {
+        items.forEach(name => {
+          const item = document.createElement('div');
+          item.className = 'meal-item';
+          item.textContent = name;
+          item.dataset.id = Date.now();
+          zone.appendChild(item);
+        });
+        saveMeals();
+      }
+    };
+
+    $('#addToShoppingFromMeals').onclick = async () => {
+      const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
+      for (const name of meals) await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed: 1 }) });
+      alert('Added to shopping list!');
+    };
+
+    $('#analyzeNutrition').onclick = async () => {
+      const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
+      if (!meals.length) return alert('Plan some meals first!');
+      const res = await api('/nutrition', { method: 'POST', body: JSON.stringify({ text: meals.join(' + ') }) });
+      if (res?.calories) {
+        $('#calories').textContent = Math.round(res.calories);
+        $('#calorieBar').style.width = `${Math.min(100, res.calories / 25)}%`;
+        $('#nutritionSummary').classList.remove('hidden');
+      }
+    };
+
+    loadMeals();
+  </script>
+</body>
+</html>
