@@ -54,7 +54,7 @@
     async function requestPushPermission() {
       try {
         const token = await getToken(messaging, {
-          vapidKey: "BKg5kL2vY8f3d9pR7tW1qX4cV6bN8mZ0aS2eF4gH6jI8kL0nM2oP4qR6sT8uV0wX2yZ"
+          vapidKey: "BKPcrxsEbkHtmRSMPZeMXjm-cUn4jT_58dMPZ5ZiSja0_-4oWDsy2CkxSrsDKNZPJG4uNZG7v4Q5I2DAedOtZSs"
         });
         if (token && firebase.auth().currentUser) {
           const idToken = await firebase.auth().currentUser.getIdToken();
