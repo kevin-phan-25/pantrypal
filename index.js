@@ -212,15 +212,17 @@ app.get('/user-info', checkAuth, async (req, res) => {
   res.json({ scans: data.scans || 0, isPro: !!data.isPro, familyCode: data.familyCode });
 });
 
-// === RECORD SCAN ===
+// === RECORD SCAN (FREE USERS GET 10 SCANS) ===
 app.post('/record-scan', checkAuth, async (req, res) => {
   const userRef = db.collection('users').doc(req.user.uid);
   const snap = await userRef.get();
-  const data = snap.data();
+  const data = snap.data() || {};
   if (data.isPro) return res.json({ allowed: true });
+
   const newCount = (data.scans || 0) + 1;
-  if (newCount > 10) return res.json({ allowed: false, message: 'Free limit reached' });
-  await userRef.update({ scans: newCount });
+  if (newCount > 10) return res.json({ allowed: false, message: 'Upgrade to Pro for unlimited scans' });
+
+  await userRef.set({ scans: newCount }, { merge: true });
   res.json({ allowed: true });
 });
 
