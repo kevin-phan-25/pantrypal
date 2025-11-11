@@ -27,16 +27,13 @@
     .pulse { animation: pulse 2s infinite; }
     .spinner { width:24px;height:24px;border:3px solid #e5e7eb;border-top:3px solid #3b82f6;border-radius:50%;animation:spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .animate-listen { animation: pulse 1.5s infinite; }
 
-    /* RESPONSIVE TABS */
     .tab-btn {
       @apply px-3 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 font-medium transition rounded-t-lg flex-1 min-w-0;
     }
     .tab-btn:hover { @apply bg-gray-100 dark:bg-gray-700; }
     .tab-btn.active { @apply bg-blue-600 text-white; }
 
-    /* MEAL GRID */
     .meal-day {
       @apply bg-white dark:bg-gray-800 p-2 sm:p-3 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 min-h-24 sm:min-h-28 flex flex-col;
     }
@@ -52,48 +49,23 @@
     .recipe-card {
       @apply bg-white dark:bg-gray-800 p-3 rounded-lg shadow hover:shadow-md transition cursor-grab active:cursor-grabbing;
     }
+    .template-card {
+      @apply bg-gray-50 dark:bg-gray-700 p-3 rounded-lg border cursor-pointer hover:border-blue-300 transition text-xs;
+    }
     .nutrition-bar {
       @apply h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden;
     }
     .nutrition-fill {
       @apply h-full transition-all duration-500;
     }
-    .template-btn {
-      @apply bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-medium hover:shadow;
+    .price-table {
+      @apply w-full border-collapse border border-gray-300 text-xs overflow-x-auto;
     }
+    .price-table td, .price-table th {
+      @apply border border-gray-300 p-1 min-w-16;
+    }
+    .price-lowest { @apply bg-green-100 font-bold; }
   </style>
-
-  <!-- Web Push Notifications -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-      authDomain: "pantrypal-6e410.firebaseapp.com",
-      projectId: "pantrypal-6e410",
-      storageBucket: "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const messaging = getMessaging(app);
-
-    window.requestPushPermission = async () => {
-      try {
-        const token = await getToken(messaging, { vapidKey: "BKPcrxsEbkHtmRSMPZeMXjm-cUn4jT_58dMPZ5ZiSja0_-4oWDsy2CkxSrsDKNZPJG4uNZG7v4Q5I2DAedOtZSs" });
-        if (token && firebase.auth().currentUser) {
-          const idToken = await firebase.auth().currentUser.getIdToken();
-          await fetch('/save-token', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }, body: JSON.stringify({ token }) });
-        }
-      } catch (err) { console.log('Push denied:', err); }
-    };
-
-    onMessage(messaging, (payload) => {
-      new Notification(payload.notification.title, { body: payload.notification.body, icon: '/icon-192.png' });
-    });
-  </script>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
   <!-- Header -->
@@ -121,16 +93,10 @@
 
   <!-- Main App -->
   <main id="app" class="hidden max-w-4xl mx-auto p-4 space-y-6">
-    <!-- User + Push -->
-    <div class="flex flex-col gap-2">
-      <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
-        <p class="font-medium text-sm"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
-        <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded transition">Sign Out</button>
-      </div>
-      <div id="pushBanner" class="bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded-lg text-xs hidden">
-        Enable notifications to get expiration alerts!
-        <button id="enablePush" class="text-blue-600 underline text-xs ml-2">Enable Now</button>
-      </div>
+    <!-- User Info -->
+    <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
+      <p class="font-medium text-sm"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
+      <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded transition">Sign Out</button>
     </div>
 
     <!-- Scanner Button -->
@@ -139,21 +105,8 @@
       Start Scanner
     </button>
 
-    <!-- Voice -->
-    <div class="bg-white dark:bg-gray-800 p-4 sm:p-5 rounded-xl shadow">
-      <h3 class="text-base sm:text-lg font-semibold mb-3 flex items-center gap-2">
-        <svg class="icon"><use href="#heroicons-microphone"/></svg>
-        Voice Commands
-      </h3>
-      <button id="voiceBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition text-sm">
-        <svg class="icon"><use href="#heroicons-microphone"/></svg>
-        <span>Hold to Speak</span>
-      </button>
-      <div id="voiceResult" class="mt-4 text-center text-xs hidden"></div>
-    </div>
-
     <!-- TAB BAR -->
-    <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-x-auto scrollbar-hide">
+    <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-x-auto">
       <button class="tab-btn active" data-tab="inventory">Inventory</button>
       <button class="tab-btn" data-tab="shopping">Shopping</button>
       <button class="tab-btn" data-tab="meals">Meals</button>
@@ -161,7 +114,7 @@
 
     <!-- SWIPEABLE CONTENT -->
     <div id="tabContainer" class="relative overflow-hidden rounded-b-xl shadow bg-white dark:bg-gray-800">
-      <div id="tabSlider" class="flex tab-content" style="width: 300%; transform: translateX(0%);">
+      <div id="tabSlider" class="flex" style="width: 300%; transform: translateX(0%);">
         <!-- INVENTORY -->
         <section id="inventory" class="w-full p-4 sm:p-5">
           <h3 class="text-base sm:text-lg font-semibold mb-3">Add Item</h3>
@@ -193,17 +146,20 @@
 
           <!-- Recipe Search -->
           <div class="mb-4">
-            <input type="text" id="recipeSearch" placeholder="Search recipes..." class="w-full p-3 border rounded-lg text-sm"/>
+            <input type="text" id="recipeSearch" placeholder="Search meal prep recipes..." class="w-full p-3 border rounded-lg text-sm"/>
             <button id="searchRecipes" class="mt-2 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm">Find Recipes</button>
           </div>
           <div id="recipeResults" class="space-y-3 mb-6 max-h-48 overflow-y-auto"></div>
 
           <!-- Templates -->
-          <div class="flex gap-2 mb-4 flex-wrap">
-            <button class="template-btn" onclick="applyTemplate('breakfast')">Breakfast</button>
-            <button class="template-btn" onclick="applyTemplate('lunch')">Lunch</button>
-            <button class="template-btn" onclick="applyTemplate('dinner')">Dinner</button>
-            <button class="template-btn" onclick="applyTemplate('snacks')">Snacks</button>
+          <div class="mb-4">
+            <h4 class="font-bold text-sm mb-2">Meal Prep Templates</h4>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <button class="template-card" onclick="applyTemplate('vegan-breakfast')">Vegan Oatmeal (300 cal)</button>
+              <button class="template-card" onclick="applyTemplate('chicken-dinner')">Sheet Pan Chicken (450 cal)</button>
+              <button class="template-card" onclick="applyTemplate('lentil-soup')">Creamy Lentil Soup (380 cal)</button>
+              <button class="template-card" onclick="applyTemplate('peanut-stew')">Peanut Stew (420 cal)</button>
+            </div>
           </div>
 
           <!-- Week Header -->
@@ -214,6 +170,16 @@
           <!-- Meal Grid -->
           <div id="mealGrid" class="grid grid-cols-7 gap-2 sm:gap-3"></div>
 
+          <!-- Nutrition Summary -->
+          <div id="nutritionSummary" class="mt-6 p-4 bg-green-50 dark:bg-green-900 rounded-lg hidden">
+            <h4 class="font-bold text-sm mb-2">Daily Nutrition</h4>
+            <div class="space-y-2 text-xs">
+              <div>Calories: <span id="calories">0</span> kcal</div>
+              <div class="nutrition-bar"><div id="calorieBar" class="nutrition-fill bg-green-500 w-0"></div></div>
+              <div>Protein: <span id="protein">0</span>g | Carbs: <span id="carbs">0</span>g | Fat: <span id="fat">0</span>g</div>
+            </div>
+          </div>
+
           <!-- Actions -->
           <div class="mt-6 flex flex-col gap-2 max-w-md mx-auto">
             <button id="addToShoppingFromMeals" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl transition shadow-md text-sm">
@@ -222,13 +188,6 @@
             <button id="analyzeNutrition" class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm">
               Analyze Nutrition
             </button>
-          </div>
-
-          <!-- Nutrition Summary -->
-          <div id="nutritionSummary" class="mt-4 p-3 bg-green-50 dark:bg-green-900 rounded-lg hidden text-xs">
-            <h4 class="font-bold mb-1">Daily Nutrition</h4>
-            <div>Calories: <span id="calories">0</span></div>
-            <div class="nutrition-bar mt-1"><div id="calorieBar" class="nutrition-fill bg-green-500 w-0"></div></div>
           </div>
         </section>
       </div>
@@ -245,7 +204,6 @@
   <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
     <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></symbol>
     <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
-    <symbol id="heroicons-microphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8a1 1 0 01-1-1v-1a5 5 0 1110 0v1a1 1 0 01-1 1h-4"/></symbol>
     <symbol id="heroicons-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></symbol>
   </svg>
 
@@ -254,16 +212,26 @@
     const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
     firebase.initializeApp(firebaseConfig);
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
-    ui.start('#firebaseui-auth-container', { signInFlow: 'popup', signInOptions: ['google.com','apple.com','emailLink','password','phone'], callbacks: { signInSuccessWithAuthResult: () => false } });
+    ui.start('#firebaseui-auth-container', { signInFlow: 'popup', signInOptions: ['google.com','emailLink','password'], callbacks: { signInSuccessWithAuthResult: () => false } });
 
     let currentUser = null, idToken = null;
     const $ = s => document.querySelector(s);
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    // MEAL PREP RECIPES
+    const mealPrepRecipes = [
+      { name: "Vegan Oatmeal Bowl", ingredients: ["1 cup oats", "1 banana", "1 tbsp chia seeds"], calories: 300 },
+      { name: "Sheet Pan Chicken", ingredients: ["4 chicken thighs", "2 cups broccoli", "1 sweet potato"], calories: 450 },
+      { name: "Creamy Lentil Soup", ingredients: ["1 cup lentils", "1 onion", "2 carrots", "1L broth"], calories: 380 },
+      { name: "Peanut Stew", ingredients: ["1 can chickpeas", "2 tbsp peanut butter", "1 can tomatoes"], calories: 420 }
+    ];
+
+    // TEMPLATES
     const templates = {
-      breakfast: ['Oatmeal', 'Greek Yogurt', 'Smoothie'],
-      lunch: ['Turkey Sandwich', 'Salad Bowl', 'Quinoa Wrap'],
-      dinner: ['Grilled Chicken', 'Pasta', 'Stir Fry'],
-      snacks: ['Apple', 'Almonds', 'Hummus + Carrots']
+      'vegan-breakfast': { name: "Vegan Oatmeal", items: ["Oats", "Banana", "Chia Seeds"], calories: 300 },
+      'chicken-dinner': { name: "Sheet Pan Chicken", items: ["Chicken", "Broccoli", "Sweet Potato"], calories: 450 },
+      'lentil-soup': { name: "Lentil Soup", items: ["Lentils", "Onion", "Carrots"], calories: 380 },
+      'peanut-stew': { name: "Peanut Stew", items: ["Chickpeas", "Peanut Butter", "Tomatoes"], calories: 420 }
     };
 
     async function api(path, opts = {}) {
@@ -283,7 +251,6 @@
         $('#auth-section').classList.add('hidden');
         $('#app').classList.remove('hidden');
         await loadMeals();
-        if (Notification.permission === 'default') $('#pushBanner').classList.remove('hidden');
       } else {
         $('#auth-section').classList.remove('hidden');
         $('#app').classList.add('hidden');
@@ -346,74 +313,80 @@
       await api('/save-meals', { method: 'POST', body: JSON.stringify({ meals }) });
     }
 
-    // DRAG RECIPES
+    // RECIPE SEARCH
     $('#searchRecipes').onclick = async () => {
-      const q = $('#recipeSearch').value.trim();
-      if (!q) return;
-      const res = await fetch(`/recipes?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
+      const q = $('#recipeSearch').value.trim().toLowerCase();
       const container = $('#recipeResults');
       container.innerHTML = '';
-      data.recipes?.forEach(r => {
+      const matches = mealPrepRecipes.filter(r => r.name.toLowerCase().includes(q));
+      matches.forEach(r => {
         const card = document.createElement('div');
         card.className = 'recipe-card';
         card.draggable = true;
         card.dataset.recipe = r.name;
-        card.innerHTML = `<div class="flex gap-2"><img src="${r.image}" class="w-12 h-12 rounded"><div><h4 class="font-bold text-xs">${r.name}</h4></div></div>`;
+        card.innerHTML = `<div class="font-bold text-xs">${r.name} (${r.calories} cal)</div>`;
         card.ondragstart = e => e.dataTransfer.setData('text/plain', r.name);
         container.appendChild(card);
       });
     };
 
-    document.querySelectorAll('.meal-dropzone').forEach(zone => {
-      zone.ondragover = e => e.preventDefault();
-      zone.ondrop = e => {
-        e.preventDefault();
-        const name = e.dataTransfer.getData('text/plain');
-        if (name) {
-          const item = document.createElement('div');
-          item.className = 'meal-item';
-          item.textContent = name;
-          item.dataset.id = Date.now();
-          zone.appendChild(item);
-          saveMeals();
-        }
-      };
-    });
-
     // TEMPLATES
-    window.applyTemplate = type => {
-      const items = templates[type];
+    window.applyTemplate = key => {
+      const t = templates[key];
       const zone = document.querySelector('.meal-dropzone');
-      if (zone) {
-        items.forEach(name => {
-          const item = document.createElement('div');
-          item.className = 'meal-item';
-          item.textContent = name;
-          item.dataset.id = Date.now();
-          zone.appendChild(item);
-        });
+      if (zone && t) {
+        const item = document.createElement('div');
+        item.className = 'meal-item';
+        item.textContent = t.name;
+        item.dataset.id = Date.now();
+        zone.appendChild(item);
         saveMeals();
+        // Add ingredients to shopping
+        t.items.forEach(name => api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed: 1 }) }));
       }
     };
 
-    // ACTIONS
-    $('#addToShoppingFromMeals').onclick = async () => {
-      const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
-      for (const name of meals) await api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed: 1 }) });
-      alert('Meals added!');
-    };
-
+    // NUTRITION ANALYSIS
     $('#analyzeNutrition').onclick = async () => {
       const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
-      if (!meals.length) return alert('No meals');
-      const res = await api('/analyze-meal', { method: 'POST', body: JSON.stringify({ meals }) });
-      if (res?.total) {
-        $('#calories').textContent = res.total.calories;
-        $('#calorieBar').style.width = `${Math.min(100, res.total.calories / 20)}%`;
+      if (!meals.length) return alert('No meals planned');
+      const text = meals.join(' + ');
+      const res = await api('/nutrition', { method: 'POST', body: JSON.stringify({ text }) });
+      if (res?.calories) {
+        $('#calories').textContent = Math.round(res.calories);
+        $('#protein').textContent = Math.round(res.totalNutrients.PROCNT?.quantity || 0);
+        $('#carbs').textContent = Math.round(res.totalNutrients.CHOCDF?.quantity || 0);
+        $('#fat').textContent = Math.round(res.totalNutrients.FAT?.quantity || 0);
+        $('#calorieBar').style.width = `${Math.min(100, res.calories / 20)}%`;
         $('#nutritionSummary').classList.remove('hidden');
+      } else {
+        alert('Nutrition analysis failed');
       }
     };
+
+    $('#addToShoppingFromMeals').onclick = async () => {
+      const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
+      for (const name of meals) {
+        const recipe = mealPrepRecipes.find(r => r.name === name);
+        if (recipe) recipe.ingredients.forEach(i => api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ itemName: i, needed: 1 }) }));
+      }
+      alert('Ingredients added to shopping!');
+    };
+
+    // DRAG & DROP
+    document.addEventListener('dragover', e => e.preventDefault());
+    document.addEventListener('drop', e => {
+      e.preventDefault();
+      const name = e.dataTransfer.getData('text/plain');
+      if (name && e.target.classList.contains('meal-dropzone')) {
+        const item = document.createElement('div');
+        item.className = 'meal-item';
+        item.textContent = name;
+        item.dataset.id = Date.now();
+        e.target.appendChild(item);
+        saveMeals();
+      }
+    });
 
     // INIT
     loadMeals();
