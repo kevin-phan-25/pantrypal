@@ -42,6 +42,11 @@
     .tab-btn.active {
       @apply bg-blue-600 text-white;
     }
+
+    /* === SWIPE TRANSITION === */
+    .tab-content {
+      transition: transform 0.3s ease-in-out;
+    }
   </style>
 
   <!-- Web Push Notifications -->
@@ -180,34 +185,39 @@
       <button class="tab-btn flex-1" data-tab="shopping">Shopping List</button>
     </div>
 
-    <!-- INVENTORY TAB -->
-    <section id="inventory" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <h3 class="text-lg font-semibold mb-3">Add / Edit Item</h3>
-      <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
-      <div class="grid grid-cols-2 gap-2">
-        <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
-        <input type="date" id="invExp" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
-      </div>
-      <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 text-2xl">
-        <svg class="w-8 h-8"><use href="#heroicons-plus"/></svg>
-        <span id="inventoryBtnText" class="text-lg">Add to Inventory</span>
-      </button>
-      <button id="exportCsv" class="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition">Export Inventory (CSV)</button>
-      <div id="inventoryList" class="mt-5 space-y-2"></div>
-    </section>
+    <!-- SWIPEABLE TAB CONTENT -->
+    <div id="tabContainer" class="relative overflow-hidden rounded-b-xl shadow bg-white dark:bg-gray-800">
+      <div id="tabSlider" class="flex tab-content" style="width: 200%; transform: translateX(0%);">
+        <!-- INVENTORY TAB -->
+        <section id="inventory" class="tab w-full p-5">
+          <h3 class="text-lg font-semibold mb-3">Add / Edit Item</h3>
+          <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
+            <input type="date" id="invExp" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
+          </div>
+          <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 text-2xl">
+            <svg class="w-8 h-8"><use href="#heroicons-plus"/></svg>
+            <span id="inventoryBtnText" class="text-lg">Add to Inventory</span>
+          </button>
+          <button id="exportCsv" class="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition">Export Inventory (CSV)</button>
+          <div id="inventoryList" class="mt-5 space-y-2"></div>
+        </section>
 
-    <!-- SHOPPING TAB -->
-    <section id="shopping" class="tab hidden bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
-      <h3 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h3>
-      <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
-      <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
-      <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3"/>
-      <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 text-2xl">
-        <svg class="w-8 h-8"><use href="#heroicons-plus"/></svg>
-        <span id="shoppingBtnText" class="text-lg">Add to List</span>
-      </button>
-      <div id="shoppingList" class="mt-5 space-y-2"></div>
-    </section>
+        <!-- SHOPPING TAB -->
+        <section id="shopping" class="tab w-full p-5">
+          <h3 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h3>
+          <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
+          <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
+          <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3"/>
+          <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 text-2xl">
+            <svg class="w-8 h-8"><use href="#heroicons-plus"/></svg>
+            <span id="shoppingBtnText" class="text-lg">Add to List</span>
+          </button>
+          <div id="shoppingList" class="mt-5 space-y-2"></div>
+        </section>
+      </div>
+    </div>
 
     <!-- Scanner Modal -->
     <div id="scannerModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 hidden">
@@ -310,7 +320,6 @@
         loadScanCount();
         loadFamily();
 
-        // Show push banner if not enabled
         if (Notification.permission === 'default') {
           $('#pushBanner').classList.remove('hidden');
         }
@@ -329,15 +338,54 @@
     };
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-    // === TAB SWITCHING (FIXED) ===
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.tab).classList.remove('hidden');
+    // === TAB SWITCHING + SWIPE GESTURES ===
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabSlider = $('#tabSlider');
+    let currentTab = 0; // 0 = inventory, 1 = shopping
+    let startX = 0;
+    let isDragging = false;
+
+    function switchTab(index) {
+      currentTab = index;
+      tabButtons.forEach((b, i) => {
+        b.classList.toggle('active', i === index);
       });
+      tabSlider.style.transform = `translateX(-${index * 50}%)`;
+    }
+
+    tabButtons.forEach((btn, i) => {
+      btn.addEventListener('click', () => switchTab(i));
     });
+
+    // === SWIPE GESTURES ===
+    const container = $('#tabContainer');
+    container.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+      isDragging = true;
+    }, { passive: true });
+
+    container.addEventListener('touchmove', e => {
+      if (!isDragging) return;
+      const currentX = e.touches[0].clientX;
+      const diff = startX - currentX;
+      const threshold = 50;
+
+      if (Math.abs(diff) > threshold) {
+        if (diff > 0 && currentTab === 0) {
+          switchTab(1); // Swipe left → Shopping
+        } else if (diff < 0 && currentTab === 1) {
+          switchTab(0); // Swipe right → Inventory
+        }
+        isDragging = false;
+      }
+    }, { passive: true });
+
+    container.addEventListener('touchend', () => {
+      isDragging = false;
+    });
+
+    // Initialize
+    switchTab(0);
 
     // === SCANNER (ZXing + Manual Capture) ===
     $('#startScanner').onclick = async () => {
@@ -375,7 +423,7 @@
     };
 
     function beep() {
-      const ctx = new AudioContext();
+      const ctx = newremio AudioContext();
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       o.connect(g); g.connect(ctx.destination);
@@ -418,7 +466,7 @@
       alert(`Scanned: ${code}`);
     }
 
-    // === VOICE (Improved Regex + Feedback) ===
+    // === VOICE ===
     const voiceBtn = $('#voiceBtn'), voiceResult = $('#voiceResult');
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -458,7 +506,7 @@
         if (match) {
           let item = (match[1] || match[2]).replace(/^\d+\s*/, '').trim();
           let qty = parseInt(match[2] || match[1]) || 1;
-          item = item.charAt(0).toppperCase() + item.slice(1);
+          item = item.charAt(0).toUpperCase() + item.slice(1);
           $('#shopName').value = item;
           $('#shopNeeded').value = qty;
           setTimeout(() => $('#addToShopping').click(), 300);
