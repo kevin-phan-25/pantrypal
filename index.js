@@ -1,292 +1,667 @@
-// index.js – PantryPal AI + Firestore + PWA + Family Share + Low Stock + VISION FIXED
-import express from 'express';
-import fileUpload from 'express-fileupload';
-import bodyParser from 'body-parser';
-import { initializeApp, cert } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import vision from '@google-cloud/vision';
-import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+<!DOCTYPE html>
+<html lang="en" class="dark:bg-gray-900 dark:text-white">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PantryPal</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" href="icon-192.png"/>
+  <meta name="theme-color" content="#3b82f6"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
+  <style>
+    .icon { @apply w-5 h-5 inline-block; }
+    .tab { @apply hidden; }
+    .tab.active { @apply block; }
+    #scanner-overlay::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 80%; height: 60px;
+      border: 3px solid rgba(59,130,246,0.8);
+      border-radius: 8px;
+      transform: translate(-50%,-50%);
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+      pointer-events: none;
+    }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+    .pulse { animation: pulse 2s infinite; }
+    .low-stock { @apply bg-red-50 dark:bg-red-900 border-l-4 border-red-500 p-3 rounded-lg shadow-sm; }
+    .low-stock span { @apply text-red-600 font-bold; }
+    .spinner { width:24px;height:24px;border:3px solid #e5e7eb;border-top:3px solid #3b82f6;border-radius:50%;animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-listen { animation: pulse 1.5s infinite; }
+  </style>
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const app = express();
+  <!-- Web Push Notifications -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
-app.use(cors());
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(fileUpload({ limits: { fileSize: 10 * 1024 * 1024 } }));
-app.use(express.static(path.join(__dirname, 'public')));
-
-// HEALTH CHECK
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', uptime: process.uptime() });
-});
-
-// Firebase Admin
-let credential;
-try {
-  if (process.env.FIREBASE_CREDENTIALS) {
-    credential = cert(JSON.parse(process.env.FIREBASE_CREDENTIALS));
-    console.log('Using FIREBASE_CREDENTIALS env var');
-  } else if (fs.existsSync('./credentials.json')) {
-    credential = cert('./credentials.json');
-    console.log('Using ./credentials.json');
-  } else {
-    throw new Error('No Firebase credentials');
-  }
-  initializeApp({ credential });
-  console.log('Firebase Admin OK');
-} catch (err) {
-  console.error('Firebase init failed:', err.message);
-  process.exit(1);
-}
-
-const auth = getAuth();
-const db = getFirestore();
-
-// Vision Client (FIXED – Uses Render Secret File)
-let visionClient;
-try {
-  const keyPath = '/etc/secrets/gcloud-key.json';  // Render secret file path
-  if (fs.existsSync(keyPath)) {
-    console.log('Vision API key loaded from:', keyPath);
-    visionClient = new vision.ImageAnnotatorClient({ keyFilename: keyPath });
-  } else {
-    console.log('Vision API key not found – disabling AI scan');
-    visionClient = {
-      textDetection: async () => {
-        return [{ textAnnotations: [{ description: '' }] }];
-      }
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
     };
-  }
-} catch (err) {
-  console.error('Vision API init failed:', err.message);
-  visionClient = {
-    textDetection: async () => {
-      return [{ textAnnotations: [{ description: '' }] }];
+
+    const app = initializeApp(firebaseConfig);
+    const messaging = getMessaging(app);
+
+    async function requestPushPermission() {
+      try {
+        const token = await getToken(messaging, {
+          vapidKey: "BKg5kL2vY8f3d9pR7tW1qX4cV6bN8mZ0aS2eF4gH6jI8kL0nM2oP4qR6sT8uV0wX2yZ"
+        });
+        if (token && firebase.auth().currentUser) {
+          const idToken = await firebase.auth().currentUser.getIdToken();
+          await fetch('/save-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ token })
+          });
+        }
+      } catch (err) {
+        console.log('Push permission denied:', err);
+      }
     }
-  };
-}
 
-// Auth Middleware
-async function checkAuth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'No token' });
-  const token = header.split(' ')[1];
-  try {
-    req.user = await auth.verifyIdToken(token);
-    const userRef = db.collection('users').doc(req.user.uid);
-    const doc = await userRef.get();
-    if (!doc.exists) {
-      await userRef.set({ scans: 0, isPro: false, createdAt: FieldValue.serverTimestamp() });
-    }
-    next();
-  } catch (e) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-}
+    onMessage(messaging, (payload) => {
+      new Notification(payload.notification.title, {
+        body: payload.notification.body,
+        icon: '/icon-192.png'
+      });
+    });
 
-// === AI SCAN (Fixed – Handles Missing Key Gracefully) ===
-app.post('/scan', checkAuth, async (req, res) => {
-  if (!req.files?.image) return res.status(400).json({ error: 'No image uploaded' });
-
-  try {
-    const [result] = await visionClient.textDetection({ image: { content: req.files.image.data } });
-    const text = result.textAnnotations?.[0]?.description || '';
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const itemName = lines[0] || 'Unknown';
-    const expMatch = lines.find(l => /\d{4}-\d{2}-\d{2}/.test(l));
-    const expirationDate = expMatch || '';
-    const barcodeMatch = lines.find(l => /^\d{8,}$/.test(l)) || req.body.barcode || '';
-
-    console.log('AI Scan Result:', { itemName, expirationDate, barcodeMatch, fullText: text.slice(0, 200) });
-
-    if (barcodeMatch) {
-      const ref = db.collection('users').doc(req.user.uid).collection('items').doc(barcodeMatch);
-      const doc = await ref.get();
-      if (doc.exists) {
-        await ref.update({ name: itemName, expiration: expirationDate || doc.data().expiration });
-      } else {
-        await ref.set({
-          name: itemName,
-          barcode: barcodeMatch,
-          quantity: 1,
-          expiration: expirationDate,
-          addedAt: FieldValue.serverTimestamp()
+    firebase.auth().onAuthStateChanged(user => {
+      if (user && Notification.permission === 'default') {
+        Notification.requestPermission().then(perm => {
+          if (perm === 'granted') requestPushPermission();
         });
       }
-    }
-
-    res.json({
-      success: true,
-      record: { itemName, expirationDate, barcode: barcodeMatch, detectedText: text }
     });
-  } catch (err) {
-    console.error('AI Scan Error:', err);
-    res.status(500).json({ error: 'AI scan unavailable. Upload a Google Cloud Vision key as "gcloud-key.json" in Render Secret Files.' });
-  }
-});
+  </script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 shadow-md">
+    <div class="max-w-3xl mx-auto px-4 flex justify-between items-center">
+      <div class="text-center flex-1">
+        <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
+          <svg class="icon"><use href="#heroicons-home"/></svg>
+          PantryPal
+        </h1>
+        <p class="text-sm opacity-90">Voice • QR • Barcode • AI Scan</p>
+      </div>
+      <button id="darkModeBtn" class="p-2 rounded-full hover:bg-blue-700 transition">
+        <svg class="icon"><use href="#heroicons-moon"/></svg>
+      </button>
+    </div>
+  </header>
 
-// === ADD TO INVENTORY ===
-app.post('/add', checkAuth, async (req, res) => {
-  const { barcode, quantity = 1, expiration = '', name } = req.body;
-  const userId = req.user.uid;
-  if (!barcode) return res.status(400).json({ error: 'barcode required' });
-  const ref = db.collection('users').doc(userId).collection('items').doc(barcode);
-  const doc = await ref.get();
-  if (doc.exists) {
-    await ref.update({ quantity: FieldValue.increment(parseInt(quantity)), expiration: expiration || doc.data().expiration });
-  } else {
-    await ref.set({ name: name || barcode, quantity: parseInt(quantity), expiration, addedAt: FieldValue.serverTimestamp() });
-  }
-  res.json({ success: true });
-});
+  <!-- Auth -->
+  <section id="auth-section" class="max-w-md mx-auto mt-12 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+    <h2 class="text-xl font-semibold text-center mb-4">Welcome to PantryPal!</h2>
+    <div id="firebaseui-auth-container"></div>
+    <p class="text-center text-xs text-gray-500 mt-3">Sign in with Google, Email, or Phone</p>
+  </section>
 
-// === ADD TO SHOPPING LIST ===
-app.post('/add-to-shopping', checkAuth, async (req, res) => {
-  const { barcode, itemName, needed = 1 } = req.body;
-  const userId = req.user.uid;
-  if (!barcode || !itemName) return res.status(400).json({ error: 'barcode and itemName required' });
-  const ref = db.collection('users').doc(userId).collection('shopping').doc(barcode);
-  const doc = await ref.get();
-  if (doc.exists) {
-    await ref.update({ needed: FieldValue.increment(parseInt(needed)) });
-  } else {
-    await ref.set({ itemName, needed: parseInt(needed), addedAt: FieldValue.serverTimestamp() });
-  }
-  res.json({ success: true });
-});
+  <!-- Main App -->
+  <main id="app" class="hidden max-w-3xl mx-auto p-4 space-y-6">
+    <!-- User + Family -->
+    <div class="flex flex-col gap-2">
+      <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
+        <p class="font-medium"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
+        <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1 rounded transition">Sign Out</button>
+      </div>
+      <div id="familySection" class="bg-indigo-50 dark:bg-indigo-900 p-3 rounded-lg text-sm hidden">
+        <p>Family: <span id="familyName">My Family</span> | Role: <span id="familyRole"></span></p>
+        <button id="leaveFamily" class="text-red-600 underline text-xs">Leave</button>
+      </div>
+      <div id="scanCounter" class="bg-blue-50 dark:bg-blue-900 p-3 rounded-lg text-center text-sm">Loading...</div>
+      <!-- Push Banner -->
+      <div id="pushBanner" class="bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded-lg text-sm hidden">
+        Enable notifications to get expiration alerts!
+        <button id="enablePush" class="text-blue-600 underline text-xs ml-2">Enable Now</button>
+      </div>
+    </div>
 
-// === GET INVENTORY ===
-app.get('/inventory', checkAuth, async (req, res) => {
-  const snapshot = await db.collection('users').doc(req.user.uid).collection('items').get();
-  const items = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
-  res.json({ items });
-});
+    <!-- Scanner Button -->
+    <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md pulse">
+      <svg class="icon"><use href="#heroicons-camera"/></svg>
+      Start Scanner (QR + Barcode)
+    </button>
 
-// === GET SHOPPING LIST ===
-app.get('/shopping', checkAuth, async (req, res) => {
-  const snapshot = await db.collection('users').doc(req.user.uid).collection('shopping').get();
-  const list = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
-  res.json({ list });
-});
+    <!-- Voice -->
+    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
+      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+        <svg class="icon"><use href="#heroicons-microphone"/></svg>
+        Voice Commands
+      </h3>
+      <button id="voiceBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition">
+        <svg class="icon"><use href="#heroicons-microphone"/></svg>
+        <span>Hold to Speak</span>
+      </button>
+      <div id="voiceResult" class="mt-4 text-center text-sm hidden"></div>
+    </div>
 
-// === REMOVE FROM INVENTORY ===
-app.post('/remove', checkAuth, async (req, res) => {
-  const { barcode } = req.body;
-  await db.collection('users').doc(req.user.uid).collection('items').doc(barcode).delete();
-  res.json({ success: true });
-});
+    <!-- AI Scan (PRO) -->
+    <section class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
+      <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+        <svg class="icon"><use href="#heroicons-sparkles"/></svg>
+        AI Scan Product
+        <span class="bg-yellow-400 text-xs px-2 py-1 rounded-full text-black font-bold ml-2">PRO</span>
+      </h3>
+      <input type="file" id="scanImage" accept="image/*" capture="environment" class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+      <button id="scanBtn" class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
+        <svg class="icon"><use href="#heroicons-magnifying-glass"/></svg>
+        Scan with AI
+      </button>
+      <div id="scanLoading" class="hidden text-center mt-4">
+        <div class="spinner inline-block"></div>
+        <p class="text-sm mt-2 text-gray-600">Analyzing product...</p>
+      </div>
+      <div id="scanResult" class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hidden">
+        <pre id="scanText" class="text-xs overflow-x-auto"></pre>
+      </div>
+    </section>
 
-// === REMOVE FROM SHOPPING ===
-app.post('/remove-from-shopping', checkAuth, async (req, res) => {
-  const { barcode } = req.body;
-  await db.collection('users').doc(req.user.uid).collection('shopping').doc(barcode).delete();
-  res.json({ success: true });
-});
+    <!-- TAB BAR -->
+    <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden">
+      <button class="tab-btn flex-1 py-3 font-medium text-center transition active" data-tab="inventory">Inventory</button>
+      <button class="tab-btn flex-1 py-3 font-medium text-center transition" data-tab="shopping">Shopping List</button>
+    </div>
 
-// === PRODUCT INFO ===
-app.get('/product-info/:barcode', checkAuth, async (req, res) => {
-  const { barcode } = req.params;
-  try {
-    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-    const data = await response.json();
-    if (data.status === 1) {
-      const p = data.product;
-      res.json({ name: p.product_name || p.generic_name || barcode, image: p.image_front_thumb_url || p.image_small_url || null });
-    } else {
-      res.json({ name: barcode, image: null });
+    <!-- INVENTORY TAB -->
+    <section id="inventory" class="tab active bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
+      <h3 class="text-lg font-semibold mb-3">Add / Edit Item</h3>
+      <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
+      <div class="grid grid-cols-2 gap-2">
+        <input type="number" id="invQty" value="1" min="1" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
+        <input type="date" id="invExp" class="p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg"/>
+      </div>
+      <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 text-2xl">
+        <svg class="w-8 h-8"><use href="#heroicons-plus"/></svg>
+        <span id="inventoryBtnText" class="text-lg">Add to Inventory</span>
+      </button>
+      <button id="exportCsv" class="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition">Export Inventory (CSV)</button>
+      <div id="inventoryList" class="mt-5 space-y-2"></div>
+    </section>
+
+    <!-- SHOPPING TAB -->
+    <section id="shopping" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
+      <h3 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h3>
+      <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
+      <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
+      <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-3"/>
+      <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl transition flex items-center justify-center gap-2 text-2xl">
+        <svg class="w-8 h-8"><use href="#heroicons-plus"/></svg>
+        <span id="shoppingBtnText" class="text-lg">Add to List</span>
+      </button>
+      <div id="shoppingList" class="mt-5 space-y-2"></div>
+    </section>
+
+    <!-- Scanner Modal -->
+    <div id="scannerModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 hidden">
+      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl w-full max-w-lg">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-lg font-bold">Scan QR / Barcode</h3>
+          <button id="closeScanner" class="text-gray-600 hover:text-gray-800">
+            <svg class="w-6 h-6"><use href="#heroicons-x"/></svg>
+          </button>
+        </div>
+        <div class="relative">
+          <div id="scanner-overlay"></div>
+          <video id="scanner-video" class="w-full rounded-lg" autoplay playsinline></video>
+        </div>
+        <p class="text-center mt-2 text-sm text-gray-600" id="scannerStatus">Point camera at barcode...</p>
+        <div class="flex justify-center mt-3 gap-3">
+          <button id="captureBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2">
+            <svg class="w-5 h-5"><use href="#heroicons-camera"/></svg> Capture
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Family Modal -->
+    <div id="familyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-sm w-full">
+        <h3 class="text-lg font-bold mb-3">Join Family</h3>
+        <input type="text" id="familyCodeInput" placeholder="Enter 6-digit code" class="w-full p-3 border rounded-lg mb-3"/>
+        <div class="flex gap-2">
+          <button id="joinFamilyModalBtn" class="flex-1 bg-blue-600 text-white py-2 rounded-lg">Join</button>
+          <button id="cancelFamilyBtn" class="flex-1 bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.js"></script>
+  <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.css" />
+
+  <!-- Icons -->
+  <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
+    <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></symbol>
+    <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></symbol>
+    <symbol id="heroicons-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></symbol>
+    <symbol id="heroicons-magnifying-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></symbol>
+    <symbol id="heroicons-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></symbol>
+    <symbol id="heroicons-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></symbol>
+    <symbol id="heroicons-microphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8a1 1 0 01-1-1v-1a5 5 0 1110 0v1a1 1 0 01-1 1h-4"/></symbol>
+    <symbol id="heroicons-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></symbol>
+  </svg>
+
+  <!-- App Logic -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386",
+      measurementId: "G-P641JW4KS4"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const ui = new firebaseui.auth.AuthUI(firebase.auth());
+    ui.start('#firebaseui-auth-container', {
+      signInFlow: 'popup',
+      signInOptions: ['google.com','apple.com','emailLink','password','phone'],
+      callbacks: { signInSuccessWithAuthResult: () => false }
+    });
+
+    let currentUser = null, idToken = null, isPro = false, editingItem = null;
+    let scannerActive = false, recognition = null, scannerInstance = null, scannerStream = null, lastScannedCode = null;
+    const $ = s => document.querySelector(s);
+
+    async function api(path, opts = {}) {
+      if (!idToken) return alert('Not signed in');
+      const res = await fetch(path, {
+        ...opts,
+        headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json', ...opts.headers }
+      });
+      if (!res.ok) { const e = await res.text(); alert('API Error: ' + e); return null; }
+      return res.json();
     }
-  } catch (err) {
-    res.json({ name: barcode, image: null });
-  }
-});
 
-// === USER INFO ===
-app.get('/user-info', checkAuth, async (req, res) => {
-  const snap = await db.collection('users').doc(req.user.uid).get();
-  const data = snap.data();
-  res.json({ scans: data.scans || 0, isPro: !!data.isPro, familyCode: data.familyCode });
-});
+    // Auth
+    firebase.auth().onAuthStateChanged(async user => {
+      if (user) {
+        currentUser = user;
+        idToken = await user.getIdToken();
+        $('#userEmail').textContent = user.email || user.phoneNumber || 'User';
+        $('#auth-section').classList.add('hidden');
+        $('#app').classList.remove('hidden');
+        const u = await api('/user-info');
+        isPro = u?.isPro ?? false;
+        await loadInventory();
+        await loadShopping();
+        loadScanCount();
+        loadFamily();
+      } else {
+        $('#auth-section').classList.remove('hidden');
+        $('#app').classList.add('hidden');
+      }
+    });
 
-// === RECORD SCAN (FREE USERS GET 10 SCANS) ===
-app.post('/record-scan', checkAuth, async (req, res) => {
-  const userRef = db.collection('users').doc(req.user.uid);
-  const snap = await userRef.get();
-  const data = snap.data() || {};
-  if (data.isPro) return res.json({ allowed: true });
+    $('#signOutBtn').onclick = () => firebase.auth().signOut();
 
-  const newCount = (data.scans || 0) + 1;
-  if (newCount > 10) return res.json({ allowed: false, message: 'Upgrade to Pro for unlimited scans' });
+    // Dark Mode
+    $('#darkModeBtn').onclick = () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+    };
+    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-  await userRef.set({ scans: newCount }, { merge: true });
-  res.json({ allowed: true });
-});
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.onclick = () => {
+        document.querySelectorAll('.tab-btn,.tab').forEach(e => e.classList.remove('active'));
+        b.classList.add('active');
+        $(`#${b.dataset.tab}`).classList.add('active');
+      };
+    });
 
-// === EXPORT CSV ===
-app.get('/export-csv', checkAuth, async (req, res) => {
-  const snapshot = await db.collection('users').doc(req.user.uid).collection('items').get();
-  const items = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
-  const csv = [
-    ['Barcode', 'Name', 'Quantity', 'Expiration'],
-    ...items.map(i => [i.barcode, i.name || i.barcode, i.quantity, i.expiration || ''])
-  ].map(row => row.join(',')).join('\n');
-  res.set('Content-Type', 'text/csv');
-  res.set('Content-Disposition', 'attachment; filename="pantrypal-inventory.csv"');
-  res.send(csv);
-});
+    // === SCANNER (ZXing + Manual Capture) ===
+    $('#startScanner').onclick = async () => {
+      const modal = $('#scannerModal'), video = $('#scanner-video'), status = $('#scannerStatus');
+      modal.classList.remove('hidden'); status.textContent = 'Opening camera...';
 
-// === FAMILY ROUTES ===
-app.post('/create-family', checkAuth, async (req, res) => {
-  const userId = req.user.uid;
-  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-  const batch = db.batch();
-  batch.update(db.collection('users').doc(userId), { familyCode: code, familyRole: 'owner' });
-  batch.set(db.collection('families').doc(code), { owner: userId, name: 'My Family', members: [userId] });
-  await batch.commit();
-  res.json({ code });
-});
+      try {
+        scannerStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        video.srcObject = scannerStream;
+        scannerActive = true;
+        await video.play();
 
-app.post('/join-family', checkAuth, async (req, res) => {
-  const { code } = req.body;
-  const userId = req.user.uid;
-  if (!code) {
-    await db.collection('users').doc(userId).update({ familyCode: FieldValue.delete(), familyRole: FieldValue.delete() });
-    return res.json({ success: true });
-  }
-  const familySnap = await db.collection('families').doc(code).get();
-  if (!familySnap.exists) return res.status(400).json({ error: 'Invalid code' });
-  const isPro = (await db.collection('users').doc(userId).get()).data().isPro;
-  const role = isPro ? 'editor' : 'viewer';
-  const batch = db.batch();
-  batch.update(db.collection('users').doc(userId), { familyCode: code, familyRole: role });
-  batch.update(familySnap.ref, { members: FieldValue.arrayUnion(userId) });
-  await batch.commit();
-  res.json({ role });
-});
+        status.textContent = 'Scanning... Move barcode into frame';
 
-app.get('/shared', checkAuth, async (req, res) => {
-  const userSnap = await db.collection('users').doc(req.user.uid).get();
-  const { familyCode, familyRole } = userSnap.data() || {};
-  if (!familyCode) return res.json({ inventory: [], shopping: [], role: null });
-  const ownerId = (await db.collection('families').doc(familyCode).get()).data().owner;
-  const invSnap = await db.collection('users').doc(ownerId).collection('items').get();
-  const shopSnap = await db.collection('users').doc(ownerId).collection('shopping').get();
-  res.json({
-    inventory: invSnap.docs.map(d => ({ barcode: d.id, ...d.data() })),
-    shopping: shopSnap.docs.map(d => ({ barcode: d.id, ...d.data() })),
-    role: familyRole
-  });
-});
+        scannerInstance = new ZXing.BrowserMultiFormatReader();
+        scannerInstance.decodeFromVideoDevice(null, video, (result, err) => {
+          if (result && scannerActive) {
+            const code = result.getText();
+            if (code !== lastScannedCode) {
+              lastScannedCode = code;
+              handleScannedCode(code);
+              beep();
+              closeScanner();
+            }
+          }
+          if (err && !(err instanceof ZXing.NotFoundException)) console.warn('ZXing error:', err);
+        }, { delay: 300 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+      } catch (e) {
+        status.textContent = 'Camera access denied';
+        console.error(e);
+      }
+    };
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`PantryPal LIVE on port ${PORT}`);
-});
+    function beep() {
+      const ctx = new AudioContext();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 800;
+      g.gain.setValueAtTime(0.1, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      o.start(); o.stop(ctx.currentTime + 0.1);
+    }
+
+    $('#closeScanner').onclick = closeScanner;
+    function closeScanner() {
+      if (scannerInstance) { scannerInstance.reset(); scannerInstance = null; }
+      if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
+      $('#scannerModal').classList.add('hidden');
+      scannerActive = false;
+      lastScannedCode = null;
+    }
+
+    $('#captureBtn').onclick = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      canvas.toBlob(async blob => {
+        const codeReader = new ZXing.BrowserMultiFormatReader();
+        try {
+          const result = await codeReader.decodeFromImage(canvas.toDataURL());
+          handleScannedCode(result.getText());
+          closeScanner();
+        } catch (e) {
+          alert('No barcode found. Try again.');
+        }
+      }, 'image/jpeg');
+    };
+
+    function handleScannedCode(code) {
+      $('#invBarcode').value = code;
+      $('#shopBarcode').value = code;
+      alert(`Scanned: ${code}`);
+    }
+
+    // === VOICE (Improved Regex + Feedback) ===
+    const voiceBtn = $('#voiceBtn'), voiceResult = $('#voiceResult');
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SR();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      let listening = false;
+      const start = () => {
+        if (listening) return;
+        recognition.start();
+        listening = true;
+        voiceBtn.classList.add('bg-red-600', 'animate-listen');
+        voiceBtn.innerHTML = `<svg class="icon"><use href="#heroicons-microphone"/></svg> Listening...`;
+        voiceResult.classList.add('hidden');
+      };
+      const stop = () => {
+        if (!listening) return;
+        recognition.stop();
+        listening = false;
+        voiceBtn.classList.remove('bg-red-600', 'animate-listen');
+        voiceBtn.innerHTML = `<svg class="icon"><use href="#heroicons-microphone"/></svg> Hold to Speak`;
+      };
+
+      voiceBtn.addEventListener('pointerdown', start);
+      voiceBtn.addEventListener('pointerup', stop);
+      voiceBtn.addEventListener('pointerleave', stop);
+
+      recognition.onresult = e => {
+        const transcript = e.results[0][0].transcript.trim();
+        const txt = transcript.toLowerCase();
+        voiceResult.innerHTML = `Heard: "${transcript}"`;
+        voiceResult.classList.remove('hidden');
+
+        const match = txt.match(/add\s+(.+?)(?:\s+(\d+))?$/) || txt.match(/add\s+(\d+)\s+(.+)$/);
+        if (match) {
+          let item = (match[1] || match[2]).replace(/^\d+\s*/, '').trim();
+          let qty = parseInt(match[2] || match[1]) || 1;
+          item = item.charAt(0).toUpperCase() + item.slice(1);
+          $('#shopName').value = item;
+          $('#shopNeeded').value = qty;
+          setTimeout(() => $('#addToShopping').click(), 300);
+          voiceResult.innerHTML += '<br><span class="text-green-600">Added!</span>';
+        } else {
+          voiceResult.innerHTML += '<br><span class="text-orange-600">Try: "Add milk 2"</span>';
+        }
+      };
+
+      recognition.onerror = () => {
+        voiceResult.textContent = 'Voice error'; voiceResult.classList.remove('hidden'); stop();
+      };
+      recognition.onend = stop;
+    } else {
+      voiceBtn.disabled = true;
+      voiceBtn.innerHTML = '<span>Mic not supported</span>';
+    }
+
+    // === AI SCAN ===
+    $('#scanBtn').onclick = async () => {
+      const file = $('#scanImage').files[0];
+      if (!file) return alert('Pick an image');
+      if (!isPro) {
+        const rec = await api('/record-scan', {method:'POST'});
+        if (!rec?.allowed) return alert(rec.message || 'Free limit reached');
+      }
+      const fd = new FormData(); fd.append('image', file);
+      $('#scanLoading').classList.remove('hidden');
+      $('#scanResult').classList.add('hidden');
+      try {
+        const r = await fetch('/scan', { method:'POST', headers:{'Authorization':`Bearer ${idToken}`}, body:fd });
+        const d = await r.json();
+        const resDiv = $('#scanResult'), txt = $('#scanText');
+        txt.textContent = d.success ? JSON.stringify(d.record, null, 2) : (d.error || 'Failed');
+        resDiv.classList.remove('hidden');
+        if (d.record?.barcode) $('#invBarcode').value = d.record.barcode;
+      } catch (err) {
+        $('#scanText').textContent = 'Network error.';
+        $('#scanResult').classList.remove('hidden');
+      } finally {
+        $('#scanLoading').classList.add('hidden');
+        loadScanCount();
+      }
+    };
+
+    // === INVENTORY & SHOPPING ===
+    async function loadInventory() {
+      const d = await api('/inventory');
+      $('#inventoryList').innerHTML = await renderItems(d?.items||[], false);
+    }
+    async function loadShopping() {
+      const d = await api('/shopping');
+      $('#shoppingList').innerHTML = await renderItems(d?.list||[], true);
+    }
+    async function renderItems(items, isShopping) {
+      if (!items.length) return '<p class="text-center text-gray-500">Empty</p>';
+      const rows = await Promise.all(items.map(async i => {
+        let img = 'icon-192.png';
+        if (i.barcode) {
+          const p = await api(`/product-info/${i.barcode}`);
+          if (p?.image) img = p.image;
+        }
+        const editFn = isShopping ? `editShopping('${i.barcode}')` : `editItem('${i.barcode}')`;
+        const delFn = isShopping ? `removeShopping('${i.barcode}')` : `removeItem('${i.barcode}')`;
+        const qty = i.quantity ?? i.needed ?? 0;
+        const low = qty <= 2 ? 'low-stock' : '';
+        const daysLeft = i.expiration ? Math.max(0, Math.ceil((new Date(i.expiration) - new Date()) / 86400000)) : null;
+        const expClass = daysLeft !== null && daysLeft <= 3 ? 'text-red-600' : 'text-gray-600';
+        return `
+          <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow ${low}">
+            <div class="flex items-center gap-3">
+              <img src="${img}" alt="${i.name||i.itemName}" class="w-10 h-10 rounded object-cover bg-gray-200 border" loading="lazy" onerror="this.src='icon-192.png';">
+              <div>
+                <strong>${i.name||i.itemName}</strong><br>
+                <span class="text-sm ${expClass}">${qty} ${i.expiration ? '| Exp: '+i.expiration : ''} ${daysLeft !== null && daysLeft <= 3 ? `(${daysLeft} days)` : ''}</span>
+                ${qty <= 2 ? '<span class="text-red-600 text-xs ml-2 font-bold">Low!</span>' : ''}
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="${editFn}" class="text-blue-600 text-sm">Edit</button>
+              <button onclick="${delFn}" class="text-red-600 text-sm">Remove</button>
+            </div>
+          </div>`;
+      }));
+      return rows.join('');
+    }
+
+    window.editItem = async barcode => {
+      const d = await api('/inventory');
+      const itm = d.items.find(x=>x.barcode===barcode);
+      if (!itm) return;
+      $('#invBarcode').value = barcode;
+      $('#invQty').value = itm.quantity;
+      $('#invExp').value = itm.expiration||'';
+      editingItem = {barcode, isShopping:false};
+      $('#inventoryBtnText').textContent = 'Update Inventory';
+    };
+    window.editShopping = async barcode => {
+      const d = await api('/shopping');
+      const itm = d.list.find(x=>x.barcode===barcode);
+      if (!itm) return;
+      $('#shopBarcode').value = barcode;
+      $('#shopName').value = itm.itemName;
+      $('#shopNeeded').value = itm.needed;
+      editingItem = {barcode, isShopping:true};
+      $('#shoppingBtnText').textContent = 'Update List';
+    };
+
+    $('#addToInventory').onclick = async () => {
+      const barcode = $('#invBarcode').value.trim();
+      const qty = parseInt($('#invQty').value)||1;
+      const exp = $('#invExp').value;
+      if (!barcode) return alert('Barcode required');
+      await api('/add', {method:'POST', body:JSON.stringify({barcode, quantity:qty, expiration:exp})});
+      resetForm('inventory');
+      loadInventory();
+    };
+
+    $('#addToShopping').onclick = async () => {
+      const barcode = $('#shopBarcode').value.trim();
+      const name = $('#shopName').value.trim();
+      const needed = parseInt($('#shopNeeded').value)||1;
+      if (!barcode || !name) return alert('Barcode & name required');
+      await api('/add-to-shopping', {method:'POST', body:JSON.stringify({barcode, itemName:name, needed})});
+      resetForm('shopping');
+      loadShopping();
+    };
+
+    function resetForm(tab) {
+      if (tab === 'inventory') {
+        $('#invBarcode').value=''; $('#invQty').value=1; $('#invExp').value='';
+        $('#inventoryBtnText').textContent = 'Add to Inventory';
+      } else {
+        $('#shopBarcode').value=''; $('#shopName').value=''; $('#shopNeeded').value=1;
+        $('#shoppingBtnText').textContent = 'Add to List';
+      }
+      editingItem = null;
+    }
+
+    window.removeItem = async barcode => { if(confirm('Delete?')) { await api('/remove',{method:'POST',body:JSON.stringify({barcode})}); loadInventory(); }};
+    window.removeShopping = async barcode => { if(confirm('Delete?')) { await api('/remove-from-shopping',{method:'POST',body:JSON.stringify({barcode})}); loadShopping(); }};
+    $('#exportCsv').onclick = () => { const a=document.createElement('a'); a.href='/export-csv'; a.download='pantrypal-inventory.csv'; a.click(); };
+
+    async function loadScanCount(){
+      const d = await api('/user-info');
+      $('#scanCounter').innerHTML = d?.isPro ? 'Unlimited scans (Pro)' : `Free scans: ${d?.scans||0}/10`;
+    }
+
+    // === FAMILY UI ===
+    const familyHTML = `
+      <div class="flex gap-2 mt-2">
+        <button id="createFamilyBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm">Create Family</button>
+        <button id="joinFamilyBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg text-sm">Join Family</button>
+      </div>`;
+    $('#familySection').insertAdjacentHTML('beforeend', familyHTML);
+
+    $('#createFamilyBtn').onclick = async () => {
+      const res = await api('/create-family', {method:'POST'});
+      if (res?.code) prompt('Share this code:', res.code);
+      loadFamily();
+    };
+    $('#joinFamilyBtn').onclick = () => $('#familyModal').classList.remove('hidden');
+
+    async function loadFamily(){
+      const u = await api('/user-info');
+      const shared = await api('/shared');
+      const sec = $('#familySection');
+      if (u?.familyCode) {
+        sec.classList.remove('hidden');
+        $('#familyName').textContent = 'My Family';
+        $('#familyRole').textContent = u.familyRole || 'member';
+        if (shared?.role && shared.role !== 'owner') {
+          $('#inventoryList').innerHTML = await renderItems(shared.inventory||[], false);
+          $('#shoppingList').innerHTML = await renderItems(shared.shopping||[], true);
+        }
+      } else sec.classList.add('hidden');
+    }
+
+    $('#leaveFamily').onclick = async () => {
+      if(confirm('Leave family?')) {
+        await api('/join-family',{method:'POST',body:JSON.stringify({code:''})});
+        location.reload();
+      }
+    };
+
+    $('#joinFamilyModalBtn').onclick = async () => {
+      const code = $('#familyCodeInput').value.trim().toUpperCase();
+      if(!code) return alert('Enter code');
+      await api('/join-family',{method:'POST',body:JSON.stringify({code})});
+      $('#familyModal').classList.add('hidden');
+      loadFamily();
+    };
+
+    $('#cancelFamilyBtn').onclick = () => {
+      $('#familyModal').classList.add('hidden');
+    };
+
+    loadFamily();
+
+    // === PUSH BANNER LOGIC ===
+    $('#enablePush').onclick = () => {
+      Notification.requestPermission().then(p => {
+        if (p === 'granted') {
+          requestPushPermission();
+          $('#pushBanner').classList.add('hidden');
+        }
+      });
+    };
+    if (Notification.permission === 'default') {
+      $('#pushBanner').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>
