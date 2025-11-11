@@ -13,7 +13,6 @@
   <style>
     .icon { @apply w-5 h-5 inline-block; }
     .tab { @apply hidden; }
-    .tab.active { @apply block; }
     #scanner-overlay::after {
       content: '';
       position: absolute;
@@ -32,6 +31,17 @@
     .spinner { width:24px;height:24px;border:3px solid #e5e7eb;border-top:3px solid #3b82f6;border-radius:50%;animation:spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .animate-listen { animation: pulse 1.5s infinite; }
+
+    /* === TAB STYLES === */
+    .tab-btn {
+      @apply px-4 py-3 text-gray-600 dark:text-gray-300 font-medium transition rounded-t-lg;
+    }
+    .tab-btn:hover {
+      @apply bg-gray-100 dark:bg-gray-700;
+    }
+    .tab-btn.active {
+      @apply bg-blue-600 text-white;
+    }
   </style>
 
   <!-- Web Push Notifications -->
@@ -51,7 +61,7 @@
     const app = initializeApp(firebaseConfig);
     const messaging = getMessaging(app);
 
-    async function requestPushPermission() {
+    window.requestPushPermission = async () => {
       try {
         const token = await getToken(messaging, {
           vapidKey: "BKPcrxsEbkHtmRSMPZeMXjm-cUn4jT_58dMPZ5ZiSja0_-4oWDsy2CkxSrsDKNZPJG4uNZG7v4Q5I2DAedOtZSs"
@@ -70,21 +80,13 @@
       } catch (err) {
         console.log('Push permission denied:', err);
       }
-    }
+    };
 
     onMessage(messaging, (payload) => {
       new Notification(payload.notification.title, {
         body: payload.notification.body,
         icon: '/icon-192.png'
       });
-    });
-
-    firebase.auth().onAuthStateChanged(user => {
-      if (user && Notification.permission === 'default') {
-        Notification.requestPermission().then(perm => {
-          if (perm === 'granted') requestPushPermission();
-        });
-      }
     });
   </script>
 </head>
@@ -174,12 +176,12 @@
 
     <!-- TAB BAR -->
     <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden">
-      <button class="tab-btn flex-1 py-3 font-medium text-center transition active" data-tab="inventory">Inventory</button>
-      <button class="tab-btn flex-1 py-3 font-medium text-center transition" data-tab="shopping">Shopping List</button>
+      <button class="tab-btn flex-1 active" data-tab="inventory">Inventory</button>
+      <button class="tab-btn flex-1" data-tab="shopping">Shopping List</button>
     </div>
 
     <!-- INVENTORY TAB -->
-    <section id="inventory" class="tab active bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
+    <section id="inventory" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
       <h3 class="text-lg font-semibold mb-3">Add / Edit Item</h3>
       <input type="text" id="invBarcode" placeholder="Barcode / QR (auto-filled)" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <div class="grid grid-cols-2 gap-2">
@@ -195,7 +197,7 @@
     </section>
 
     <!-- SHOPPING TAB -->
-    <section id="shopping" class="tab bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
+    <section id="shopping" class="tab hidden bg-white dark:bg-gray-800 p-5 rounded-b-xl shadow">
       <h3 class="text-lg font-semibold mb-3">Add / Edit Shopping Item</h3>
       <input type="text" id="shopBarcode" placeholder="Barcode" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
       <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg mb-2"/>
@@ -307,6 +309,11 @@
         await loadShopping();
         loadScanCount();
         loadFamily();
+
+        // Show push banner if not enabled
+        if (Notification.permission === 'default') {
+          $('#pushBanner').classList.remove('hidden');
+        }
       } else {
         $('#auth-section').classList.remove('hidden');
         $('#app').classList.add('hidden');
@@ -322,13 +329,14 @@
     };
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-    // Tabs
-    document.querySelectorAll('.tab-btn').forEach(b => {
-      b.onclick = () => {
-        document.querySelectorAll('.tab-btn,.tab').forEach(e => e.classList.remove('active'));
-        b.classList.add('active');
-        $(`#${b.dataset.tab}`).classList.add('active');
-      };
+    // === TAB SWITCHING (FIXED) ===
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.remove('hidden');
+      });
     });
 
     // === SCANNER (ZXing + Manual Capture) ===
@@ -450,7 +458,7 @@
         if (match) {
           let item = (match[1] || match[2]).replace(/^\d+\s*/, '').trim();
           let qty = parseInt(match[2] || match[1]) || 1;
-          item = item.charAt(0).toUpperCase() + item.slice(1);
+          item = item.charAt(0).toppperCase() + item.slice(1);
           $('#shopName').value = item;
           $('#shopNeeded').value = qty;
           setTimeout(() => $('#addToShopping').click(), 300);
@@ -659,9 +667,6 @@
         }
       });
     };
-    if (Notification.permission === 'default') {
-      $('#pushBanner').classList.remove('hidden');
-    }
   </script>
 </body>
 </html>
