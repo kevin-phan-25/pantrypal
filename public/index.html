@@ -56,13 +56,6 @@
       .nutrition-fill {
         @apply h-full transition-all duration-500;
       }
-      .price-table {
-        @apply w-full border-collapse border border-gray-300 text-xs overflow-x-auto;
-      }
-      .price-table td, .price-table th {
-        @apply border border-gray-300 p-1 min-w-16;
-      }
-      .price-lowest { @apply bg-green-100 font-bold; }
     </style>
   </head>
   <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
@@ -91,29 +84,24 @@
 
     <!-- Main App -->
     <main id="app" class="hidden max-w-4xl mx-auto p-4 space-y-6">
-      <!-- User Info -->
       <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
         <p class="font-medium text-sm"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
         <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded transition">Sign Out</button>
       </div>
 
-      <!-- Scanner Button -->
       <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md pulse text-sm sm:text-base">
         <svg class="icon"><use href="#heroicons-camera"/></svg>
         Start Scanner
       </button>
 
-      <!-- TAB BAR -->
       <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-x-auto">
         <button class="tab-btn active" data-tab="inventory">Inventory</button>
         <button class="tab-btn" data-tab="shopping">Shopping</button>
         <button class="tab-btn" data-tab="meals">Meals</button>
       </div>
 
-      <!-- SWIPEABLE CONTENT -->
       <div id="tabContainer" class="relative overflow-hidden rounded-b-xl shadow bg-white dark:bg-gray-800">
         <div id="tabSlider" class="flex" style="width: 300%; transform: translateX(0%);">
-          <!-- INVENTORY -->
           <section id="inventory" class="w-full p-4 sm:p-5">
             <h3 class="text-base sm:text-lg font-semibold mb-3">Add Item</h3>
             <input type="text" id="invBarcode" placeholder="Barcode / QR" class="w-full p-3 border rounded-lg mb-2 text-sm"/>
@@ -127,7 +115,6 @@
             <div id="inventoryList" class="mt-5 space-y-2"></div>
           </section>
 
-          <!-- SHOPPING -->
           <section id="shopping" class="w-full p-4 sm:p-5">
             <h3 class="text-base sm:text-lg font-semibold mb-3">Shopping List</h3>
             <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border rounded-lg mb-2 text-sm"/>
@@ -138,7 +125,6 @@
             <div id="shoppingList" class="mt-5 space-y-2"></div>
           </section>
 
-          <!-- MEALS -->
           <section id="meals" class="w-full p-4 sm:p-5">
             <h3 class="text-base sm:text-lg font-semibold mb-4">Meal Plan</h3>
             <div class="mb-4">
@@ -202,9 +188,9 @@
 
     <!-- App Logic -->
     <script>
-      // BULLETPROOF API BASE — WORKS ON ANY RENDER URL FOREVER
-      const API_BASE = window.location.origin;
-      console.log('API_BASE →', API_BASE); // Should show: https://pantrypal-zdi4.onrender.com
+      // YOUR PERMANENT BACKEND URL — NEVER CHANGES
+      const API_BASE = 'https://pantrypal-zdi4.onrender.com';
+      console.log('API_BASE →', API_BASE);
 
       const firebaseConfig = {
         apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
@@ -272,7 +258,6 @@
       });
 
       $('#signOutBtn').onclick = () => firebase.auth().signOut();
-
       $('#darkModeBtn').onclick = () => {
         document.documentElement.classList.toggle('dark');
         localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
