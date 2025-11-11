@@ -33,6 +33,60 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .animate-listen { animation: pulse 1.5s infinite; }
   </style>
+
+  <!-- Web Push Notifications -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const messaging = getMessaging(app);
+
+    async function requestPushPermission() {
+      try {
+        const token = await getToken(messaging, {
+          vapidKey: "BKg5kL2vY8f3d9pR7tW1qX4cV6bN8mZ0aS2eF4gH6jI8kL0nM2oP4qR6sT8uV0wX2yZ"
+        });
+        if (token && firebase.auth().currentUser) {
+          const idToken = await firebase.auth().currentUser.getIdToken();
+          await fetch('/save-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ token })
+          });
+        }
+      } catch (err) {
+        console.log('Push permission denied:', err);
+      }
+    }
+
+    onMessage(messaging, (payload) => {
+      new Notification(payload.notification.title, {
+        body: payload.notification.body,
+        icon: '/icon-192.png'
+      });
+    });
+
+    firebase.auth().onAuthStateChanged(user => {
+      if (user && Notification.permission === 'default') {
+        Notification.requestPermission().then(perm => {
+          if (perm === 'granted') requestPushPermission();
+        });
+      }
+    });
+  </script>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
   <!-- Header -->
@@ -71,6 +125,11 @@
         <button id="leaveFamily" class="text-red-600 underline text-xs">Leave</button>
       </div>
       <div id="scanCounter" class="bg-blue-50 dark:bg-blue-900 p-3 rounded-lg text-center text-sm">Loading...</div>
+      <!-- Push Banner -->
+      <div id="pushBanner" class="bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded-lg text-sm hidden">
+        Enable notifications to get expiration alerts!
+        <button id="enablePush" class="text-blue-600 underline text-xs ml-2">Enable Now</button>
+      </div>
     </div>
 
     <!-- Scanner Button -->
@@ -590,6 +649,19 @@
     };
 
     loadFamily();
+
+    // === PUSH BANNER LOGIC ===
+    $('#enablePush').onclick = () => {
+      Notification.requestPermission().then(p => {
+        if (p === 'granted') {
+          requestPushPermission();
+          $('#pushBanner').classList.add('hidden');
+        }
+      });
+    };
+    if (Notification.permission === 'default') {
+      $('#pushBanner').classList.remove('hidden');
+    }
   </script>
 </body>
 </html>
