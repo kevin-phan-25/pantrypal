@@ -1,71 +1,52 @@
 const express = require('express');
 const admin = require('firebase-admin');
-const { ImageAnnotatorClient } = require('@google-cloud/vision');
-require('dotenv').config();
-const cors = require('cors');
-const fileUpload = require('express-fileupload');
-const path = require('path');
+const multer = require('multer');
+const vision = require('@google-cloud/vision');
+const client = new vision.ImageAnnotatorClient();
 
-// ———————— LOAD CREDENTIALS FROM ENV VAR ————————
-let serviceAccount;
-try {
-  const rawKey = process.env.GCLOUD_KEY_JSON;
-  if (!rawKey) throw new Error('Missing GCLOUD_KEY_JSON environment variable!');
-  serviceAccount = JSON.parse(rawKey);
-  console.log('SUCCESS: Loaded credentials from GCLOUD_KEY_JSON env var');
-} catch (err) {
-  console.error('FATAL: Could not load Google Cloud credentials');
-  console.error('Error:', err.message);
-  process.exit(1);
-}
+admin.initializeApp();
+const db = admin.firestore();
+const upload = multer();
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
-const vision = new ImageAnnotatorClient();
+app.use(express.json());
 
-// ———————— Express App ————————
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(fileUpload());
-
-// ———————— SERVE public/ FIRST (THIS FIXES THE UI) ————————
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// PRO CHECK + SCAN COUNTER
+app.get('/user-info', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const doc = await db.collection('users').doc(decoded.uid).get();
+    const data = doc.data() || { scans: 0, isPro: false };
+    res.json({ scans: data.scans || 0, isPro: data.isPro || false, familyCode: data.familyCode });
+  } catch { res.json({ scans: 0, isPro: false }); }
 });
 
-// ———————— API ROUTES (NOW THEY DON'T OVERRIDE /) ————————
-app.get('/meals', async (req, res) => {
-  res.json({ meals: {} });
-});
-
-app.post('/save-meals', async (req, res) => {
-  console.log('Meals saved:', req.body);
-  res.json({ success: true });
-});
-
-app.post('/add-to-shopping', async (req, res) => {
-  console.log('Added to shopping:', req.body);
-  res.json({ success: true });
-});
-
-app.post('/nutrition', async (req, res) => {
-  res.json({
-    calories: 1850,
-    totalNutrients: {
-      PROCNT: { quantity: 92 },
-      CHOCDF: { quantity: 210 },
-      FAT: { quantity: 78 }
+// RECORD SCAN (FREE LIMIT)
+app.post('/record-scan', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const ref = db.collection('users').doc(decoded.uid);
+    const doc = await ref.get();
+    const data = doc.data() || { scans: 0 };
+    if (data.isPro || data.scans < 10) {
+      await ref.set({ scans: (data.scans || 0) + 1 }, { merge: true });
+      res.json({ allowed: true });
+    } else {
+      res.json({ allowed: false, message: "Upgrade to Pro for unlimited scans!" });
     }
-  });
+  } catch { res.json({ allowed: false }); }
 });
 
-// ———————— Start Server ————————
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`PantryPal running on port ${PORT}`);
-  console.log(`LIVE UI: https://pantrypal-zdi4.onrender.com`);
-  console.log(`Time (EST): ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}`);
+// AI SCAN
+app.post('/scan', upload.single('image'), async (req, res) => {
+  try {
+    const [result] = await client.labelDetection(req.file.buffer);
+    const labels = result.labelAnnotations.map(l => l.description);
+    res.json({ success: true, record: { labels, barcode: "123456789" } }); // mock barcode
+  } catch (err) {
+    res.json({ error: err.message });
+  }
 });
+
+// All your existing routes: /inventory, /add, /remove, /shopping, /join-family, etc.
