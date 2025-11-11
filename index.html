@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en" class="dark:bg-gray-900 dark:text-white">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PantryPal</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icon-192.png" />
+    <meta name="theme-color" content="#3b82f6" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+      .icon { @apply w-5 h-5 inline-block; }
+      #scanner-overlay::after {
+        content: '';
+        position: absolute;
+        top: 50%; left: 50%;
+        width: 80%; height: 60px;
+        border: 3px solid rgba(59,130,246,0.8);
+        border-radius: 8px;
+        transform: translate(-50%,-50%);
+        box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+        pointer-events: none;
+      }
+      @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+      .pulse { animation: pulse 2s infinite; }
+      .spinner { width:24px;height:24px;border:3px solid #e5e7eb;border-top:3px solid #3b82f6;border-radius:50%;animation:spin 1s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .tab-btn {
+        @apply px-3 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 font-medium transition rounded-t-lg flex-1 min-w-0;
+      }
+      .tab-btn:hover { @apply bg-gray-100 dark:bg-gray-700; }
+      .tab-btn.active { @apply bg-blue-600 text-white; }
+      .meal-day {
+        @apply bg-white dark:bg-gray-800 p-2 sm:p-3 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 min-h-24 sm:min-h-28 flex flex-col;
+      }
+      .meal-day-header {
+        @apply text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1;
+      }
+      .meal-dropzone {
+        @apply flex-1 min-h-12 sm:min-h-16 overflow-y-auto;
+      }
+      .meal-item {
+        @apply bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs cursor-move mb-1 hover:shadow transition;
+      }
+      .recipe-card {
+        @apply bg-white dark:bg-gray-800 p-3 rounded-lg shadow hover:shadow-md transition cursor-grab active:cursor-grabbing;
+      }
+      .template-card {
+        @apply bg-gray-50 dark:bg-gray-700 p-3 rounded-lg border cursor-pointer hover:border-blue-300 transition text-xs;
+      }
+      .nutrition-bar {
+        @apply h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden;
+      }
+      .nutrition-fill {
+        @apply h-full transition-all duration-500;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 shadow-md sticky top-0 z-40">
+      <div class="max-w-4xl mx-auto px-4 flex justify-between items-center">
+        <div class="text-center flex-1">
+          <h1 class="text-xl sm:text-2xl font-bold flex items-center justify-center gap-2">
+            <svg class="icon"><use href="#heroicons-home"/></svg>
+            PantryPal
+          </h1>
+          <p class="text-xs sm:text-sm opacity-90">Voice • QR • AI • Recipes • Nutrition</p>
+        </div>
+        <button id="darkModeBtn" class="p-2 rounded-full hover:bg-blue-700 transition">
+          <svg class="icon"><use href="#heroicons-moon"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Auth -->
+    <section id="auth-section" class="max-w-md mx-auto mt-12 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+      <h2 class="text-xl font-semibold text-center mb-4">Welcome to PantryPal!</h2>
+      <div id="firebaseui-auth-container"></div>
+      <p class="text-center text-xs text-gray-500 mt-3">Sign in with Google, Email, or Phone</p>
+    </section>
+
+    <!-- Main App -->
+    <main id="app" class="hidden max-w-4xl mx-auto p-4 space-y-6">
+      <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg shadow">
+        <p class="font-medium text-sm"><span class="font-bold">User:</span> <span id="userEmail"></span></p>
+        <button id="signOutBtn" class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded transition">Sign Out</button>
+      </div>
+
+      <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md pulse text-sm sm:text-base">
+        <svg class="icon"><use href="#heroicons-camera"/></svg>
+        Start Scanner
+      </button>
+
+      <div class="flex border-b border-gray-200 bg-white dark:bg-gray-800 rounded-t-lg overflow-x-auto">
+        <button class="tab-btn active" data-tab="inventory">Inventory</button>
+        <button class="tab-btn" data-tab="shopping">Shopping</button>
+        <button class="tab-btn" data-tab="meals">Meals</button>
+      </div>
+
+      <div id="tabContainer" class="relative overflow-hidden rounded-b-xl shadow bg-white dark:bg-gray-800">
+        <div id="tabSlider" class="flex" style="width: 300%; transform: translateX(0%);">
+          <section id="inventory" class="w-full p-4 sm:p-5">
+            <h3 class="text-base sm:text-lg font-semibold mb-3">Add Item</h3>
+            <input type="text" id="invBarcode" placeholder="Barcode / QR" class="w-full p-3 border rounded-lg mb-2 text-sm"/>
+            <div class="grid grid-cols-2 gap-2">
+              <input type="number" id="invQty" value="1" min="1" class="p-3 border rounded-lg text-sm"/>
+              <input type="date" id="invExp" class="p-3 border rounded-lg text-sm"/>
+            </div>
+            <button id="addToInventory" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl transition text-sm">
+              Add to Inventory
+            </button>
+            <div id="inventoryList" class="mt-5 space-y-2"></div>
+          </section>
+
+          <section id="shopping" class="w-full p-4 sm:p-5">
+            <h3 class="text-base sm:text-lg font-semibold mb-3">Shopping List</h3>
+            <input type="text" id="shopName" placeholder="Item Name" class="w-full p-3 border rounded-lg mb-2 text-sm"/>
+            <input type="number" id="shopNeeded" value="1" min="1" class="w-full p-3 border rounded-lg mb-3 text-sm"/>
+            <button id="addToShopping" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl transition text-sm">
+              Add to List
+            </button>
+            <div id="shoppingList" class="mt-5 space-y-2"></div>
+          </section>
+
+          <section id="meals" class="w-full p-4 sm:p-5">
+            <h3 class="text-base sm:text-lg font-semibold mb-4">Meal Plan</h3>
+            <div class="mb-4">
+              <input type="text" id="recipeSearch" placeholder="Search meal prep recipes..." class="w-full p-3 border rounded-lg text-sm"/>
+              <button id="searchRecipes" class="mt-2 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm">Find Recipes</button>
+            </div>
+            <div id="recipeResults" class="space-y-3 mb-6 max-h-48 overflow-y-auto"></div>
+            <div class="mb-4">
+              <h4 class="font-bold text-sm mb-2">Meal Prep Templates</h4>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <button class="template-card" onclick="applyTemplate('vegan-breakfast')">Vegan Oatmeal (300 cal)</button>
+                <button class="template-card" onclick="applyTemplate('chicken-dinner')">Sheet Pan Chicken (450 cal)</button>
+                <button class="template-card" onclick="applyTemplate('lentil-soup')">Creamy Lentil Soup (380 cal)</button>
+                <button class="template-card" onclick="applyTemplate('peanut-stew')">Peanut Stew (420 cal)</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-7 gap-1 sm:gap-2 text-center text-xs font-bold text-gray-600 dark:text-gray-300 mb-2">
+              <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+            </div>
+            <div id="mealGrid" class="grid grid-cols-7 gap-2 sm:gap-3"></div>
+            <div id="nutritionSummary" class="mt-6 p-4 bg-green-50 dark:bg-green-900 rounded-lg hidden">
+              <h4 class="font-bold text-sm mb-2">Daily Nutrition</h4>
+              <div class="space-y-2 text-xs">
+                <div>Calories: <span id="calories">0</span> kcal</div>
+                <div class="nutrition-bar"><div id="calorieBar" class="nutrition-fill bg-green-500 w-0"></div></div>
+                <div>Protein: <span id="protein">0</span>g | Carbs: <span id="carbs">0</span>g | Fat: <span id="fat">0</span>g</div>
+              </div>
+            </div>
+            <div class="mt-6 flex flex-col gap-2 max-w-md mx-auto">
+              <button id="addToShoppingFromMeals" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl transition shadow-md text-sm">
+                Add All Meals to Shopping
+              </button>
+              <button id="analyzeNutrition" class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm">
+                Analyze Nutrition
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.js"></script>
+    <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.css" />
+
+    <!-- Icons -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
+      <symbol id="heroicons-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+      </symbol>
+      <symbol id="heroicons-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+        <path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </symbol>
+      <symbol id="heroicons-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+      </symbol>
+    </svg>
+
+    <!-- App Logic -->
+    <script>
+      // YOUR PERMANENT BACKEND URL — NEVER CHANGES
+      const API_BASE = 'https://pantrypal-zdi4.onrender.com';
+      console.log('API_BASE →', API_BASE);
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+        authDomain: "pantrypal-6e410.firebaseapp.com",
+        projectId: "pantrypal-6e410",
+        storageBucket: "pantrypal-6e410.firebasestorage.app",
+        messagingSenderId: "592127259891",
+        appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
+      };
+      firebase.initializeApp(firebaseConfig);
+      const ui = new firebaseui.auth.AuthUI(firebase.auth());
+      ui.start('#firebaseui-auth-container', {
+        signInFlow: 'popup',
+        signInOptions: ['google.com', 'emailLink', 'password'],
+        callbacks: { signInSuccessWithAuthResult: () => false }
+      });
+
+      let currentUser = null, idToken = null;
+      const $ = s => document.querySelector(s);
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const mealPrepRecipes = [
+        { name: "Vegan Oatmeal Bowl", ingredients: ["1 cup oats", "1 banana", "1 tbsp chia seeds"], calories: 300 },
+        { name: "Sheet Pan Chicken", ingredients: ["4 chicken thighs", "2 cups broccoli", "1 sweet potato"], calories: 450 },
+        { name: "Creamy Lentil Soup", ingredients: ["1 cup lentils", "1 onion", "2 carrots", "1L broth"], calories: 380 },
+        { name: "Peanut Stew", ingredients: ["1 can chickpeas", "2 tbsp peanut butter", "1 can tomatoes"], calories: 420 }
+      ];
+      const templates = {
+        'vegan-breakfast': { name: "Vegan Oatmeal", items: ["Oats", "Banana", "Chia Seeds"], calories: 300 },
+        'chicken-dinner': { name: "Sheet Pan Chicken", items: ["Chicken", "Broccoli", "Sweet Potato"], calories: 450 },
+        'lentil-soup': { name: "Lentil Soup", items: ["Lentils", "Onion", "Carrots"], calories: 380 },
+        'peanut-stew': { name: "Peanut Stew", items: ["Chickpeas", "Peanut Butter", "Tomatoes"], calories: 420 }
+      };
+
+      async function api(path, opts = {}) {
+        if (!idToken) return null;
+        try {
+          const res = await fetch(API_BASE + path, {
+            ...opts,
+            headers: {
+              'Authorization': `Bearer ${idToken}`,
+              'Content-Type': 'application/json',
+              ...opts.headers
+            }
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return await res.json();
+        } catch (err) {
+          console.error('API error:', err);
+          return null;
+        }
+      }
+
+      firebase.auth().onAuthStateChanged(async user => {
+        if (user) {
+          currentUser = user;
+          idToken = await user.getIdToken();
+          $('#userEmail').textContent = user.email || 'User';
+          $('#auth-section').classList.add('hidden');
+          $('#app').classList.remove('hidden');
+          await loadMeals();
+        } else {
+          $('#auth-section').classList.remove('hidden');
+          $('#app').classList.add('hidden');
+        }
+      });
+
+      $('#signOutBtn').onclick = () => firebase.auth().signOut();
+      $('#darkModeBtn').onclick = () => {
+        document.documentElement.classList.toggle('dark');
+        localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+      };
+      if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+
+      const tabButtons = document.querySelectorAll('.tab-btn');
+      const tabSlider = $('#tabSlider');
+      let currentTab = 0;
+      function switchTab(i) {
+        currentTab = i;
+        tabButtons.forEach((b, j) => b.classList.toggle('active', j === i));
+        tabSlider.style.transform = `translateX(-${i * 33.33}%)`;
+      }
+      tabButtons.forEach((b, i) => b.onclick = () => switchTab(i));
+
+      async function loadMeals() {
+        const data = await api('/meals') || { meals: {} };
+        const grid = $('#mealGrid');
+        grid.innerHTML = '';
+        const today = new Date().getDay();
+        days.forEach((day, i) => {
+          const div = document.createElement('div');
+          div.className = 'meal-day';
+          const isToday = i === today;
+          div.innerHTML = `
+            <div class="meal-day-header ${isToday ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-600 dark:text-gray-400'}">${day}</div>
+            <div class="meal-dropzone" data-day="${day}"></div>
+          `;
+          const zone = div.querySelector('.meal-dropzone');
+          (data.meals[day] || []).forEach(m => {
+            const item = document.createElement('div');
+            item.className = 'meal-item';
+            item.textContent = m.name;
+            item.dataset.id = m.id;
+            zone.appendChild(item);
+          });
+          new Sortable(zone, { group: 'meals', animation: 150, onEnd: saveMeals });
+          grid.appendChild(div);
+        });
+      }
+
+      async function saveMeals() {
+        const meals = {};
+        document.querySelectorAll('.meal-dropzone').forEach(z => {
+          const day = z.dataset.day;
+          meals[day] = Array.from(z.children).map(el => ({ id: el.dataset.id, name: el.textContent }));
+        });
+        await api('/save-meals', { method: 'POST', body: JSON.stringify({ meals }) });
+      }
+
+      $('#searchRecipes').onclick = async () => {
+        const q = $('#recipeSearch').value.trim().toLowerCase();
+        const container = $('#recipeResults');
+        container.innerHTML = '';
+        const matches = mealPrepRecipes.filter(r => r.name.toLowerCase().includes(q));
+        matches.forEach(r => {
+          const card = document.createElement('div');
+          card.className = 'recipe-card';
+          card.draggable = true;
+          card.innerHTML = `<div class="font-bold text-xs">${r.name} (${r.calories} cal)</div>`;
+          card.ondragstart = e => e.dataTransfer.setData('text/plain', r.name);
+          container.appendChild(card);
+        });
+      };
+
+      window.applyTemplate = key => {
+        const t = templates[key];
+        const zone = document.querySelector(`.meal-dropzone[data-day="Sun"]`);
+        if (zone && t) {
+          const item = document.createElement('div');
+          item.className = 'meal-item';
+          item.textContent = t.name;
+          item.dataset.id = Date.now();
+          zone.appendChild(item);
+          saveMeals();
+          t.items.forEach(name => api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed: 1 }) }));
+        }
+      };
+
+      $('#analyzeNutrition').onclick = async () => {
+        const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
+        if (!meals.length) return alert('No meals planned');
+        const text = meals.join(' + ');
+        const res = await api('/nutrition', { method: 'POST', body: JSON.stringify({ text }) });
+        if (res?.calories) {
+          $('#calories').textContent = Math.round(res.calories);
+          $('#protein').textContent = Math.round(res.totalNutrients.PROCNT?.quantity || 0);
+          $('#carbs').textContent = Math.round(res.totalNutrients.CHOCDF?.quantity || 0);
+          $('#fat').textContent = Math.round(res.totalNutrients.FAT?.quantity || 0);
+          $('#calorieBar').style.width = `${Math.min(100, res.calories / 20)}%`;
+          $('#nutritionSummary').classList.remove('hidden');
+        } else {
+          alert('Nutrition analysis failed');
+        }
+      };
+
+      $('#addToShoppingFromMeals').onclick = async () => {
+        const meals = Array.from(document.querySelectorAll('.meal-item')).map(el => el.textContent);
+        for (const name of meals) {
+          const recipe = mealPrepRecipes.find(r => r.name === name);
+          if (recipe) recipe.ingredients.forEach(i => api('/add-to-shopping', { method: 'POST', body: JSON.stringify({ itemName: i, needed: 1 }) }));
+        }
+        alert('Ingredients added to shopping!');
+      };
+
+      document.addEventListener('dragover', e => e.preventDefault());
+      document.addEventListener('drop', e => {
+        e.preventDefault();
+        const name = e.dataTransfer.getData('text/plain');
+        if (name && e.target.classList.contains('meal-dropzone')) {
+          const item = document.createElement('div');
+          item.className = 'meal-item';
+          item.textContent = name;
+          item.dataset.id = Date.now();
+          e.target.appendChild(item);
+          saveMeals();
+        }
+      });
+
+      loadMeals();
+    </script>
+  </body>
+</html>
