@@ -25,30 +25,13 @@
       box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
       pointer-events: none;
     }
-    /* Pulse Animation */
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
     .pulse { animation: pulse 2s infinite; }
-
-    /* Low Stock Warning */
-    .low-stock {
-      @apply bg-red-50 dark:bg-red-900 border-l-4 border-red-500 p-3 rounded-lg shadow-sm;
-    }
+    .low-stock { @apply bg-red-50 dark:bg-red-900 border-l-4 border-red-500 p-3 rounded-lg shadow-sm; }
     .low-stock span { @apply text-red-600 font-bold; }
-
-    /* Loading Spinner */
-    .spinner {
-      width: 24px; height: 24px;
-      border: 3px solid #e5e7eb;
-      border-top: 3px solid #3b82f6;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    .spinner { width:24px;height:24px;border:3px solid #e5e7eb;border-top:3px solid #3b82f6;border-radius:50%;animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-listen { animation: pulse 1.5s infinite; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
@@ -90,7 +73,7 @@
       <div id="scanCounter" class="bg-blue-50 dark:bg-blue-900 p-3 rounded-lg text-center text-sm">Loading...</div>
     </div>
 
-    <!-- Scanner Button (with pulse) -->
+    <!-- Scanner Button -->
     <button id="startScanner" class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition shadow-md pulse">
       <svg class="icon"><use href="#heroicons-camera"/></svg>
       Start Scanner (QR + Barcode)
@@ -106,10 +89,10 @@
         <svg class="icon"><use href="#heroicons-microphone"/></svg>
         <span>Hold to Speak</span>
       </button>
-      <div id="voiceResult" class="mt-4 text-center text-sm text-green-600 hidden"></div>
+      <div id="voiceResult" class="mt-4 text-center text-sm hidden"></div>
     </div>
 
-    <!-- AI Scan (with PRO badge) -->
+    <!-- AI Scan (PRO) -->
     <section class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow">
       <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
         <svg class="icon"><use href="#heroicons-sparkles"/></svg>
@@ -179,6 +162,11 @@
           <video id="scanner-video" class="w-full rounded-lg" autoplay playsinline></video>
         </div>
         <p class="text-center mt-2 text-sm text-gray-600" id="scannerStatus">Point camera at barcode...</p>
+        <div class="flex justify-center mt-3 gap-3">
+          <button id="captureBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2">
+            <svg class="w-5 h-5"><use href="#heroicons-camera"/></svg> Capture
+          </button>
+        </div>
       </div>
     </div>
 
@@ -233,7 +221,7 @@
     });
 
     let currentUser = null, idToken = null, isPro = false, editingItem = null;
-    let scannerActive = false, recognition = null;
+    let scannerActive = false, recognition = null, scannerInstance = null, scannerStream = null, lastScannedCode = null;
     const $ = s => document.querySelector(s);
 
     async function api(path, opts = {}) {
@@ -284,40 +272,78 @@
       };
     });
 
-    // Scanner
+    // === SCANNER (ZXing + Manual Capture) ===
     $('#startScanner').onclick = async () => {
       const modal = $('#scannerModal'), video = $('#scanner-video'), status = $('#scannerStatus');
-      modal.classList.remove('hidden'); status.textContent = 'Requesting camera…';
+      modal.classList.remove('hidden'); status.textContent = 'Opening camera...';
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        video.srcObject = stream; scannerActive = true;
-        await new Promise(r => video.onloadedmetadata = r);
-        const codeReader = new ZXing.BrowserMultiFormatReader();
-        codeReader.decodeFromVideoDevice(null, 'scanner-video', (result, err) => {
-          if (result && scannerActive) { handleScannedCode(result.getText()); closeScanner(); }
-          if (err && !(err instanceof ZXing.NotFoundException)) startQuagga(stream);
+        scannerStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
         });
-      } catch (e) { status.textContent = 'Camera denied'; console.error(e); }
+        video.srcObject = scannerStream;
+        scannerActive = true;
+        await video.play();
+
+        status.textContent = 'Scanning... Move barcode into frame';
+
+        scannerInstance = new ZXing.BrowserMultiFormatReader();
+        scannerInstance.decodeFromVideoDevice(null, video, (result, err) => {
+          if (result && scannerActive) {
+            const code = result.getText();
+            if (code !== lastScannedCode) {
+              lastScannedCode = code;
+              handleScannedCode(code);
+              beep();
+              closeScanner();
+            }
+          }
+          if (err && !(err instanceof ZXing.NotFoundException)) console.warn('ZXing error:', err);
+        }, { delay: 300 });
+
+      } catch (e) {
+        status.textContent = 'Camera access denied';
+        console.error(e);
+      }
     };
 
-    function startQuagga(stream) {
-      Quagga.init({
-        inputStream: { name: "Live", type: "LiveStream", target: $('#scanner-video') },
-        decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","upc_reader"] }
-      }, err => { if (err) return console.error(err); Quagga.start(); });
-      Quagga.onDetected(d => {
-        if (scannerActive) { handleScannedCode(d.codeResult.code); Quagga.stop(); closeScanner(); }
-      });
+    function beep() {
+      const ctx = new AudioContext();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 800;
+      g.gain.setValueAtTime(0.1, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      o.start(); o.stop(ctx.currentTime + 0.1);
     }
 
     $('#closeScanner').onclick = closeScanner;
     function closeScanner() {
-      const v = $('#scanner-video');
-      if (v.srcObject) v.srcObject.getTracks().forEach(t => t.stop());
-      if (typeof Quagga !== 'undefined') Quagga.stop();
+      if (scannerInstance) { scannerInstance.reset(); scannerInstance = null; }
+      if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
       $('#scannerModal').classList.add('hidden');
       scannerActive = false;
+      lastScannedCode = null;
     }
+
+    $('#captureBtn').onclick = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      canvas.toBlob(async blob => {
+        const codeReader = new ZXing.BrowserMultiFormatReader();
+        try {
+          const result = await codeReader.decodeFromImage(canvas.toDataURL());
+          handleScannedCode(result.getText());
+          closeScanner();
+        } catch (e) {
+          alert('No barcode found. Try again.');
+        }
+      }, 'image/jpeg');
+    };
 
     function handleScannedCode(code) {
       $('#invBarcode').value = code;
@@ -325,45 +351,66 @@
       alert(`Scanned: ${code}`);
     }
 
-    // Voice
+    // === VOICE (Improved Regex + Feedback) ===
     const voiceBtn = $('#voiceBtn'), voiceResult = $('#voiceResult');
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SR(); recognition.continuous = false; recognition.interimResults = false; recognition.lang = 'en-US';
+      recognition = new SR();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
       let listening = false;
       const start = () => {
         if (listening) return;
-        recognition.start(); listening = true;
-        voiceBtn.classList.add('bg-red-600');
-        voiceBtn.innerHTML = `<svg class="icon"><use href="#heroicons-microphone"/></svg> Speak now…`;
+        recognition.start();
+        listening = true;
+        voiceBtn.classList.add('bg-red-600', 'animate-listen');
+        voiceBtn.innerHTML = `<svg class="icon"><use href="#heroicons-microphone"/></svg> Listening...`;
         voiceResult.classList.add('hidden');
       };
       const stop = () => {
         if (!listening) return;
-        recognition.stop(); listening = false;
-        voiceBtn.classList.remove('bg-red-600');
+        recognition.stop();
+        listening = false;
+        voiceBtn.classList.remove('bg-red-600', 'animate-listen');
         voiceBtn.innerHTML = `<svg class="icon"><use href="#heroicons-microphone"/></svg> Hold to Speak`;
       };
+
       voiceBtn.addEventListener('pointerdown', start);
       voiceBtn.addEventListener('pointerup', stop);
       voiceBtn.addEventListener('pointerleave', stop);
+
       recognition.onresult = e => {
-        const txt = e.results[0][0].transcript.trim().toLowerCase();
-        voiceResult.textContent = `Heard: "${txt}"`; voiceResult.classList.remove('hidden');
-        const m = txt.match(/add\s+(.+?)(?:\s+(\d+))?/);
-        if (m) {
-          $('#shopName').value = m[1].trim();
-          $('#shopNeeded').value = m[2] ? parseInt(m[2]) : 1;
-          $('#addToShopping').click();
+        const transcript = e.results[0][0].transcript.trim();
+        const txt = transcript.toLowerCase();
+        voiceResult.innerHTML = `Heard: "${transcript}"`;
+        voiceResult.classList.remove('hidden');
+
+        const match = txt.match(/add\s+(.+?)(?:\s+(\d+))?$/) || txt.match(/add\s+(\d+)\s+(.+)$/);
+        if (match) {
+          let item = (match[1] || match[2]).replace(/^\d+\s*/, '').trim();
+          let qty = parseInt(match[2] || match[1]) || 1;
+          item = item.charAt(0).toUpperCase() + item.slice(1);
+          $('#shopName').value = item;
+          $('#shopNeeded').value = qty;
+          setTimeout(() => $('#addToShopping').click(), 300);
+          voiceResult.innerHTML += '<br><span class="text-green-600">Added!</span>';
+        } else {
+          voiceResult.innerHTML += '<br><span class="text-orange-600">Try: "Add milk 2"</span>';
         }
       };
-      recognition.onerror = () => { voiceResult.textContent = 'Voice error'; voiceResult.classList.remove('hidden'); stop(); };
+
+      recognition.onerror = () => {
+        voiceResult.textContent = 'Voice error'; voiceResult.classList.remove('hidden'); stop();
+      };
       recognition.onend = stop;
     } else {
-      voiceBtn.disabled = true; voiceBtn.innerHTML = '<span>Mic not supported</span>';
+      voiceBtn.disabled = true;
+      voiceBtn.innerHTML = '<span>Mic not supported</span>';
     }
 
-    // AI Scan with Loading
+    // === AI SCAN ===
     $('#scanBtn').onclick = async () => {
       const file = $('#scanImage').files[0];
       if (!file) return alert('Pick an image');
@@ -382,7 +429,7 @@
         resDiv.classList.remove('hidden');
         if (d.record?.barcode) $('#invBarcode').value = d.record.barcode;
       } catch (err) {
-        $('#scanText').textContent = 'Network error. Try again.';
+        $('#scanText').textContent = 'Network error.';
         $('#scanResult').classList.remove('hidden');
       } finally {
         $('#scanLoading').classList.add('hidden');
@@ -390,7 +437,7 @@
       }
     };
 
-    // Inventory & Shopping
+    // === INVENTORY & SHOPPING ===
     async function loadInventory() {
       const d = await api('/inventory');
       $('#inventoryList').innerHTML = await renderItems(d?.items||[], false);
@@ -409,15 +456,18 @@
         }
         const editFn = isShopping ? `editShopping('${i.barcode}')` : `editItem('${i.barcode}')`;
         const delFn = isShopping ? `removeShopping('${i.barcode}')` : `removeItem('${i.barcode}')`;
-        const low = (i.quantity ?? i.needed) <= 2 ? 'low-stock' : '';
+        const qty = i.quantity ?? i.needed ?? 0;
+        const low = qty <= 2 ? 'low-stock' : '';
+        const daysLeft = i.expiration ? Math.max(0, Math.ceil((new Date(i.expiration) - new Date()) / 86400000)) : null;
+        const expClass = daysLeft !== null && daysLeft <= 3 ? 'text-red-600' : 'text-gray-600';
         return `
           <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow ${low}">
             <div class="flex items-center gap-3">
               <img src="${img}" alt="${i.name||i.itemName}" class="w-10 h-10 rounded object-cover bg-gray-200 border" loading="lazy" onerror="this.src='icon-192.png';">
               <div>
                 <strong>${i.name||i.itemName}</strong><br>
-                <span class="text-sm text-gray-600">${i.quantity||i.needed} ${i.expiration ? '| Exp: '+i.expiration : ''}</span>
-                ${(i.quantity??i.needed)<=2 ? '<span class="text-red-600 text-xs ml-2 font-bold">Low!</span>' : ''}
+                <span class="text-sm ${expClass}">${qty} ${i.expiration ? '| Exp: '+i.expiration : ''} ${daysLeft !== null && daysLeft <= 3 ? `(${daysLeft} days)` : ''}</span>
+                ${qty <= 2 ? '<span class="text-red-600 text-xs ml-2 font-bold">Low!</span>' : ''}
               </div>
             </div>
             <div class="flex gap-2">
@@ -456,9 +506,7 @@
       const exp = $('#invExp').value;
       if (!barcode) return alert('Barcode required');
       await api('/add', {method:'POST', body:JSON.stringify({barcode, quantity:qty, expiration:exp})});
-      $('#invBarcode').value=''; $('#invQty').value=1; $('#invExp').value='';
-      $('#inventoryBtnText').textContent = 'Add to Inventory';
-      editingItem = null;
+      resetForm('inventory');
       loadInventory();
     };
 
@@ -468,11 +516,20 @@
       const needed = parseInt($('#shopNeeded').value)||1;
       if (!barcode || !name) return alert('Barcode & name required');
       await api('/add-to-shopping', {method:'POST', body:JSON.stringify({barcode, itemName:name, needed})});
-      $('#shopBarcode').value=''; $('#shopName').value=''; $('#shopNeeded').value=1;
-      $('#shoppingBtnText').textContent = 'Add to List';
-      editingItem = null;
+      resetForm('shopping');
       loadShopping();
     };
+
+    function resetForm(tab) {
+      if (tab === 'inventory') {
+        $('#invBarcode').value=''; $('#invQty').value=1; $('#invExp').value='';
+        $('#inventoryBtnText').textContent = 'Add to Inventory';
+      } else {
+        $('#shopBarcode').value=''; $('#shopName').value=''; $('#shopNeeded').value=1;
+        $('#shoppingBtnText').textContent = 'Add to List';
+      }
+      editingItem = null;
+    }
 
     window.removeItem = async barcode => { if(confirm('Delete?')) { await api('/remove',{method:'POST',body:JSON.stringify({barcode})}); loadInventory(); }};
     window.removeShopping = async barcode => { if(confirm('Delete?')) { await api('/remove-from-shopping',{method:'POST',body:JSON.stringify({barcode})}); loadShopping(); }};
@@ -483,7 +540,7 @@
       $('#scanCounter').innerHTML = d?.isPro ? 'Unlimited scans (Pro)' : `Free scans: ${d?.scans||0}/10`;
     }
 
-    // Family UI
+    // === FAMILY UI ===
     const familyHTML = `
       <div class="flex gap-2 mt-2">
         <button id="createFamilyBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm">Create Family</button>
@@ -530,7 +587,6 @@
 
     $('#cancelFamilyBtn').onclick = () => {
       $('#familyModal').classList.add('hidden');
-      localStorage.setItem('hasSeenJoinPrompt','true');
     };
 
     loadFamily();
