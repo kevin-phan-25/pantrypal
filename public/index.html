@@ -189,7 +189,8 @@
     <!-- App Logic -->
     <script>
       // YOUR PERMANENT BACKEND URL — NEVER CHANGES
-      const API_BASE = 'https://pantrypal-zdi4.onrender.com';
+      // BULLETPROOF API BASE — WORKS ON RENDER FOREVER
+      const API_BASE = window.location.origin;
       console.log('API_BASE →', API_BASE);
 
       const firebaseConfig = {
