@@ -79,9 +79,11 @@ app.post('/nutrition', async (req, res) => {
 
 // ———————— Start Server ————————
 const PORT = process.env.PORT || 3000;
+const BASE_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+
 app.listen(PORT, () => {
   console.log(`PantryPal API running on port ${PORT}`);
-  console.log(`Backend: https://pantrypal.onrender.com`);
+  console.log(`Backend: ${BASE_URL}`);  // ← NOW CORRECT
   console.log(`Time (EST): ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}`);
 });
 
