@@ -69,8 +69,8 @@ try {
 }
 
 // === WEB PUSH CONFIG ===
-const publicVapidKey = 'BKPcrxsEbkHtmRSMPZeMXjm-cUn4jT_58dMPZ5ZiSja0_-4oWDsy2CkxSrsDKNZPJG4uNZG7v4Q5I2DAedOtZSs';
-const privateVapidKey = 'cAbR7BWZHx4l4g3YhIymbgFdvrtytzP6u_VMqIGT160';
+const publicVapidKey = process.env.VAPID_PUBLIC;
+const privateVapidKey = process.env.VAPID_PRIVATE;
 
 webpush.setVapidDetails(
   'mailto:kevin@pantrypal.com',
