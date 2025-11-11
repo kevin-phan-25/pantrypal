@@ -10,7 +10,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-
     <style>
       .icon { @apply w-5 h-5 inline-block; }
       #scanner-overlay::after {
@@ -66,7 +65,6 @@
       .price-lowest { @apply bg-green-100 font-bold; }
     </style>
   </head>
-
   <body class="bg-gray-50 text-gray-800 min-h-screen transition-colors">
     <!-- Header -->
     <header class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 shadow-md sticky top-0 z-40">
@@ -143,15 +141,11 @@
           <!-- MEALS -->
           <section id="meals" class="w-full p-4 sm:p-5">
             <h3 class="text-base sm:text-lg font-semibold mb-4">Meal Plan</h3>
-
-            <!-- Recipe Search -->
             <div class="mb-4">
               <input type="text" id="recipeSearch" placeholder="Search meal prep recipes..." class="w-full p-3 border rounded-lg text-sm"/>
               <button id="searchRecipes" class="mt-2 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm">Find Recipes</button>
             </div>
             <div id="recipeResults" class="space-y-3 mb-6 max-h-48 overflow-y-auto"></div>
-
-            <!-- Templates -->
             <div class="mb-4">
               <h4 class="font-bold text-sm mb-2">Meal Prep Templates</h4>
               <div class="grid grid-cols-2 gap-2 text-xs">
@@ -161,16 +155,10 @@
                 <button class="template-card" onclick="applyTemplate('peanut-stew')">Peanut Stew (420 cal)</button>
               </div>
             </div>
-
-            <!-- Week Header -->
             <div class="grid grid-cols-7 gap-1 sm:gap-2 text-center text-xs font-bold text-gray-600 dark:text-gray-300 mb-2">
               <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
             </div>
-
-            <!-- Meal Grid -->
             <div id="mealGrid" class="grid grid-cols-7 gap-2 sm:gap-3"></div>
-
-            <!-- Nutrition Summary -->
             <div id="nutritionSummary" class="mt-6 p-4 bg-green-50 dark:bg-green-900 rounded-lg hidden">
               <h4 class="font-bold text-sm mb-2">Daily Nutrition</h4>
               <div class="space-y-2 text-xs">
@@ -179,8 +167,6 @@
                 <div>Protein: <span id="protein">0</span>g | Carbs: <span id="carbs">0</span>g | Fat: <span id="fat">0</span>g</div>
               </div>
             </div>
-
-            <!-- Actions -->
             <div class="mt-6 flex flex-col gap-2 max-w-md mx-auto">
               <button id="addToShoppingFromMeals" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl transition shadow-md text-sm">
                 Add All Meals to Shopping
@@ -216,34 +202,9 @@
 
     <!-- App Logic -->
     <script>
-      // ———————— SMART BACKEND URL DETECTION ————————
-      const getApiBase = () => {
-        // 1. Check for Vite-style env var (if using build tools)
-        if (typeof import !== 'undefined' && import.meta?.env?.VITE_API_URL) {
-          return import.meta.env.VITE_API_URL;
-        }
-
-        // 2. Check for injected env var (Render Static Site)
-        if (window.__ENV__?.VITE_API_URL) {
-          return window.__ENV__.VITE_API_URL;
-        }
-
-        // 3. Auto-detect if on Render (swap base domain)
-        if (window.location.hostname.includes('onrender.com')) {
-          const hostname = window.location.hostname;
-          if (hostname.includes('pantrypal-zdi4')) {
-            return `https://${hostname}`;
-          } else {
-            return `https://${hostname.replace('pantrypal', 'pantrypal-zdi4')}`;
-          }
-        }
-
-        // 4. Local development
-        return 'http://localhost:3000';
-      };
-
-      const API_BASE = getApiBase();
-      console.log('API_BASE →', API_BASE); // Debug: Check in browser console
+      // BULLETPROOF API BASE — WORKS ON ANY RENDER URL FOREVER
+      const API_BASE = window.location.origin;
+      console.log('API_BASE →', API_BASE); // Should show: https://pantrypal-zdi4.onrender.com
 
       const firebaseConfig = {
         apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
@@ -263,7 +224,6 @@
 
       let currentUser = null, idToken = null;
       const $ = s => document.querySelector(s);
-
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const mealPrepRecipes = [
         { name: "Vegan Oatmeal Bowl", ingredients: ["1 cup oats", "1 banana", "1 tbsp chia seeds"], calories: 300 },
@@ -433,7 +393,6 @@
         }
       });
 
-      // Auto-load meals on start
       loadMeals();
     </script>
   </body>
