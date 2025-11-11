@@ -1,362 +1,142 @@
-// index.js – PantryPal AI + Firestore + PWA + Family Share + Low Stock + VISION + PUSH NOTIFICATIONS
-import express from 'express';
-import fileUpload from 'express-fileupload';
-import bodyParser from 'body-parser';
-import { initializeApp, cert } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import vision from '@google-cloud/vision';
-import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
-import webpush from 'web-push';
+const express = require('express');
+const admin = require('firebase-admin');
+const fetch = require('node-fetch');
+const path = require('path');
+require('dotenv').config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const app = express();
+app.use(express.json());
+app.use(express.static('public'));
 
-app.use(cors());
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(fileUpload({ limits: { fileSize: 10 * 1024 * 1024 } }));
-app.use(express.static(path.join(__dirname, 'public')));
-
-// HEALTH CHECK
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+// Initialize Firebase Admin
+const serviceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString());
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
 });
 
-// Firebase Admin
-let credential;
-try {
-  if (process.env.FIREBASE_CREDENTIALS) {
-    credential = cert(JSON.parse(process.env.FIREBASE_CREDENTIALS));
-    console.log('Using FIREBASE_CREDENTIALS env var');
-  } else if (fs.existsSync('./credentials.json')) {
-    credential = cert('./credentials.json');
-    console.log('Using ./credentials.json');
-  } else {
-    throw new Error('No Firebase credentials');
-  }
-  initializeApp({ credential });
-  console.log('Firebase Admin OK');
-} catch (err) {
-  console.error('Firebase init failed:', err.message);
-  process.exit(1);
-}
+const db = admin.firestore();
 
-const auth = getAuth();
-const db = getFirestore();
-
-// Vision Client
-let visionClient;
-try {
-  const keyPath = '/etc/secrets/gcloud-key.json';
-  if (fs.existsSync(keyPath)) {
-    console.log('Vision API key loaded from:', keyPath);
-    visionClient = new vision.ImageAnnotatorClient({ keyFilename: keyPath });
-  } else {
-    console.log('Vision API key not found – disabling AI scan');
-    visionClient = {
-      textDetection: async () => [{ textAnnotations: [{ description: '' }] }]
-    };
-  }
-} catch (err) {
-  console.error('Vision API init failed:', err.message);
-  visionClient = {
-    textDetection: async () => [{ textAnnotations: [{ description: '' }] }]
-  };
-}
-
-// === WEB PUSH CONFIG ===
-const publicVapidKey = process.env.VAPID_PUBLIC;
-const privateVapidKey = process.env.VAPID_PRIVATE;
-
-webpush.setVapidDetails(
-  'mailto:kevin@pantrypal.com',
-  publicVapidKey,
-  privateVapidKey
-);
-
-// Auth Middleware
+// Middleware: Verify Firebase ID Token
 async function checkAuth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'No token' });
-  const token = header.split(' ')[1];
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'No token' });
   try {
-    req.user = await auth.verifyIdToken(token);
-    const userRef = db.collection('users').doc(req.user.uid);
-    const doc = await userRef.get();
-    if (!doc.exists) {
-      await userRef.set({ scans: 0, isPro: false, createdAt: FieldValue.serverTimestamp() });
-    }
+    const idToken = authHeader.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    req.user = decoded;
     next();
-  } catch (e) {
+  } catch (err) {
     res.status(401).json({ error: 'Invalid token' });
   }
 }
 
-// === SAVE FCM TOKEN ===
-app.post('/save-token', checkAuth, async (req, res) => {
-  const { token } = req.body;
-  if (!token) return res.status(400).json({ error: 'No token' });
-
-  await db.collection('users').doc(req.user.uid).update({
-    fcmToken: token,
-    tokenUpdatedAt: FieldValue.serverTimestamp()
-  });
-
-  res.json({ success: true });
-});
-
-// === DAILY EXPIRATION PUSH NOTIFICATIONS ===
-async function checkExpirations() {
-  console.log('Running expiration check...');
-  const now = new Date();
-  const in3Days = new Date(now);
-  in3Days.setDate(now.getDate() + 3);
-
-  const usersSnap = await db.collection('users').get();
-  for (const userDoc of usersSnap.docs) {
-    const userId = userDoc.id;
-    const userData = userDoc.data();
-    const fcmToken = userData.fcmToken;
-    if (!fcmToken) continue;
-
-    const itemsSnap = await db.collection('users').doc(userId).collection('items')
-      .where('expiration', '<=', in3Days.toISOString().split('T')[0])
-      .where('expiration', '>=', now.toISOString().split('T')[0])
-      .get();
-
-    const expiring = itemsSnap.docs.map(d => ({
-      name: d.data().name || d.id,
-      exp: d.data().expiration
-    }));
-
-    if (expiring.length > 0) {
-      const title = `${expiring.length} item${expiring.length > 1 ? 's' : ''} expiring soon!`;
-      const body = expiring.map(i => `${i.name} (${i.exp})`).join(', ');
-
-      const payload = JSON.stringify({
-        notification: { title, body },
-        data: { url: '/' }
-      });
-
-      try {
-        await webpush.sendNotification({ endpoint: fcmToken, keys: {} }, payload);
-        console.log(`Push sent to ${userId}`);
-      } catch (err) {
-        console.error(`Push failed for ${userId}:`, err);
-        if (err.statusCode === 410) {
-          await db.collection('users').doc(userId).update({ fcmToken: FieldValue.delete() });
-        }
-      }
-    }
-  }
-}
-
-// Run every 24 hours
-setInterval(checkExpirations, 24 * 60 * 60 * 1000);
-checkExpirations();
-
-// === AI SCAN ===
-app.post('/scan', checkAuth, async (req, res) => {
-  if (!req.files?.image) return res.status(400).json({ error: 'No image uploaded' });
-
-  try {
-    const [result] = await visionClient.textDetection({ image: { content: req.files.image.data } });
-    const text = result.textAnnotations?.[0]?.description || '';
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const itemName = lines[0] || 'Unknown';
-    const expMatch = lines.find(l => /\d{4}-\d{2}-\d{2}/.test(l));
-    const expirationDate = expMatch || '';
-    const barcodeMatch = lines.find(l => /^\d{8,}$/.test(l)) || req.body.barcode || '';
-
-    console.log('AI Scan Result:', { itemName, expirationDate, barcodeMatch, fullText: text.slice(0, 200) });
-
-    if (barcodeMatch) {
-      const ref = db.collection('users').doc(req.user.uid).collection('items').doc(barcodeMatch);
-      const doc = await ref.get();
-      if (doc.exists) {
-        await ref.update({ name: itemName, expiration: expirationDate || doc.data().expiration });
-      } else {
-        await ref.set({
-          name: itemName,
-          barcode: barcodeMatch,
-          quantity: 1,
-          expiration: expirationDate,
-          addedAt: FieldValue.serverTimestamp()
-        });
-      }
-    }
-
-    res.json({
-      success: true,
-      record: { itemName, expirationDate, barcode: barcodeMatch, detectedText: text }
-    });
-  } catch (err) {
-    console.error('AI Scan Error:', err);
-    res.status(500).json({ error: 'AI scan unavailable. Upload a Google Cloud Vision key as "gcloud-key.json" in Render Secret Files.' });
-  }
-});
-
-// === ADD TO INVENTORY ===
-app.post('/add', checkAuth, async (req, res) => {
-  const { barcode, quantity = 1, expiration = '', name } = req.body;
-  const userId = req.user.uid;
-  if (!barcode) return res.status(400).json({ error: 'barcode required' });
-  const ref = db.collection('users').doc(userId).collection('items').doc(barcode);
-  const doc = await ref.get();
-  if (doc.exists) {
-    await ref.update({ quantity: FieldValue.increment(parseInt(quantity)), expiration: expiration || doc.data().expiration });
-  } else {
-    await ref.set({ name: name || barcode, quantity: parseInt(quantity), expiration, addedAt: FieldValue.serverTimestamp() });
-  }
-  res.json({ success: true });
-});
-
-// === ADD TO SHOPPING LIST ===
-app.post('/add-to-shopping', checkAuth, async (req, res) => {
-  const { barcode, itemName, needed = 1 } = req.body;
-  const userId = req.user.uid;
-  if (!barcode || !itemName) return res.status(400).json({ error: 'barcode and itemName required' });
-  const ref = db.collection('users').doc(userId).collection('shopping').doc(barcode);
-  const doc = await ref.get();
-  if (doc.exists) {
-    await ref.update({ needed: FieldValue.increment(parseInt(needed)) });
-  } else {
-    await ref.set({ itemName, needed: parseInt(needed), addedAt: FieldValue.serverTimestamp() });
-  }
-  res.json({ success: true });
-});
-
-// === GET INVENTORY ===
+// === INVENTORY ===
 app.get('/inventory', checkAuth, async (req, res) => {
-  const snapshot = await db.collection('users').doc(req.user.uid).collection('items').get();
-  const items = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
+  const snap = await db.collection('inventory').where('uid', '==', req.user.uid).get();
+  const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   res.json({ items });
 });
 
-// === GET SHOPPING LIST ===
+app.post('/add-to-inventory', checkAuth, async (req, res) => {
+  const { barcode, name, qty, exp } = req.body;
+  await db.collection('inventory').add({
+    uid: req.user.uid,
+    barcode, name, qty: Number(qty), exp, addedAt: new Date()
+  });
+  res.json({ success: true });
+});
+
+// === SHOPPING LIST ===
 app.get('/shopping', checkAuth, async (req, res) => {
-  const snapshot = await db.collection('users').doc(req.user.uid).collection('shopping').get();
-  const list = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
-  res.json({ list });
+  const snap = await db.collection('shopping').where('uid', '==', req.user.uid).get();
+  const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  res.json({ items });
 });
 
-// === REMOVE FROM INVENTORY ===
-app.post('/remove', checkAuth, async (req, res) => {
-  const { barcode } = req.body;
-  await db.collection('users').doc(req.user.uid).collection('items').doc(barcode).delete();
+app.post('/add-to-shopping', checkAuth, async (req, res) => {
+  const { itemName, needed } = req.body;
+  await db.collection('shopping').add({
+    uid: req.user.uid,
+    name: itemName,
+    needed: Number(needed),
+    addedAt: new Date()
+  });
   res.json({ success: true });
 });
 
-// === REMOVE FROM SHOPPING ===
-app.post('/remove-from-shopping', checkAuth, async (req, res) => {
-  const { barcode } = req.body;
-  await db.collection('users').doc(req.user.uid).collection('shopping').doc(barcode).delete();
+// === MEAL PLAN ===
+app.get('/meals', checkAuth, async (req, res) => {
+  const doc = await db.collection('meals').doc(req.user.uid).get();
+  res.json(doc.exists ? doc.data() : { meals: {} });
+});
+
+app.post('/save-meals', checkAuth, async (req, res) => {
+  const { meals } = req.body;
+  await db.collection('meals').doc(req.user.uid).set({ meals }, { merge: true });
   res.json({ success: true });
 });
 
-// === PRODUCT INFO ===
-app.get('/product-info/:barcode', checkAuth, async (req, res) => {
-  const { barcode } = req.params;
+// === NUTRITION ANALYSIS (EDAMAM) ===
+app.post('/nutrition', checkAuth, async (req, res) => {
+  const { text } = req.body;
+  const appId = process.env.EDAMAM_APP_ID;
+  const appKey = process.env.EDAMAM_APP_KEY;
+
+  if (!appId || !appKey) {
+    return res.status(500).json({ error: 'Edamam API not configured' });
+  }
+
   try {
-    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const response = await fetch(
+      `https://api.edamam.com/api/nutrition-data?app_id=${appId}&app_key=${appKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingr: [text] })
+      }
+    );
     const data = await response.json();
-    if (data.status === 1) {
-      const p = data.product;
-      res.json({ name: p.product_name || p.generic_name || barcode, image: p.image_front_thumb_url || p.image_small_url || null });
-    } else {
-      res.json({ name: barcode, image: null });
-    }
+    res.json(data);
   } catch (err) {
-    res.json({ name: barcode, image: null });
+    console.error('Edamam error:', err);
+    res.status(500).json({ error: 'Nutrition analysis failed' });
+  }
+});
+
+// === PRICE COMPARISON (Open Food Facts Open Prices) ===
+app.get('/prices', checkAuth, async (req, res) => {
+  const { item } = req.query;
+  if (!item) return res.json({ prices: [] });
+
+  try {
+    const response = await fetch(
+      `https://prices.openfoodfacts.org/api/v1/prices?product_name=${encodeURIComponent(item)}`
+    );
+    const data = await response.json();
+    const prices = data.prices?.slice(0, 5).map(p => ({
+      store: p.location || 'Unknown',
+      price: p.price,
+      currency: p.currency || 'USD'
+    })) || [];
+    res.json({ prices });
+  } catch (err) {
+    res.json({ prices: [] });
   }
 });
 
 // === USER INFO ===
 app.get('/user-info', checkAuth, async (req, res) => {
-  const snap = await db.collection('users').doc(req.user.uid).get();
-  const data = snap.data();
-  res.json({ scans: data.scans || 0, isPro: !!data.isPro, familyCode: data.familyCode });
+  res.json({ isPro: false });
 });
 
-// === RECORD SCAN ===
-app.post('/record-scan', checkAuth, async (req, res) => {
-  const userRef = db.collection('users').doc(req.user.uid);
-  const snap = await userRef.get();
-  const data = snap.data() || {};
-  if (data.isPro) return res.json({ allowed: true });
-
-  const newCount = (data.scans || 0) + 1;
-  if (newCount > 10) return res.json({ allowed: false, message: 'Upgrade to Pro for unlimited scans' });
-
-  await userRef.set({ scans: newCount }, { merge: true });
-  res.json({ allowed: true });
-});
-
-// === EXPORT CSV ===
-app.get('/export-csv', checkAuth, async (req, res) => {
-  const snapshot = await db.collection('users').doc(req.user.uid).collection('items').get();
-  const items = snapshot.docs.map(d => ({ barcode: d.id, ...d.data() }));
-  const csv = [
-    ['Barcode', 'Name', 'Quantity', 'Expiration'],
-    ...items.map(i => [i.barcode, i.name || i.barcode, i.quantity, i.expiration || ''])
-  ].map(row => row.join(',')).join('\n');
-  res.set('Content-Type', 'text/csv');
-  res.set('Content-Disposition', 'attachment; filename="pantrypal-inventory.csv"');
-  res.send(csv);
-});
-
-// === FAMILY ROUTES ===
-app.post('/create-family', checkAuth, async (req, res) => {
-  const userId = req.user.uid;
-  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-  const batch = db.batch();
-  batch.update(db.collection('users').doc(userId), { familyCode: code, familyRole: 'owner' });
-  batch.set(db.collection('families').doc(code), { owner: userId, name: 'My Family', members: [userId] });
-  await batch.commit();
-  res.json({ code });
-});
-
-app.post('/join-family', checkAuth, async (req, res) => {
-  const { code } = req.body;
-  const userId = req.user.uid;
-  if (!code) {
-    await db.collection('users').doc(userId).update({ familyCode: FieldValue.delete(), familyRole: FieldValue.delete() });
-    return res.json({ success: true });
-  }
-  const familySnap = await db.collection('families').doc(code).get();
-  if (!familySnap.exists) return res.status(400).json({ error: 'Invalid code' });
-  const isPro = (await db.collection('users').doc(userId).get()).data().isPro;
-  const role = isPro ? 'editor' : 'viewer';
-  const batch = db.batch();
-  batch.update(db.collection('users').doc(userId), { familyCode: code, familyRole: role });
-  batch.update(familySnap.ref, { members: FieldValue.arrayUnion(userId) });
-  await batch.commit();
-  res.json({ role });
-});
-
-app.get('/shared', checkAuth, async (req, res) => {
-  const userSnap = await db.collection('users').doc(req.user.uid).get();
-  const { familyCode, familyRole } = userSnap.data() || {};
-  if (!familyCode) return res.json({ inventory: [], shopping: [], role: null });
-  const ownerId = (await db.collection('families').doc(familyCode).get()).data().owner;
-  const invSnap = await db.collection('users').doc(ownerId).collection('items').get();
-  const shopSnap = await db.collection('users').doc(ownerId).collection('shopping').get();
-  res.json({
-    inventory: invSnap.docs.map(d => ({ barcode: d.id, ...d.data() })),
-    shopping: shopSnap.docs.map(d => ({ barcode: d.id, ...d.data() })),
-    role: familyRole
-  });
-});
-
+// Serve index.html
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`PantryPal LIVE on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`PantryPal running on port ${PORT}`);
+  console.log(`Edamam: ${process.env.EDAMAM_APP_ID ? 'Configured' : 'MISSING'}`);
 });
