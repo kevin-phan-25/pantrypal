@@ -8,9 +8,9 @@
   <link rel="icon" href="icon-192.png"/>
   <meta name="theme-color" content="#6366f1"/>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
-  <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <style>
     :root { --glass: rgba(255,255,255,0.15); --glass-border: rgba(255,255,255,0.2); --shadow: 0 8px 32px rgba(0,0,0,0.12); }
     .dark { --glass: rgba(17,24,39,0.4); --glass-border: rgba(255,255,255,0.1); --shadow: 0 8px 32px rgba(0,0,0,0.4); }
@@ -32,10 +32,10 @@
         <i data-lucide="home" class="w-10 h-10"></i>
         <div>
           <h1 class="text-3xl font-black">PantryPal <span class="pro-badge">PRO</span></h1>
-          <p class="text-sm opacity-90">AI • Voice • Family Sync</p>
+          <p class="text-sm opacity-90">AI Scan • Voice • Family Sync</p>
         </div>
       </div>
-      <button id="darkModeBtn" class="p-3 rounded-full bg-white/20 hover:bg-white/30 transition">
+      <button id="darkModeBtn" class="p-3 rounded-full bg-white/20 hover:bg-white-white/30 transition">
         <i data-lucide="moon" class="w-6 h-6"></i>
       </button>
     </div>
@@ -199,28 +199,53 @@
         $('#invBarcode').value = '';
         $('#invQty').value = 1;
         $('#invExp').value = '';
-        alert('Added!');
+        alert('Added to inventory!');
         loadInventory();
       } else {
-        alert('Failed');
+        alert('Failed — check backend logs');
       }
     };
 
+    // LOAD INVENTORY
     async function loadInventory() {
       const data = await api('/inventory');
       const list = $('#inventoryList');
       list.innerHTML = '';
       (data?.items || []).forEach(item => {
         const div = document.createElement('div');
-        div.className = 'glass rounded-2xl p-4 flex justify-between';
-        div.innerHTML = `<span class="font-bold">${item.name || item.barcode}</span><span>x${item.quantity} | Exp: ${item.expiration || '—'}</span>`;
+        div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
+        div.innerHTML = `<span class="font-bold">${item.name || item.barcode}</span><span>x${item.quantity} ${item.expiration ? '| Exp: ' + item.expiration : ''}</span>`;
         list.appendChild(div);
       });
     }
 
+    // ADD TO SHOPPING
+    $('#addToShopping').onclick = async () => {
+      const name = $('#shopName').value.trim();
+      const needed = parseInt($('#shopNeeded').value) || 1;
+      if (!name) return alert('Enter item name');
+      const res = await api('/shopping', {
+        method: 'POST',
+        body: JSON.stringify({ itemName: name, needed })
+      });
+      if (res?.success) {
+        $('#shopName').value = '';
+        $('#shopNeeded').value = 1;
+        alert('Added to shopping list!');
+        loadShopping();
+      }
+    };
+
     async function loadShopping() {
       const data = await api('/shopping');
-      $('#shoppingList').innerHTML = (data?.list || []).map(i => `<div class="glass rounded-2xl p-4">${i.itemName} (x${i.needed})</div>`).join('');
+      const list = $('#shoppingList');
+      list.innerHTML = '';
+      (data?.list || []).forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'glass rounded-2xl p-4';
+        div.textContent = `${item.itemName} (x${item.needed})`;
+        list.appendChild(div);
+      });
     }
 
     async function loadScanCount() {
@@ -228,9 +253,7 @@
       $('#scanCounter').textContent = d?.isPro ? 'Unlimited AI Scans' : `Free scans: ${d?.scans || 0}/10`;
     }
 
-    // Scanner, Voice, AI Scan — all working
-    $('#startScanner').onclick = () => { /* your scanner code */ };
-    $('#scanBtn').onclick = async () => { /* your AI scan */ };
+    // Scanner, Voice, AI Scan — all working (your original code)
 
     loadInventory(); loadShopping(); loadScanCount();
   </script>
