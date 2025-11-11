@@ -18,7 +18,7 @@
         position: absolute;
         top: 50%; left: 50%;
         width: 80%; height: 60px;
-  border: 3px solid rgba(59,130,246,0.8);
+        border: 3px solid rgba(59,130,246,0.8);
         border-radius: 8px;
         transform: translate(-50%,-50%);
         box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
@@ -216,6 +216,35 @@
 
     <!-- App Logic -->
     <script>
+      // ———————— SMART BACKEND URL DETECTION ————————
+      const getApiBase = () => {
+        // 1. Check for Vite-style env var (if using build tools)
+        if (typeof import !== 'undefined' && import.meta?.env?.VITE_API_URL) {
+          return import.meta.env.VITE_API_URL;
+        }
+
+        // 2. Check for injected env var (Render Static Site)
+        if (window.__ENV__?.VITE_API_URL) {
+          return window.__ENV__.VITE_API_URL;
+        }
+
+        // 3. Auto-detect if on Render (swap base domain)
+        if (window.location.hostname.includes('onrender.com')) {
+          const hostname = window.location.hostname;
+          if (hostname.includes('pantrypal-zdi4')) {
+            return `https://${hostname}`;
+          } else {
+            return `https://${hostname.replace('pantrypal', 'pantrypal-zdi4')}`;
+          }
+        }
+
+        // 4. Local development
+        return 'http://localhost:3000';
+      };
+
+      const API_BASE = getApiBase();
+      console.log('API_BASE →', API_BASE); // Debug: Check in browser console
+
       const firebaseConfig = {
         apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
         authDomain: "pantrypal-6e410.firebaseapp.com",
@@ -234,9 +263,6 @@
 
       let currentUser = null, idToken = null;
       const $ = s => document.querySelector(s);
-
-      // BACKEND URL
-      const API_BASE = 'https://pantrypal.onrender.com';
 
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const mealPrepRecipes = [
@@ -407,6 +433,7 @@
         }
       });
 
+      // Auto-load meals on start
       loadMeals();
     </script>
   </body>
