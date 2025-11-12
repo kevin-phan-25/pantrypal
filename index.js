@@ -1,111 +1,122 @@
-// index.js — PantryPal Backend v1.0 (Full API)
 const express = require('express');
-const cors = require('cors');
-const app = express();
-const PORT = process.env.PORT || 3000;
+const admin = require('firebase-admin');
+const multer = require('multer');
+const vision = require('@google-cloud/vision');
+const client = new vision.ImageAnnotatorClient();
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+admin.initializeApp();
+const db = admin.firestore();
+const upload = multer();
 
-// In-memory storage (replace with MongoDB later)
-let inventory = [
-  { id: 1, name: 'Rice', quantity: 5, unit: 'kg', expDate: '2025-12-01' },
-  { id: 2, name: 'Pasta', quantity: 3, unit: 'packs', expDate: '2025-11-25' },
-  { id: 3, name: 'Tomato Sauce', quantity: 8, unit: 'cans', expDate: '2025-11-30' }
-];
+app.use(express.json());
 
-// ROOT: Health check + Welcome (Fixes "Cannot GET /")
-app.get('/', (req, res) => {
-  res.json({
-    message: 'PantryPal API v1.0 LIVE!',
-    status: 'ready',
-    endpoints: {
-      inventory: '/inventory (GET/POST)',
-      item: '/inventory/:id (PUT/DELETE)'
-    },
-    developer: '@Kevin_Phan25',
-    time: new Date().toISOString()
-  });
+// PRO CHECK + SCAN COUNTER
+app.get('/user-info', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const doc = await db.collection('users').doc(decoded.uid).get();
+    const data = doc.data() || { scans: 0, isPro: false };
+    res.json({ scans: data.scans || 0, isPro: data.isPro || false, familyCode: data.familyCode });
+  } catch { res.json({ scans: 0, isPro: false }); }
 });
 
-// GET /inventory — Fetch all items
-app.get('/inventory', (req, res) => {
+// RECORD SCAN (FREE LIMIT)
+app.post('/record-scan', async (req, res) => {
   try {
-    res.json({ success: true, data: inventory });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// POST /inventory — Add new item
-app.post('/inventory', (req, res) => {
-  try {
-    const { name, quantity, unit, expDate } = req.body;
-    if (!name || quantity == null) {
-      return res.status(400).json({ success: false, error: 'Name and quantity required' });
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const ref = db.collection('users').doc(decoded.uid);
+    const doc = await ref.get();
+    const data = doc.data() || { scans: 0 };
+    if (data.isPro || data.scans < 10) {
+      await ref.set({ scans: (data.scans || 0) + 1 }, { merge: true });
+      res.json({ allowed: true });
+    } else {
+      res.json({ allowed: false, message: "Upgrade to Pro for unlimited scans!" });
     }
-    const newItem = {
-      id: Date.now(),  // Simple ID gen
-      name,
-      quantity: parseInt(quantity),
-      unit: unit || 'units',
-      expDate: expDate || null
-    };
-    inventory.push(newItem);
-    res.status(201).json({ success: true, data: newItem });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  } catch { res.json({ allowed: false }); }
 });
 
-// PUT /inventory/:id — Update item
-app.put('/inventory/:id', (req, res) => {
+// AI SCAN
+app.post('/scan', upload.single('image'), async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const item = inventory.find(i => i.id === id);
-    if (!item) return res.status(404).json({ success: false, error: 'Item not found' });
-
-    const { name, quantity, unit, expDate } = req.body;
-    if (name !== undefined) item.name = name;
-    if (quantity !== undefined) item.quantity = parseInt(quantity);
-    if (unit !== undefined) item.unit = unit;
-    if (expDate !== undefined) item.expDate = expDate;
-
-    res.json({ success: true, data: item });
+    const [result] = await client.labelDetection(req.file.buffer);
+    const labels = result.labelAnnotations.map(l => l.description);
+    res.json({ success: true, record: { labels, barcode: "123456789" } }); // mock barcode
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.json({ error: err.message });
   }
 });
 
-// DELETE /inventory/:id — Remove item
-app.delete('/inventory/:id', (req, res) => {
+// GET INVENTORY
+app.get('/inventory', async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const index = inventory.findIndex(i => i.id === id);
-    if (index === -1) return res.status(404).json({ success: false, error: 'Item not found' });
-
-    inventory.splice(index, 1);
-    res.json({ success: true, message: 'Item deleted' });
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const doc = await db.collection('users').doc(decoded.uid).get();
+    const data = doc.data() || {};
+    res.json({ items: data.inventory || [] });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ items: [] });
   }
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', uptime: process.uptime(), timestamp: new Date().toISOString() });
+// ADD TO INVENTORY
+app.post('/inventory', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const { barcode, quantity, expiration } = req.body;
+    const userRef = db.collection('users').doc(decoded.uid);
+    await userRef.set({
+      inventory: admin.firestore.FieldValue.arrayUnion({
+        barcode,
+        name: barcode,
+        quantity,
+        expiration,
+        addedAt: new Date().toISOString()
+      })
+    }, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 404 Handler (Optional — Catches undefined routes)
-app.use((req, res) => {
-  res.status(404).json({ success: false, error: 'Endpoint not found' });
+// GET SHOPPING
+app.get('/shopping', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const doc = await db.collection('users').doc(decoded.uid).get();
+    const data = doc.data() || {};
+    res.json({ list: data.shopping || [] });
+  } catch (err) {
+    res.status(500).json({ list: [] });
+  }
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`PantryPal API v1.0 running on port ${PORT}`);
-  console.log(`Root: http://localhost:${PORT}/`);
-  console.log(`Health: http://localhost:${PORT}/health`);
-  console.log(`Inventory: http://localhost:${PORT}/inventory`);
+// ADD TO SHOPPING
+app.post('/shopping', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const { itemName, needed } = req.body;
+    const userRef = db.collection('users').doc(decoded.uid);
+    await userRef.set({
+      shopping: admin.firestore.FieldValue.arrayUnion({
+        itemName,
+        needed,
+        addedAt: new Date().toISOString()
+      })
+    }, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
+
+// All your existing routes: /inventory, /add, /remove, /shopping, /join-family, etc.
