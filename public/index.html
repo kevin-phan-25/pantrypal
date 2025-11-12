@@ -52,7 +52,7 @@
       <!-- TABS -->
       <div class="flex space-x-4 mb-8 overflow-x-auto">
         <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="inventory">Inventory</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="shopping">Shopping List</button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="shopping">Shopping List</  button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="scanner">Scanner</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="voice">Voice</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="ai">AI Scan (Pro)</button>
@@ -85,7 +85,7 @@
         </div>
       </section>
 
-      <!-- SCANNER, VOICE, AI SCAN -->
+      <!-- SCANNER -->
       <section id="scanner" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">Scan Barcode / QR</h2>
@@ -95,6 +95,7 @@
         </div>
       </section>
 
+      <!-- VOICE -->
       <section id="voice" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">Voice Add</h2>
@@ -104,6 +105,7 @@
         </div>
       </section>
 
+      <!-- AI SCAN -->
       <section id="ai" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">AI Photo Scan (Pro)</h2>
@@ -126,7 +128,7 @@
       storageBucket: "pantrypal-6e410.firebasestorage.app",
       messagingSenderId: "592127259891",
       appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
-68    };
+    };
 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -135,22 +137,7 @@
     let idToken = null;
     const $ = s => document.querySelector(s);
 
-    const uiConfig = {
-      signInFlow: 'popup',
-      signInOptions: [
-        firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-        firebase.auth.EmailAuthProvider.PROVIDER_ID
-      ],
-      callbacks: { signInSuccessWithAuthResult: () => false }
-    };
-
-    function showLogin() {
-      $('#auth-section').classList.remove('hidden');
-      $('#app').classList.add('hidden');
-      $('#firebaseui-auth-container').innerHTML = '';
-      ui.start('#firebaseui-auth-container', uiConfig);
-    }
-
+    // === AUTH STATE CHANGE (FIXED) ===
     auth.onAuthStateChanged(async (user) => {
       if (user) {
         idToken = await user.getIdToken();
@@ -159,16 +146,32 @@
         $('#app').classList.remove('hidden');
         await Promise.all([loadInventory(), loadShopping(), loadScanCount()]);
       } else {
+        // FULL SIGN OUT → SHOW LOGIN
         idToken = null;
-        showLogin();
+        $('#auth-section').classList.remove('hidden');
+        $('#app').classList.add('hidden');
+        ui.start('#firebaseui-auth-container', {
+          signInFlow: 'popup',
+          signInOptions: [
+            firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+            firebase.auth.EmailAuthProvider.PROVIDER_ID
+          ],
+          callbacks: { signInSuccessWithAuthResult: () => false }
+        });
       }
     });
 
+    // === SIGN OUT BUTTON (FIXED) ===
     $('#signOutBtn').onclick = async () => {
-      await auth.signOut();
-      alert('Signed out!');
+      try {
+        await auth.signOut();
+        alert('Signed out successfully!');
+      } catch (err) {
+        alert('Sign out failed');
+      }
     };
 
+    // === API HELPER ===
     async function api(path, opts = {}) {
       if (!idToken) return null;
       const res = await fetch(API_BASE + path, {
@@ -182,28 +185,22 @@
       return res.ok ? await res.json() : null;
     }
 
-    // === PRODUCT ICONS ===
-    const productIcons = {
-      'coke': 'https://img.icons8.com/fluency/48/coca-cola.png',
-      'cola': 'https://img.icons8.com/fluency/48/coca-cola.png',
-      'milk': 'https://img.icons8.com/fluency/48/milk-bottle.png',
-      'bread': 'https://img.icons8.com/fluency/48/bread.png',
-      'egg': 'https://img.icons8.com/fluency/48/egg.png',
-      'water': 'https://img.icons8.com/fluency/48/water.png',
-      'juice': 'https://img.icons8.com/fluency/48/orange-juice.png',
-      'apple': 'https://img.icons8.com/fluency/48/apple.png',
-      'banana': 'https://img.icons8.com/fluency/48/banana.png',
-      'chicken': 'https://img.icons8.com/fluency/48/chicken.png',
-      'rice': 'https://img.icons8.com/fluency/48/rice-bowl.png'
+    // === DARK MODE ===
+    $('#darkModeBtn').onclick = () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
     };
+    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-    function getProductIcon(name) {
-      const lower = name.toLowerCase();
-      for (const key in productIcons) {
-        if (lower.includes(key)) return productIcons[key];
-      }
-      return 'https://img.icons8.com/fluency/48/grocery-bag.png';
-    }
+    // === TABS ===
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        btn.classList.add('tab-active');
+        document.querySelectorAll('section[id]').forEach(s => s.classList.add('hidden'));
+        $(`#${btn.dataset.tab}`).classList.remove('hidden');
+      };
+    });
 
     // === INVENTORY ===
     $('#addToInventory').onclick = async () => {
@@ -224,14 +221,11 @@
       const list = $('#inventoryList');
       list.innerHTML = '';
       (data?.items || []).forEach((item, i) => {
-        const name = item.name || item.barcode;
-        const icon = getProductIcon(name);
         const div = document.createElement('div');
-        div.className = 'glass rounded-2xl p-4 flex items-center space-x-4';
+        div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
         div.innerHTML = `
-          <img src="${icon}" alt="${name}" class="w-12 h-12 rounded-lg object-cover">
-          <div class="flex-1">
-            <span class="font-bold">${name}</span>
+          <div>
+            <span class="font-bold">${item.name || item.barcode}</span>
             <span class="text-sm opacity-80">x${item.quantity}</span>
             ${item.expiration ? `<span class="text-xs opacity-70">| Exp: ${item.expiration}</span>` : ''}
           </div>
@@ -259,40 +253,32 @@
       const list = $('#shoppingList');
       list.innerHTML = '';
       (data?.list || []).forEach((item, i) => {
-        const icon = getProductIcon(item.itemName);
         const div = document.createElement('div');
-        div.className = 'glass rounded-2xl p-4 flex items-center space-x-4';
+        div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
         div.innerHTML = `
-          <img src="${icon}" alt="${item.itemName}" class="w-12 h-12 rounded-lg object-cover">
-          <div class="flex-1">
-            <span>${item.itemName}</span>
-            <span class="text-sm opacity-80">(x${item.needed})</span>
-          </div>
+          <span>${item.itemName} <span class="text-sm opacity-80">(x${item.needed})</span></span>
           <button class="delete-btn" data-type="shopping" data-index="${i}">Delete</button>
         `;
         list.appendChild(div);
       });
     }
 
-    // === DELETE — FIXED (THIS IS THE ONLY CHANGE) ===
+    // === DELETE ===
     document.addEventListener('click', async (e) => {
       if (!e.target.classList.contains('delete-btn')) return;
       const type = e.target.dataset.type;
       const index = parseInt(e.target.dataset.index);
       if (!confirm('Delete this item?')) return;
 
-      const freshData = type === 'inventory' ? await api('/api/inventory') : await api('/api/shopping');
-      const array = type === 'inventory' ? freshData?.items : freshData?.list;
+      const data = type === 'inventory' ? (await api('/api/inventory')) : (await api('/api/shopping'));
+      const array = type === 'inventory' ? data?.items : data?.list;
       if (!array || index >= array.length) return;
 
       array.splice(index, 1);
 
-      // THIS LINE WAS WRONG BEFORE → NOW FIXED
-      const payload = type === 'inventory' ? { inventory: array } : { shopping: array };
-
       const res = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(type === 'inventory' ? { inventory: array } : { shopping: array })
       });
 
       if (res?.success) {
@@ -349,7 +335,12 @@
         : '<p class="text-red-400">Nothing detected. Try again!</p>';
     };
 
-    showLogin();
+    // Start Firebase UI on load
+    ui.start('#firebaseui-auth-container', {
+      signInFlow: 'popup',
+      signInOptions: [firebase.auth.GoogleAuthProvider.PROVIDER_ID, firebase.auth.EmailAuthProvider.PROVIDER_ID],
+      callbacks: { signInSuccessWithAuthResult: () => false }
+    });
   </script>
 </body>
 </html>
