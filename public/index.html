@@ -23,7 +23,7 @@
 </head>
 <body class="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 text-gray-900 dark:text-white transition-colors">
 
-  <!-- AUTH SECTION -->
+  <!-- AUTH -->
   <div id="auth-section" class="flex items-center justify-center min-h-screen">
     <div class="glass p-10 rounded-3xl shadow-2xl max-w-md w-full">
       <h1 class="text-4xl font-bold text-center mb-8">PantryPal Pro</h1>
@@ -49,12 +49,12 @@
 
     <main class="max-w-6xl mx-auto px-6 py-10">
       <!-- TABS -->
-      <div class="flex space-x-4 mb-8">
-        <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold" data-tab="inventory">Inventory</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="shopping">Shopping List</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="scanner">Scanner</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="voice">Voice</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="ai">AI Scan (Pro)</button>
+      <div class="flex space-x-4 mb-8 overflow-x-auto">
+        <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="inventory">Inventory</button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="shopping">Shopping List</button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="scanner">Scanner</button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="voice">Voice</button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="ai">AI Scan (Pro)</button>
       </div>
 
       <!-- INVENTORY -->
@@ -71,7 +71,7 @@
         </div>
       </section>
 
-      <!-- SHOPPING LIST -->
+      <!-- SHOPPING -->
       <section id="shopping" class="hidden">
         <div class="glass p-8 rounded-3xl">
           <h2 class="text-2xl font-bold mb-6">Shopping List</h2>
@@ -118,6 +118,7 @@
 
   <script>
     lucide.createIcons();
+    const API_BASE = window.location.origin;
     const firebaseConfig = {
       apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
       authDomain: "pantrypal-6e410.firebaseapp.com",
@@ -130,17 +131,18 @@
     const ui = new firebaseui.auth.AuthUI(firebase.auth());
     ui.start('#firebaseui-auth-container', {
       signInFlow: 'popup',
-      signInOptions: [firebase.auth.GoogleAuthProvider.PROVIDER_ID, firebase.auth.EmailAuthProvider.PROVIDER_ID],
+      signInOptions: [
+        firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+        firebase.auth.EmailAuthProvider.PROVIDER_ID
+      ],
       callbacks: { signInSuccessWithAuthResult: () => false }
     });
 
     let idToken = null;
     const $ = s => document.querySelector(s);
-    const API_BASE = window.location.origin;
 
-    // FIXED API FUNCTION
     async function api(path, opts = {}) {
-      if (!idToken) { alert("Not signed in"); return null; }
+      if (!idToken) return null;
       const res = await fetch(API_BASE + path, {
         ...opts,
         headers: {
@@ -155,7 +157,7 @@
     firebase.auth().onAuthStateChanged(async user => {
       if (user) {
         idToken = await user.getIdToken();
-        $('#userEmail').textContent = user.email || user.phoneNumber || user.displayName;
+        $('#userEmail').textContent = user.email || user.displayName;
         $('#auth-section').classList.add('hidden');
         $('#app').classList.remove('hidden');
         await Promise.all([loadInventory(), loadShopping(), loadScanCount()]);
@@ -194,7 +196,7 @@
         $('#invBarcode').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
         alert('Added!');
         loadInventory();
-      } else alert('Failed — check backend logs');
+      } else alert('Failed');
     };
 
     async function loadInventory() {
@@ -248,8 +250,11 @@
           $('#scanResult').textContent = 'Found: ' + result.getText();
           $('#invBarcode').value = result.getText();
           codeReader.reset();
+          $('#startScanner').textContent = 'Start Scanner';
         }
+        if (err && !(err instanceof ZXing.NotFoundException)) console.error(err);
       });
+      $('#startScanner').textContent = 'Scanning...';
     };
 
     // VOICE
@@ -262,9 +267,9 @@
         }
       };
       annyang.addCommands(commands);
-      $('#voiceBtn').onmousedown = () => annyang.start();
+      $('#voiceBtn').onmousedown = () => annyang.start({ autoRestart: false });
       $('#voiceBtn').onmouseup = () => annyang.abort();
-      $('#voiceBtn').ontouchstart = () => annyang.start();
+      $('#voiceBtn').ontouchstart = () => annyang.start({ autoRestart: false });
       $('#voiceBtn').ontouchend = () => annyang.abort();
     }
 
@@ -280,12 +285,12 @@
         body: form
       });
       const data = await res.json();
-      $('#aiResult').innerHTML = data.labels ? data.labels.map(l => `<div class="p-2">${l}</div>`).join('') : 'Error';
+      $('#aiResult').innerHTML = data.labels ? data.labels.map(l => `<div class="p-2 glass rounded-lg">${l}</div>`).join('') : 'No items found';
     };
 
     $('#signOutBtn').onclick = () => firebase.auth().signOut();
 
-    // Load initial data
+    // Initial load
     loadInventory(); loadShopping(); loadScanCount();
   </script>
 </body>
