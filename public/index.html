@@ -2,222 +2,119 @@
 <html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PantryPal Pro</title>
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#7c3aed">
-  
-  <!-- Icons & Fonts -->
   <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet"/>
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/ui/6.0.1/firebase-ui-auth.js"></script>
   <link rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.1/firebase-ui-auth.css"/>
-  
-  <!-- Scanner & Voice -->
   <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/annyang@2.6.1/annyang.min.js"></script>
-
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
   <style>
-    :root {
-      --primary: #7c3aed;
-      --primary-light: #a78bfa;
-      --success: #10b981;
-      --danger: #ef4444;
-      --gray-100: #f3f4f6;
-      --gray-800: #1f2937;
-    }
-    .dark {
-      --primary: #a78bfa;
-      --primary-light: #c4b5fd;
-    }
     body { font-family: 'Inter', sans-serif; }
-    .glass { background: rgba(255,255,255,0.9); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.3); }
-    .dark .glass { background: rgba(31,41,55,0.9); border-color: rgba(255,255,255,0.1); }
-    .btn { @apply w-full py-4 rounded-2xl font-bold text-lg transition-all active:scale-95; }
-    .input { @apply w-full px-5 py-4 rounded-2xl glass text-lg; }
-    .tab-active { @apply text-white bg-gradient-to-r from-purple-600 to-pink-600; }
-    .delete-btn { @apply text-red-500 font-bold text-sm px-3 py-1 rounded-full bg-red-100 dark:bg-red-900; }
-    .scan-glow { box-shadow: 0 0 20px rgba(124,58,237,0.5); }
+    .glass { background: rgba(255,255,255,0.15); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.2); }
+    .dark .glass { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); }
+    .tab-active { @apply bg-white text-purple-600 dark:bg-gray-800 dark:text-purple-400; }
+    .delete-btn { @apply text-red-500 hover:text-red-700 font-bold text-sm; }
   </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 text-gray-900 dark:text-white">
-
+<body class="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 text-gray-900 dark:text-white transition-colors">
   <!-- AUTH -->
-  <div id="auth-section" class="flex items-center justify-center min-h-screen p-6">
-    <div class="glass p-8 rounded-3xl shadow-2xl w-full max-w-sm">
-      <div class="text-center mb-8">
-        <div class="w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mx-auto mb-4 flex items-center justify-center">
-          <i data-lucide="package" class="w-10 h-10 text-white"></i>
-        </div>
-        <h1 class="text-3xl font-bold">PantryPal Pro</h1>
-        <p class="text-sm opacity-70 mt-2">Smart pantry, zero waste</p>
-      </div>
+  <div id="auth-section" class="flex items-center justify-center min-h-screen">
+    <div class="glass p-10 rounded-3xl shadow-2xl max-w-md w-full">
+      <h1 class="text-4xl font-bold text-center mb-8">PantryPal Pro</h1>
       <div id="firebaseui-auth-container"></div>
+      <p class="text-center mt-4 text-sm opacity-70">Sign in to unlock Pro features</p>
     </div>
   </div>
 
   <!-- MAIN APP -->
-  <div id="app" class="hidden pb-24">
-    <!-- Header -->
-    <header class="glass sticky top-0 z-50 shadow-lg backdrop-blur-xl">
-      <div class="px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-            <i data-lucide="package" class="w-6 h-6 text-white"></i>
-          </div>
-          <div>
-            <h1 class="text-xl font-bold">PantryPal</h1>
-            <p id="userEmail" class="text-xs opacity-70"></p>
-          </div>
+  <div id="app" class="hidden min-h-screen">
+    <header class="glass sticky top-0 z-50 shadow-lg">
+      <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+          <h1 class="text-3xl font-bold">PantryPal Pro</h1>
+          <span id="userEmail" class="text-sm opacity-80"></span>
         </div>
-        <button id="signOutBtn" class="p-2 rounded-full bg-red-500 text-white">
-          <i data-lucide="log-out" class="w-5 h-5"></i>
-        </button>
+        <div class="flex items-center space-x-4">
+          <span id="scanCounter" class="text-sm font-medium bg-yellow-400 text-black px-3 py-1 rounded-full"></span>
+          <button id="darkModeBtn" class="p-2 rounded-lg glass">Dark Mode</button>
+          <button id="signOutBtn" class="px-6 py-2 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600">Sign Out</button>
+        </div>
       </div>
     </header>
 
-    <!-- Content -->
-    <main class="px-6 py-6 space-y-6">
-
-      <!-- Quick Stats -->
-      <div class="glass p-5 rounded-3xl flex justify-between items-center">
-        <div>
-          <p class="text-sm opacity-70">AI Scans</p>
-          <p id="scanCounter" class="text-2xl font-bold">Loading...</p>
-        </div>
-        <div class="w-16 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-          <i data-lucide="zap" class="w-8 h-8 text-white"></i>
-        </div>
+    <main class="max-w-6xl mx-auto px-6 py-10">
+      <!-- TABS -->
+      <div class="flex space-x-4 mb-8 overflow-x-auto">
+        <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="inventory">Inventory</button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="shopping">Shopping List</  button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="scanner">Scanner</button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="voice">Voice</button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="ai">AI Scan (Pro)</button>
       </div>
 
       <!-- INVENTORY -->
       <section id="inventory">
-        <div class="glass p-6 rounded-3xl space-y-5">
-          <h2 class="text-xl font-bold flex items-center">
-            <i data-lucide="archive" class="w-6 h-6 mr-2"></i> Add to Pantry
-          </h2>
-          
-          <input id="invBarcode" type="text" placeholder="Scan or type barcode" class="input" autofocus/>
-          
-          <div class="grid grid-cols-2 gap-3">
-            <input id="invQty" type="number" value="1" min="1" class="input text-center"/>
-            <input id="invExp" type="date" class="input"/>
+        <div class="glass p-8 rounded-3xl">
+          <h2 class="text-2xl font-bold mb-6">Add to Inventory</h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <input id="invBarcode" type="text" placeholder="Barcode" class="px-4 py-3 rounded-xl glass"/>
+            <input id="invQty" type="number" value="1" min="1" class="px-4 py-3 rounded-xl glass"/>
+            <input id="invExp" type="date" class="px-4 py-3 rounded-xl glass"/>
           </div>
-
-          <button id="addToInventory" class="btn bg-gradient-to-r from-green-500 to-emerald-600 text-white">
-            <i data-lucide="plus" class="w-5 h-5 mr-2"></i> Add Item
-          </button>
-
-          <div id="inventoryList" class="space-y-3 max-h-96 overflow-y-auto"></div>
+          <button id="addToInventory" class="px-8 py-4 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600">Add Item</button>
+          <div id="inventoryList" class="mt-8 space-y-4"></div>
         </div>
       </section>
 
-      <!-- SHOPPING LIST -->
+      <!-- SHOPPING -->
       <section id="shopping" class="hidden">
-        <div class="glass p-6 rounded-3xl space-y-5">
-          <h2 class="text-xl font-bold flex items-center">
-            <i data-lucide="shopping-cart" class="w-6 h-6 mr-2"></i> Shopping List
-          </h2>
-
-          <input id="shopName" type="text" placeholder="What do you need?" class="input"/>
-          
-          <div class="flex gap-3">
-            <input id="shopNeeded" type="number" value="1" min="1" class="input flex-1 text-center"/>
-            <button id="addToShopping" class="btn bg-gradient-to-r from-blue-500 to-cyan-600 text-white flex-1">
-              <i data-lucide="plus" class="w-5 h-5"></i>
-            </button>
+        <div class="glass p-8 rounded-3xl">
+          <h2 class="text-2xl font-bold mb-6">Shopping List</h2>
+          <div class="flex space-x-4 mb-6">
+            <input id="shopName" type="text" placeholder="Item name" class="flex-1 px-4 py-3 rounded-xl glass"/>
+            <input id="shopNeeded" type="number" value="1" min="1" class="w-24 px-4 py-3 rounded-xl glass"/>
           </div>
-
-          <div id="shoppingList" class="space-y-3 max-h-96 overflow-y-auto"></div>
+          <button id="addToShopping" class="px-8 py-4 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600">Add to List</button>
+          <div id="shoppingList" class="mt-8 space-y-4"></div>
         </div>
       </section>
 
       <!-- SCANNER -->
       <section id="scanner" class="hidden">
-        <div class="glass p-6 rounded-3xl space-y-5 text-center">
-          <h2 class="text-xl font-bold flex items-center justify-center">
-            <i data-lucide="camera" class="w-6 h-6 mr-2"></i> Scan Barcode
-          </h2>
-
-          <div class="relative">
-            <video id="video" class="w-full rounded-2xl scan-glow" playsinline></video>
-            <div class="absolute inset-0 border-4 border-purple-500 border-dashed rounded-2xl pointer-events-none"></div>
-          </div>
-
-          <button id="startScanner" class="btn bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-            <i data-lucide="scan" class="w-5 h-5 mr-2"></i> Start Scanner
-          </button>
-
-          <p id="scanResult" class="text-lg font-mono break-all"></p>
+        <div class="glass p-8 rounded-3xl text-center">
+          <h2 class="text-2xl font-bold mb-6">Scan Barcode / QR</h2>
+          <video id="video" width="100%" class="rounded-xl mb-6" autoplay playsinline></video>
+          <button id="startScanner" class="px-8 py-4 bg-purple-500 text-white rounded-xl font-bold hover:bg-purple-600">Start Scanner</button>
+          <p id="scanResult" class="mt-6 text-xl"></p>
         </div>
       </section>
 
       <!-- VOICE -->
       <section id="voice" class="hidden">
-        <div class="glass p-6 rounded-3xl space-y-6 text-center">
-          <h2 class="text-xl font-bold flex items-center justify-center">
-            <i data-lucide="mic" class="w-6 h-6 mr-2"></i> Voice Add
-          </h2>
-
-          <button id="voiceBtn" class="w-32 h-32 mx-auto bg-gradient-to-r from-red-500 to-pink-600 rounded-full flex items-center justify-center text-white text-5xl shadow-2xl active:scale-95 transition-all">
-            Microphone
-          </button>
-
-          <p class="text-sm opacity-70">Hold & say: <br><strong>"Add milk quantity 2"</strong></p>
-          <p id="voiceResult" class="text-lg font-bold text-green-500"></p>
+        <div class="glass p-8 rounded-3xl text-center">
+          <h2 class="text-2xl font-bold mb-6">Voice Add</h2>
+          <button id="voiceBtn" class="w-24 h-24 bg-red-500 rounded-full text-white text-4xl hover:bg-red-600">Microphone</button>
+          <p class="mt-6">Hold to speak: "Add milk quantity 2"</p>
+          <p id="voiceResult" class="mt-6 text-xl"></p>
         </div>
       </section>
 
       <!-- AI SCAN -->
       <section id="ai" class="hidden">
-        <div class="glass p-6 rounded-3xl space-y-5 text-center">
-          <h2 class="text-xl font-bold flex items-center justify-center">
-            <i data-lucide="sparkles" class="w-6 h-6 mr-2"></i> AI Photo Scan (Pro)
-          </h2>
-
-          <label class="block">
-            <input type="file" id="aiImage" accept="image/*" capture="environment" class="hidden"/>
-            <div class="btn bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer">
-              <i data-lucide="camera" class="w-5 h-5 mr-2"></i> Take Photo
-            </div>
-          </label>
-
-          <button id="aiScanBtn" class="btn bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-            <i data-lucide="wand-2" class="w-5 h-5 mr-2"></i> Scan with AI
-          </button>
-
-          <div id="aiResult" class="space-y-2"></div>
+        <div class="glass p-8 rounded-3xl text-center">
+          <h2 class="text-2xl font-bold mb-6">AI Photo Scan (Pro)</h2>
+          <input type="file" id="aiImage" accept="image/*" capture="camera" class="mb-6"/>
+          <button id="aiScanBtn" class="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-bold">Scan Photo</button>
+          <div id="aiResult" class="mt-8 text-left"></div>
         </div>
       </section>
     </main>
-
-    <!-- BOTTOM NAV -->
-    <nav class="fixed bottom-0 left-0 right-0 glass border-t border-white/20 backdrop-blur-xl">
-      <div class="flex justify-around py-3">
-        <button class="tab-btn tab-active p-3 rounded-2xl" data-tab="inventory">
-          <i data-lucide="home" class="w-6 h-6"></i>
-        </button>
-        <button class="tab-btn p-3 rounded-2xl" data-tab="shopping">
-          <i data-lucide="shopping-cart" class="w-6 h-6"></i>
-        </button>
-        <button class="tab-btn p-3 rounded-2xl" data-tab="scanner">
-          <i data-lucide="scan" class="w-6 h-6"></i>
-        </button>
-        <button class="tab-btn p-3 rounded-2xl" data-tab="voice">
-          <i data-lucide="mic" class="w-6 h-6"></i>
-        </button>
-        <button class="tab-btn p-3 rounded-2xl" data-tab="ai">
-          <i data-lucide="sparkles" class="w-6 h-6"></i>
-        </button>
-      </div>
-    </nav>
   </div>
 
   <script>
@@ -236,18 +133,20 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const ui = new firebaseui.auth.AuthUI(auth);
+
     let idToken = null;
     const $ = s => document.querySelector(s);
 
-    // === AUTH ===
+    // === AUTH STATE CHANGE (FIXED) ===
     auth.onAuthStateChanged(async (user) => {
       if (user) {
         idToken = await user.getIdToken();
-        $('#userEmail').textContent = user.email.split('@')[0];
+        $('#userEmail').textContent = user.email || user.displayName || 'User';
         $('#auth-section').classList.add('hidden');
         $('#app').classList.remove('hidden');
         await Promise.all([loadInventory(), loadShopping(), loadScanCount()]);
       } else {
+        // FULL SIGN OUT → SHOW LOGIN
         idToken = null;
         $('#auth-section').classList.remove('hidden');
         $('#app').classList.add('hidden');
@@ -262,9 +161,17 @@
       }
     });
 
-    $('#signOutBtn').onclick = () => auth.signOut();
+    // === SIGN OUT BUTTON (FIXED) ===
+    $('#signOutBtn').onclick = async () => {
+      try {
+        await auth.signOut();
+        alert('Signed out successfully!');
+      } catch (err) {
+        alert('Sign out failed');
+      }
+    };
 
-    // === API ===
+    // === API HELPER ===
     async function api(path, opts = {}) {
       if (!idToken) return null;
       const res = await fetch(API_BASE + path, {
@@ -277,6 +184,13 @@
       });
       return res.ok ? await res.json() : null;
     }
+
+    // === DARK MODE ===
+    $('#darkModeBtn').onclick = () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+    };
+    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
     // === TABS ===
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -293,10 +207,11 @@
       const barcode = $('#invBarcode').value.trim();
       const qty = parseInt($('#invQty').value) || 1;
       const exp = $('#invExp').value;
-      if (!barcode) return alert('Scan or enter barcode');
+      if (!barcode) return alert('Enter barcode');
       const res = await api('/api/inventory', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
       if (res?.success) {
         $('#invBarcode').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
+        alert('Added!');
         loadInventory();
       }
     };
@@ -310,8 +225,9 @@
         div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
         div.innerHTML = `
           <div>
-            <div class="font-bold text-lg">${item.name || item.barcode}</div>
-            <div class="text-sm opacity-70">x${item.quantity} ${item.expiration ? `• Exp: ${item.expiration}` : ''}</div>
+            <span class="font-bold">${item.name || item.barcode}</span>
+            <span class="text-sm opacity-80">x${item.quantity}</span>
+            ${item.expiration ? `<span class="text-xs opacity-70">| Exp: ${item.expiration}</span>` : ''}
           </div>
           <button class="delete-btn" data-type="inventory" data-index="${i}">Delete</button>
         `;
@@ -323,10 +239,11 @@
     $('#addToShopping').onclick = async () => {
       const name = $('#shopName').value.trim();
       const needed = parseInt($('#shopNeeded').value) || 1;
-      if (!name) return;
+      if (!name) return alert('Enter item name');
       const res = await api('/api/shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed }) });
       if (res?.success) {
         $('#shopName').value = ''; $('#shopNeeded').value = 1;
+        alert('Added!');
         loadShopping();
       }
     };
@@ -339,9 +256,8 @@
         const div = document.createElement('div');
         div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
         div.innerHTML = `
-          <div class="font-bold text-lg">${item.itemName}</div>
-          <div class="text-sm opacity-70">x${item.needed}</div>
-          <button class="delete-btn ml-3" data-type="shopping" data-index="${i}">Delete</button>
+          <span>${item.itemName} <span class="text-sm opacity-80">(x${item.needed})</span></span>
+          <button class="delete-btn" data-type="shopping" data-index="${i}">Delete</button>
         `;
         list.appendChild(div);
       });
@@ -352,52 +268,48 @@
       if (!e.target.classList.contains('delete-btn')) return;
       const type = e.target.dataset.type;
       const index = parseInt(e.target.dataset.index);
-      if (!confirm('Delete?')) return;
+      if (!confirm('Delete this item?')) return;
 
       const data = type === 'inventory' ? (await api('/api/inventory')) : (await api('/api/shopping'));
       const array = type === 'inventory' ? data?.items : data?.list;
+      if (!array || index >= array.length) return;
+
       array.splice(index, 1);
 
-      await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
+      const res = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
         method: 'POST',
         body: JSON.stringify(type === 'inventory' ? { inventory: array } : { shopping: array })
       });
 
-      type === 'inventory' ? loadInventory() : loadShopping();
+      if (res?.success) {
+        alert('Deleted!');
+        type === 'inventory' ? loadInventory() : loadShopping();
+      }
     });
 
     async function loadScanCount() {
       const d = await api('/api/user-info');
-      $('#scanCounter').textContent = d?.isPro ? 'Unlimited AI' : `${d?.scans || 0}/10 Scans`;
+      $('#scanCounter').textContent = d?.isPro ? 'Unlimited AI Scans (Pro)' : `Free scans: ${d?.scans || 0}/10`;
     }
 
-    // === SCANNER ===
+    // === SCANNER, VOICE, AI SCAN (unchanged) ===
     let codeReader;
     $('#startScanner').onclick = () => {
-      if (codeReader) {
-        codeReader.reset(); codeReader = null;
-        $('#startScanner').innerHTML = '<i data-lucide="scan" class="w-5 h-5 mr-2"></i> Start Scanner';
-        $('#video').srcObject = null;
-        lucide.createIcons();
-        return;
-      }
+      if (codeReader) { codeReader.reset(); codeReader = null; $('#startScanner').textContent = 'Start Scanner'; $('#video').srcObject = null; return; }
       codeReader = new ZXing.BrowserMultiFormatReader();
       codeReader.decodeFromVideoDevice(null, 'video', (result) => {
         if (result) {
-          $('#scanResult').textContent = result.getText();
+          $('#scanResult').textContent = 'Found: ' + result.getText();
           $('#invBarcode').value = result.getText();
           alert('Scanned: ' + result.getText());
           codeReader.reset(); codeReader = null;
-          $('#startScanner').innerHTML = '<i data-lucide="scan" class="w-5 h-5 mr-2"></i> Start Scanner';
+          $('#startScanner').textContent = 'Start Scanner';
           $('#video').srcObject = null;
-          lucide.createIcons();
         }
       });
-      $('#startScanner').innerHTML = '<i data-lucide="square" class="w-5 h-5 mr-2"></i> Stop';
-      lucide.createIcons();
+      $('#startScanner').textContent = 'Stop Scanner';
     };
 
-    // === VOICE ===
     if (annyang) {
       annyang.addCommands({
         'add *item quantity *qty': (item, qty) => {
@@ -406,36 +318,24 @@
           $('#voiceResult').textContent = `Added: ${item} x${qty || 1}`;
         }
       });
-      let holdTimer;
-      $('#voiceBtn').ontouchstart = $('#voiceBtn').onmousedown = (e) => {
-        e.preventDefault();
-        holdTimer = setTimeout(() => annyang.start({ autoRestart: false }), 300);
-      };
-      $('#voiceBtn').ontouchend = $('#voiceBtn').onmouseup = () => {
-        clearTimeout(holdTimer);
-        annyang.abort();
-      };
+      $('#voiceBtn').onmousedown = $('#voiceBtn').ontouchstart = () => annyang.start({ autoRestart: false });
+      $('#voiceBtn').onmouseup = $('#voiceBtn').ontouchend = () => annyang.abort();
     }
-
-    // === AI SCAN ===
-    $('#aiImage').onchange = () => {
-      if ($('#aiImage').files[0]) $('#aiScanBtn'.click();
-    };
 
     $('#aiScanBtn').onclick = async () => {
       const file = $('#aiImage').files[0];
-      if (!file) return;
+      if (!file) return alert('Take a photo first');
       const form = new FormData();
       form.append('image', file);
-      $('#aiResult').innerHTML = '<p class="text-yellow-400">AI thinking...</p>';
+      $('#aiResult').innerHTML = '<p class="text-yellow-300">Scanning...</p>';
       const res = await fetch(API_BASE + '/api/scan', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` }, body: form });
       const data = await res.json();
       $('#aiResult').innerHTML = data.labels?.length
-        ? data.labels.map(l => `<div class="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full m-1 font-bold">${l}</div>`).join('')
-        : '<p class="text-red-400">Nothing found. Try a clearer photo!</p>';
+        ? `<p class="text-green-400 font-bold mb-4">Found:</p>${data.labels.map(l => `<div class="p-3 glass rounded-lg inline-block mr-2 mb-2">${l}</div>`).join('')}`
+        : '<p class="text-red-400">Nothing detected. Try again!</p>';
     };
 
-    // Init
+    // Start Firebase UI on load
     ui.start('#firebaseui-auth-container', {
       signInFlow: 'popup',
       signInOptions: [firebase.auth.GoogleAuthProvider.PROVIDER_ID, firebase.auth.EmailAuthProvider.PROVIDER_ID],
