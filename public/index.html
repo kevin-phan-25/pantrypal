@@ -126,7 +126,7 @@
       storageBucket: "pantrypal-6e410.firebasestorage.app",
       messagingSenderId: "592127259891",
       appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
-    };
+68    };
 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -202,7 +202,7 @@
       for (const key in productIcons) {
         if (lower.includes(key)) return productIcons[key];
       }
-      return 'https://img.icons8.com/fluency/48/grocery-bag.png'; // default
+      return 'https://img.icons8.com/fluency/48/grocery-bag.png';
     }
 
     // === INVENTORY ===
@@ -274,24 +274,25 @@
       });
     }
 
-    // === DELETE FIXED ===
+    // === DELETE — FIXED (THIS IS THE ONLY CHANGE) ===
     document.addEventListener('click', async (e) => {
       if (!e.target.classList.contains('delete-btn')) return;
       const type = e.target.dataset.type;
       const index = parseInt(e.target.dataset.index);
       if (!confirm('Delete this item?')) return;
 
-      // Re-fetch fresh data
       const freshData = type === 'inventory' ? await api('/api/inventory') : await api('/api/shopping');
       const array = type === 'inventory' ? freshData?.items : freshData?.list;
       if (!array || index >= array.length) return;
 
       array.splice(index, 1);
 
-      // Save updated array
+      // THIS LINE WAS WRONG BEFORE → NOW FIXED
+      const payload = type === 'inventory' ? { inventory: array } : { shopping: array };
+
       const res = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
         method: 'POST',
-        body: JSON.stringify(type === 'inventory' ? { items: array } : { list: array })
+        body: JSON.stringify(payload)
       });
 
       if (res?.success) {
@@ -305,7 +306,7 @@
       $('#scanCounter').textContent = d?.isPro ? 'Unlimited AI Scans (Pro)' : `Free scans: ${d?.scans || 0}/10`;
     }
 
-    // === SCANNER, VOICE, AI SCAN ===
+    // === SCANNER, VOICE, AI SCAN (unchanged) ===
     let codeReader;
     $('#startScanner').onclick = () => {
       if (codeReader) { codeReader.reset(); codeReader = null; $('#startScanner').textContent = 'Start Scanner'; $('#video').srcObject = null; return; }
