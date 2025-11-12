@@ -34,3 +34,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// YOUR ROUTES HERE (inventory, shopping, etc.)
+
+// FINAL LINE — THIS KEEPS SERVER ALIVE
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`PantryPal LIVE at https://pantrypal-zdi4.onrender.com on port ${PORT}`);
+});
