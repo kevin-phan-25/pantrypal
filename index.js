@@ -10,21 +10,25 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ---------- FIREBASE ADMIN (from GCLOUD_KEY_JSON) ----------
 let serviceAccount;
 try {
-  if (!process.env.GCLOUD_KEY_JSON) {
-    throw new Error("GCLOUD_KEY_JSON environment variable is missing");
+  const rawKey = process.env.GCLOUD_KEY_JSON;
+  if (!rawKey) {
+    throw new Error('GCLOUD_KEY_JSON is missing!');
   }
-  serviceAccount = JSON.parse(process.env.GCLOUD_KEY_JSON);
-  console.log("Firebase: Loaded project_id =", serviceAccount.project_id);
+  serviceAccount = JSON.parse(rawKey);
+  if (!serviceAccount.project_id) {
+    throw new Error('GCLOUD_KEY_JSON is missing "project_id" — check Render env var');
+  }
+  console.log('SUCCESS: Loaded service account for project:', serviceAccount.project_id);
 } catch (err) {
-  console.error("Failed to parse GCLOUD_KEY_JSON:", err.message);
+  console.error('FATAL: Invalid GCLOUD_KEY_JSON');
+  console.error(err.message);
   process.exit(1);
 }
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert(serviceAccount)
 });
 
 // ---------- GOOGLE VISION ----------
