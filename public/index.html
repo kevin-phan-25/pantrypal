@@ -52,7 +52,7 @@
       <!-- TABS -->
       <div class="flex space-x-4 mb-8 overflow-x-auto">
         <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="inventory">Inventory</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="shopping">Shopping List</  button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="shopping">Shopping List</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="scanner">Scanner</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="voice">Voice</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="ai">AI Scan (Pro)</button>
@@ -91,17 +91,17 @@
           <h2 class="text-2xl font-bold mb-6">Scan Barcode / QR</h2>
           <video id="video" width="100%" class="rounded-xl mb-6" autoplay playsinline></video>
           <button id="startScanner" class="px-8 py-4 bg-purple-500 text-white rounded-xl font-bold hover:bg-purple-600">Start Scanner</button>
-          <p id="scanResult" class="mt-6 text-xl"></p>
+          <p id="scanResult" class="mt-6 text-xl font-mono break-all"></p>
         </div>
       </section>
 
       <!-- VOICE -->
       <section id="voice" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
-          <h2 class="text-2xl font-bold mb-6">Voice Add</h2>
+          <h2 class="text-2xl font-bold mb-6">Voice Add to Shopping</h2>
           <button id="voiceBtn" class="w-24 h-24 bg-red-500 rounded-full text-white text-4xl hover:bg-red-600">Microphone</button>
           <p class="mt-6">Hold to speak: "Add milk quantity 2"</p>
-          <p id="voiceResult" class="mt-6 text-xl"></p>
+          <p id="voiceResult" class="mt-6 text-xl text-green-400"></p>
         </div>
       </section>
 
@@ -115,6 +115,23 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- SCAN TO INVENTORY + SHOPPING MODAL -->
+  <div id="scanModal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 p-6">
+    <div class="glass p-8 rounded-3xl max-w-sm w-full text-center">
+      <h3 class="text-2xl font-bold mb-4">Scanned!</h3>
+      <p class="text-lg mb-6 break-all font-mono" id="modalBarcode"></p>
+      <p class="text-sm opacity-70 mb-6">Added to <strong>Inventory</strong></p>
+      <div class="space-y-3">
+        <button id="addToShoppingBtn" class="w-full px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600">
+          Add to Shopping List
+        </button>
+        <button id="closeModalBtn" class="w-full px-6 py-3 bg-gray-500 text-white rounded-xl font-bold hover:bg-gray-600">
+          Done
+        </button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -137,7 +154,7 @@
     let idToken = null;
     const $ = s => document.querySelector(s);
 
-    // === AUTH STATE CHANGE (FIXED) ===
+    // === AUTH ===
     auth.onAuthStateChanged(async (user) => {
       if (user) {
         idToken = await user.getIdToken();
@@ -146,7 +163,6 @@
         $('#app').classList.remove('hidden');
         await Promise.all([loadInventory(), loadShopping(), loadScanCount()]);
       } else {
-        // FULL SIGN OUT → SHOW LOGIN
         idToken = null;
         $('#auth-section').classList.remove('hidden');
         $('#app').classList.add('hidden');
@@ -161,17 +177,9 @@
       }
     });
 
-    // === SIGN OUT BUTTON (FIXED) ===
-    $('#signOutBtn').onclick = async () => {
-      try {
-        await auth.signOut();
-        alert('Signed out successfully!');
-      } catch (err) {
-        alert('Sign out failed');
-      }
-    };
+    $('#signOutBtn').onclick = () => auth.signOut();
 
-    // === API HELPER ===
+    // === API ===
     async function api(path, opts = {}) {
       if (!idToken) return null;
       const res = await fetch(API_BASE + path, {
@@ -184,13 +192,6 @@
       });
       return res.ok ? await res.json() : null;
     }
-
-    // === DARK MODE ===
-    $('#darkModeBtn').onclick = () => {
-      document.documentElement.classList.toggle('dark');
-      localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-    };
-    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
     // === TABS ===
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -208,13 +209,21 @@
       const qty = parseInt($('#invQty').value) || 1;
       const exp = $('#invExp').value;
       if (!barcode) return alert('Enter barcode');
-      const res = await api('/api/inventory', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
-      if (res?.success) {
-        $('#invBarcode').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
-        alert('Added!');
-        loadInventory();
-      }
+      await addToInventory(barcode, qty, exp);
+      $('#invBarcode').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
+      loadInventory();
     };
+
+    async function addToInventory(barcode, qty = 1, exp = '') {
+      const res = await api('/api/inventory', {
+        method: 'POST',
+        body: JSON.stringify({ barcode, quantity: qty, expiration: exp })
+      });
+      if (res?.success) {
+        $('#scanResult').textContent = `Added: ${barcode}`;
+        showScanModal(barcode);
+      }
+    }
 
     async function loadInventory() {
       const data = await api('/api/inventory');
@@ -240,13 +249,20 @@
       const name = $('#shopName').value.trim();
       const needed = parseInt($('#shopNeeded').value) || 1;
       if (!name) return alert('Enter item name');
-      const res = await api('/api/shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed }) });
-      if (res?.success) {
-        $('#shopName').value = ''; $('#shopNeeded').value = 1;
-        alert('Added!');
-        loadShopping();
-      }
+      await addToShoppingList(name, needed);
+      $('#shopName').value = ''; $('#shopNeeded').value = 1;
+      loadShopping();
     };
+
+    async function addToShoppingList(name, needed = 1) {
+      const res = await api('/api/shopping', {
+        method: 'POST',
+        body: JSON.stringify({ itemName: name, needed })
+      });
+      if (res?.success) {
+        $('#voiceResult').textContent = `Added: ${name} x${needed}`;
+      }
+    }
 
     async function loadShopping() {
       const data = await api('/api/shopping');
@@ -282,7 +298,6 @@
       });
 
       if (res?.success) {
-        alert('Deleted!');
         type === 'inventory' ? loadInventory() : loadShopping();
       }
     });
@@ -292,16 +307,22 @@
       $('#scanCounter').textContent = d?.isPro ? 'Unlimited AI Scans (Pro)' : `Free scans: ${d?.scans || 0}/10`;
     }
 
-    // === SCANNER, VOICE, AI SCAN (unchanged) ===
+    // === SCANNER ===
     let codeReader;
+    let lastScanned = null;
     $('#startScanner').onclick = () => {
-      if (codeReader) { codeReader.reset(); codeReader = null; $('#startScanner').textContent = 'Start Scanner'; $('#video').srcObject = null; return; }
+      if (codeReader) {
+        codeReader.reset(); codeReader = null;
+        $('#startScanner').textContent = 'Start Scanner';
+        $('#video').srcObject = null;
+        return;
+      }
       codeReader = new ZXing.BrowserMultiFormatReader();
-      codeReader.decodeFromVideoDevice(null, 'video', (result) => {
-        if (result) {
-          $('#scanResult').textContent = 'Found: ' + result.getText();
-          $('#invBarcode').value = result.getText();
-          alert('Scanned: ' + result.getText());
+      codeReader.decodeFromVideoDevice(null, 'video', async (result) => {
+        if (result && result.getText() !== lastScanned) {
+          lastScanned = result.getText();
+          $('#scanResult').textContent = `Scanned: ${lastScanned}`;
+          await addToInventory(lastScanned, 1, '');
           codeReader.reset(); codeReader = null;
           $('#startScanner').textContent = 'Start Scanner';
           $('#video').srcObject = null;
@@ -310,18 +331,33 @@
       $('#startScanner').textContent = 'Stop Scanner';
     };
 
+    // === SCAN MODAL ===
+    function showScanModal(barcode) {
+      $('#modalBarcode').textContent = barcode;
+      $('#scanModal').classList.remove('hidden');
+
+      $('#addToShoppingBtn').onclick = async () => {
+        await addToShoppingList(barcode, 1);
+        $('#scanModal').classList.add('hidden');
+      };
+
+      $('#closeModalBtn').onclick = () => {
+        $('#scanModal').classList.add('hidden');
+      };
+    }
+
+    // === VOICE → SHOPPING ONLY ===
     if (annyang) {
       annyang.addCommands({
-        'add *item quantity *qty': (item, qty) => {
-          $('#shopName').value = item;
-          $('#shopNeeded').value = qty || 1;
-          $('#voiceResult').textContent = `Added: ${item} x${qty || 1}`;
+        'add *item quantity *qty': async (item, qty) => {
+          await addToShoppingList(item, qty || 1);
         }
       });
       $('#voiceBtn').onmousedown = $('#voiceBtn').ontouchstart = () => annyang.start({ autoRestart: false });
       $('#voiceBtn').onmouseup = $('#voiceBtn').ontouchend = () => annyang.abort();
     }
 
+    // === AI SCAN ===
     $('#aiScanBtn').onclick = async () => {
       const file = $('#aiImage').files[0];
       if (!file) return alert('Take a photo first');
@@ -335,7 +371,7 @@
         : '<p class="text-red-400">Nothing detected. Try again!</p>';
     };
 
-    // Start Firebase UI on load
+    // Init
     ui.start('#firebaseui-auth-container', {
       signInFlow: 'popup',
       signInOptions: [firebase.auth.GoogleAuthProvider.PROVIDER_ID, firebase.auth.EmailAuthProvider.PROVIDER_ID],
