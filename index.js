@@ -6,13 +6,9 @@ const cors = require('cors');
 const fileUpload = require('express-fileupload');
 const path = require('path');
 
-// CREDENTIALS
 let serviceAccount;
 try {
-  const rawKey = process.env.GCLOUD_KEY_JSON;
-  if (!rawKey) throw new Error('GCLOUD_KEY_JSON missing');
-  serviceAccount = JSON.parse(rawKey);
-  if (!serviceAccount.project_id) throw new Error('project_id missing');
+  serviceAccount = JSON.parse(process.env.GCLOUD_KEY_JSON);
   console.log('SUCCESS: Loaded project', serviceAccount.project_id);
 } catch (err) {
   console.error('FATAL:', err.message);
@@ -81,7 +77,7 @@ app.post('/inventory', async (req, res) => {
     }, { merge: true });
     res.json({ success: true });
   } catch (err) {
-    console.error('POST /inventory error:', err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -113,21 +109,7 @@ app.post('/shopping', async (req, res) => {
     }, { merge: true });
     res.json({ success: true });
   } catch (err) {
-    console.error('POST /shopping error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// AI SCAN
-app.post('/scan', async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split('Bearer ')[1];
-    const decoded = await admin.auth().verifyIdToken(token);
-    if (!req.files || !req.files.image) return res.status(400).json({ error: 'No image' });
-    const [result] = await vision.labelDetection(req.files.image.data);
-    const labels = result.labelAnnotations.map(l => l.description);
-    res.json({ success: true, labels });
-  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
