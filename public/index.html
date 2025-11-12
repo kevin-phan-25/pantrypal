@@ -28,7 +28,7 @@
     <div class="glass p-10 rounded-3xl shadow-2xl max-w-md w-full">
       <h1 class="text-4xl font-bold text-center mb-8">PantryPal Pro</h1>
       <div id="firebaseui-auth-container"></div>
-      <p class="text-center mt-6 text-sm opacity-70">Choose any login method</p>
+      <p class="text-center mt-4 text-sm opacity-70">Sign in to unlock Pro features</p>
     </div>
   </div>
 
@@ -52,7 +52,7 @@
       <!-- TABS -->
       <div class="flex space-x-4 mb-8 overflow-x-auto">
         <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="inventory">Inventory</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="shopping">Shopping List</button>
+        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="shopping">Shopping List</  button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="scanner">Scanner</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="voice">Voice</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="ai">AI Scan (Pro)</button>
@@ -85,7 +85,7 @@
         </div>
       </section>
 
-      <!-- SCANNER, VOICE, AI SCAN -->
+      <!-- SCANNER -->
       <section id="scanner" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">Scan Barcode / QR</h2>
@@ -95,6 +95,7 @@
         </div>
       </section>
 
+      <!-- VOICE -->
       <section id="voice" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">Voice Add</h2>
@@ -104,6 +105,7 @@
         </div>
       </section>
 
+      <!-- AI SCAN -->
       <section id="ai" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">AI Photo Scan (Pro)</h2>
@@ -135,48 +137,41 @@
     let idToken = null;
     const $ = s => document.querySelector(s);
 
-    // === FIREBASE UI CONFIG — ALL 4 PROVIDERS ===
-    const uiConfig = {
-      signInFlow: 'popup',
-      signInOptions: [
-        firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-        firebase.auth.EmailAuthProvider.PROVIDER_ID,
-        firebase.auth.PhoneAuthProvider.PROVIDER_ID,
-        firebase.auth.AppleAuthProvider.PROVIDER_ID
-      ],
-      callbacks: {
-        signInSuccessWithAuthResult: () => false
-      }
-    };
-
-    // === SHOW LOGIN SCREEN ===
-    function showLogin() {
-      $('#auth-section').classList.remove('hidden');
-      $('#app').classList.add('hidden');
-      ui.start('#firebaseui-auth-container', uiConfig);
-    }
-
-    // === AUTH STATE CHANGE ===
+    // === AUTH STATE CHANGE (FIXED) ===
     auth.onAuthStateChanged(async (user) => {
       if (user) {
         idToken = await user.getIdToken();
-        $('#userEmail').textContent = user.email || user.phoneNumber || user.displayName || 'User';
+        $('#userEmail').textContent = user.email || user.displayName || 'User';
         $('#auth-section').classList.add('hidden');
         $('#app').classList.remove('hidden');
         await Promise.all([loadInventory(), loadShopping(), loadScanCount()]);
       } else {
+        // FULL SIGN OUT → SHOW LOGIN
         idToken = null;
-        showLogin();
+        $('#auth-section').classList.remove('hidden');
+        $('#app').classList.add('hidden');
+        ui.start('#firebaseui-auth-container', {
+          signInFlow: 'popup',
+          signInOptions: [
+            firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+            firebase.auth.EmailAuthProvider.PROVIDER_ID
+          ],
+          callbacks: { signInSuccessWithAuthResult: () => false }
+        });
       }
     });
 
-    // === SIGN OUT ===
+    // === SIGN OUT BUTTON (FIXED) ===
     $('#signOutBtn').onclick = async () => {
-      await auth.signOut();
-      alert('Signed out!');
+      try {
+        await auth.signOut();
+        alert('Signed out successfully!');
+      } catch (err) {
+        alert('Sign out failed');
+      }
     };
 
-    // === API ===
+    // === API HELPER ===
     async function api(path, opts = {}) {
       if (!idToken) return null;
       const res = await fetch(API_BASE + path, {
@@ -340,8 +335,12 @@
         : '<p class="text-red-400">Nothing detected. Try again!</p>';
     };
 
-    // === START ON PAGE LOAD ===
-    showLogin();
+    // Start Firebase UI on load
+    ui.start('#firebaseui-auth-container', {
+      signInFlow: 'popup',
+      signInOptions: [firebase.auth.GoogleAuthProvider.PROVIDER_ID, firebase.auth.EmailAuthProvider.PROVIDER_ID],
+      callbacks: { signInSuccessWithAuthResult: () => false }
+    });
   </script>
 </body>
 </html>
