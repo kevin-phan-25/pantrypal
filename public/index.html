@@ -28,6 +28,7 @@
     <div class="glass p-10 rounded-3xl shadow-2xl max-w-md w-full">
       <h1 class="text-4xl font-bold text-center mb-8">PantryPal Pro</h1>
       <div id="firebaseui-auth-container"></div>
+      <p class="text-center mt-6 text-sm opacity-70">Choose any login method</p>
     </div>
   </div>
 
@@ -40,7 +41,7 @@
           <span id="userEmail" class="text-sm opacity-80"></span>
         </div>
         <div class="flex items-center space-x-4">
-          <span id="scanCounter" class="text-sm font-medium"></span>
+          <span id="scanCounter" class="text-sm font-medium bg-yellow-400 text-black px-3 py-1 rounded-full"></span>
           <button id="darkModeBtn" class="p-2 rounded-lg glass">Dark Mode</button>
           <button id="signOutBtn" class="px-6 py-2 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600">Sign Out</button>
         </div>
@@ -84,7 +85,7 @@
         </div>
       </section>
 
-      <!-- SCANNER, VOICE, AI SCAN (unchanged) -->
+      <!-- SCANNER, VOICE, AI SCAN -->
       <section id="scanner" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">Scan Barcode / QR</h2>
@@ -117,6 +118,7 @@
   <script>
     lucide.createIcons();
     const API_BASE = window.location.origin;
+
     const firebaseConfig = {
       apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
       authDomain: "pantrypal-6e410.firebaseapp.com",
@@ -125,20 +127,56 @@
       messagingSenderId: "592127259891",
       appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
     };
+
     firebase.initializeApp(firebaseConfig);
-    const ui = new firebaseui.auth.AuthUI(firebase.auth());
-    ui.start('#firebaseui-auth-container', {
-      signInFlow: 'popup',
-      signInOptions: [
-        firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-        firebase.auth.EmailAuthProvider.PROVIDER_ID
-      ],
-      callbacks: { signInSuccessWithAuthResult: () => false }
-    });
+    const auth = firebase.auth();
+    const ui = new firebaseui.auth.AuthUI(auth);
 
     let idToken = null;
     const $ = s => document.querySelector(s);
 
+    // === FIREBASE UI CONFIG — ALL 4 PROVIDERS ===
+    const uiConfig = {
+      signInFlow: 'popup',
+      signInOptions: [
+        firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+        firebase.auth.EmailAuthProvider.PROVIDER_ID,
+        firebase.auth.PhoneAuthProvider.PROVIDER_ID,
+        firebase.auth.AppleAuthProvider.PROVIDER_ID
+      ],
+      callbacks: {
+        signInSuccessWithAuthResult: () => false
+      }
+    };
+
+    // === SHOW LOGIN SCREEN ===
+    function showLogin() {
+      $('#auth-section').classList.remove('hidden');
+      $('#app').classList.add('hidden');
+      ui.start('#firebaseui-auth-container', uiConfig);
+    }
+
+    // === AUTH STATE CHANGE ===
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        idToken = await user.getIdToken();
+        $('#userEmail').textContent = user.email || user.phoneNumber || user.displayName || 'User';
+        $('#auth-section').classList.add('hidden');
+        $('#app').classList.remove('hidden');
+        await Promise.all([loadInventory(), loadShopping(), loadScanCount()]);
+      } else {
+        idToken = null;
+        showLogin();
+      }
+    });
+
+    // === SIGN OUT ===
+    $('#signOutBtn').onclick = async () => {
+      await auth.signOut();
+      alert('Signed out!');
+    };
+
+    // === API ===
     async function api(path, opts = {}) {
       if (!idToken) return null;
       const res = await fetch(API_BASE + path, {
@@ -152,28 +190,14 @@
       return res.ok ? await res.json() : null;
     }
 
-    firebase.auth().onAuthStateChanged(async user => {
-      if (user) {
-        idToken = await user.getIdToken();
-        $('#userEmail').textContent = user.email || user.displayName;
-        $('#auth-section').classList.add('hidden');
-        $('#app').classList.remove('hidden');
-        await Promise.all([loadInventory(), loadShopping(), loadScanCount()]);
-      } else {
-        $('#auth-section').classList.remove('hidden');
-        $('#app').classList.add('hidden');
-        idToken = null;
-      }
-    });
-
-    // DARK MODE
+    // === DARK MODE ===
     $('#darkModeBtn').onclick = () => {
       document.documentElement.classList.toggle('dark');
       localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
     };
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
 
-    // TABS
+    // === TABS ===
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.onclick = () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
@@ -183,19 +207,16 @@
       };
     });
 
-    // INVENTORY
+    // === INVENTORY ===
     $('#addToInventory').onclick = async () => {
       const barcode = $('#invBarcode').value.trim();
       const qty = parseInt($('#invQty').value) || 1;
       const exp = $('#invExp').value;
       if (!barcode) return alert('Enter barcode');
-      const res = await api('/api/inventory', { 
-        method: 'POST', 
-        body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) 
-      });
+      const res = await api('/api/inventory', { method: 'POST', body: JSON.stringify({ barcode, quantity: qty, expiration: exp }) });
       if (res?.success) {
         $('#invBarcode').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
-        alert('Added to Inventory!');
+        alert('Added!');
         loadInventory();
       }
     };
@@ -204,7 +225,7 @@
       const data = await api('/api/inventory');
       const list = $('#inventoryList');
       list.innerHTML = '';
-      (data?.items || []).forEach((item, index) => {
+      (data?.items || []).forEach((item, i) => {
         const div = document.createElement('div');
         div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
         div.innerHTML = `
@@ -213,26 +234,21 @@
             <span class="text-sm opacity-80">x${item.quantity}</span>
             ${item.expiration ? `<span class="text-xs opacity-70">| Exp: ${item.expiration}</span>` : ''}
           </div>
-          <button class="delete-btn" data-type="inventory" data-index="${index}">
-            Delete
-          </button>
+          <button class="delete-btn" data-type="inventory" data-index="${i}">Delete</button>
         `;
         list.appendChild(div);
       });
     }
 
-    // SHOPPING LIST
+    // === SHOPPING ===
     $('#addToShopping').onclick = async () => {
       const name = $('#shopName').value.trim();
       const needed = parseInt($('#shopNeeded').value) || 1;
       if (!name) return alert('Enter item name');
-      const res = await api('/api/shopping', { 
-        method: 'POST', 
-        body: JSON.stringify({ itemName: name, needed }) 
-      });
+      const res = await api('/api/shopping', { method: 'POST', body: JSON.stringify({ itemName: name, needed }) });
       if (res?.success) {
         $('#shopName').value = ''; $('#shopNeeded').value = 1;
-        alert('Added to Shopping List!');
+        alert('Added!');
         loadShopping();
       }
     };
@@ -241,40 +257,33 @@
       const data = await api('/api/shopping');
       const list = $('#shoppingList');
       list.innerHTML = '';
-      (data?.list || []).forEach((item, index) => {
+      (data?.list || []).forEach((item, i) => {
         const div = document.createElement('div');
         div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
         div.innerHTML = `
           <span>${item.itemName} <span class="text-sm opacity-80">(x${item.needed})</span></span>
-          <button class="delete-btn" data-type="shopping" data-index="${index}">
-            Delete
-          </button>
+          <button class="delete-btn" data-type="shopping" data-index="${i}">Delete</button>
         `;
         list.appendChild(div);
       });
     }
 
-    // DELETE HANDLER
+    // === DELETE ===
     document.addEventListener('click', async (e) => {
       if (!e.target.classList.contains('delete-btn')) return;
       const type = e.target.dataset.type;
       const index = parseInt(e.target.dataset.index);
+      if (!confirm('Delete this item?')) return;
 
-      if (!confirm(`Delete this ${type === 'inventory' ? 'inventory item' : 'shopping item'}?`)) return;
+      const data = type === 'inventory' ? (await api('/api/inventory')) : (await api('/api/shopping'));
+      const array = type === 'inventory' ? data?.items : data?.list;
+      if (!array || index >= array.length) return;
 
-      const currentData = type === 'inventory' 
-        ? (await api('/api/inventory'))?.items 
-        : (await api('/api/shopping'))?.list;
+      array.splice(index, 1);
 
-      if (!currentData || index >= currentData.length) return;
-
-      currentData.splice(index, 1);
-
-      const res = await api(`/${type === 'inventory' ? 'api/inventory' : 'api/shopping'}`, {
+      const res = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
         method: 'POST',
-        body: JSON.stringify({ 
-          [type === 'inventory' ? 'inventory' : 'shopping']: currentData 
-        })
+        body: JSON.stringify(type === 'inventory' ? { inventory: array } : { shopping: array })
       });
 
       if (res?.success) {
@@ -288,24 +297,17 @@
       $('#scanCounter').textContent = d?.isPro ? 'Unlimited AI Scans (Pro)' : `Free scans: ${d?.scans || 0}/10`;
     }
 
-    // SCANNER (unchanged)
+    // === SCANNER, VOICE, AI SCAN (unchanged) ===
     let codeReader;
     $('#startScanner').onclick = () => {
-      if (codeReader) {
-        codeReader.reset();
-        codeReader = null;
-        $('#startScanner').textContent = 'Start Scanner';
-        $('#video').srcObject = null;
-        return;
-      }
+      if (codeReader) { codeReader.reset(); codeReader = null; $('#startScanner').textContent = 'Start Scanner'; $('#video').srcObject = null; return; }
       codeReader = new ZXing.BrowserMultiFormatReader();
-      codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
+      codeReader.decodeFromVideoDevice(null, 'video', (result) => {
         if (result) {
           $('#scanResult').textContent = 'Found: ' + result.getText();
           $('#invBarcode').value = result.getText();
           alert('Scanned: ' + result.getText());
-          codeReader.reset();
-          codeReader = null;
+          codeReader.reset(); codeReader = null;
           $('#startScanner').textContent = 'Start Scanner';
           $('#video').srcObject = null;
         }
@@ -313,50 +315,33 @@
       $('#startScanner').textContent = 'Stop Scanner';
     };
 
-    // VOICE (unchanged)
     if (annyang) {
-      const commands = {
+      annyang.addCommands({
         'add *item quantity *qty': (item, qty) => {
           $('#shopName').value = item;
           $('#shopNeeded').value = qty || 1;
-          $('#voiceResult').textContent = `Voice added: ${item} x${qty || 1}`;
+          $('#voiceResult').textContent = `Added: ${item} x${qty || 1}`;
         }
-      };
-      annyang.addCommands(commands);
-      $('#voiceBtn').onmousedown = () => annyang.start({ autoRestart: false });
-      $('#voiceBtn').onmouseup = () => annyang.abort();
-      $('#voiceBtn').ontouchstart = () => annyang.start({ autoRestart: false });
-      $('#voiceBtn').ontouchend = () => annyang.abort();
+      });
+      $('#voiceBtn').onmousedown = $('#voiceBtn').ontouchstart = () => annyang.start({ autoRestart: false });
+      $('#voiceBtn').onmouseup = $('#voiceBtn').ontouchend = () => annyang.abort();
     }
 
-    // AI SCAN (unchanged)
     $('#aiScanBtn').onclick = async () => {
       const file = $('#aiImage').files[0];
-      if (!file) return alert('Please take or select a photo first');
+      if (!file) return alert('Take a photo first');
       const form = new FormData();
       form.append('image', file);
-      $('#aiResult').innerHTML = '<p class="text-yellow-300">Scanning with AI...</p>';
-      try {
-        const res = await fetch(API_BASE + '/api/scan', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${idToken}` },
-          body: form
-        });
-        const data = await res.json();
-        if (data.labels && data.labels.length > 0) {
-          $('#aiResult').innerHTML = `
-            <p class="text-green-400 font-bold mb-4">AI Found:</p>
-            ${data.labels.map(l => `<div class="p-3 glass rounded-lg mb-2 inline-block mr-2">${l}</div>`).join('')}
-          `;
-        } else {
-          $('#aiResult').innerHTML = '<p class="text-red-400">No items detected. Try a clearer photo!</p>';
-        }
-      } catch (err) {
-        $('#aiResult').innerHTML = '<p class="text-red-500">Scan failed.</p>';
-      }
+      $('#aiResult').innerHTML = '<p class="text-yellow-300">Scanning...</p>';
+      const res = await fetch(API_BASE + '/api/scan', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` }, body: form });
+      const data = await res.json();
+      $('#aiResult').innerHTML = data.labels?.length
+        ? `<p class="text-green-400 font-bold mb-4">Found:</p>${data.labels.map(l => `<div class="p-3 glass rounded-lg inline-block mr-2 mb-2">${l}</div>`).join('')}`
+        : '<p class="text-red-400">Nothing detected. Try again!</p>';
     };
 
-    $('#signOutBtn').onclick = () => firebase.auth().signOut();
+    // === START ON PAGE LOAD ===
+    showLogin();
   </script>
 </body>
 </html>
