@@ -1,66 +1,76 @@
-require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const vision = require('@google-cloud/vision');
 const admin = require('firebase-admin');
+const { ImageAnnotatorClient } = require('@google-cloud/vision');
+require('dotenv').config();
+const cors = require('cors');
+const fileUpload = require('express-fileupload');
 const path = require('path');
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-
+// CREDENTIALS — SAFE VERSION
 let serviceAccount;
 try {
   const rawKey = process.env.GCLOUD_KEY_JSON;
-  if (!rawKey) {
-    throw new Error('GCLOUD_KEY_JSON is missing!');
-  }
+  if (!rawKey) throw new Error('GCLOUD_KEY_JSON missing');
   serviceAccount = JSON.parse(rawKey);
-  if (!serviceAccount.project_id) {
-    throw new Error('GCLOUD_KEY_JSON is missing "project_id" — check Render env var');
-  }
-  console.log('SUCCESS: Loaded service account for project:', serviceAccount.project_id);
+  if (!serviceAccount.project_id) throw new Error('project_id missing in GCLOUD_KEY_JSON');
+  console.log('SUCCESS: Loaded project', serviceAccount.project_id);
 } catch (err) {
-  console.error('FATAL: Invalid GCLOUD_KEY_JSON');
-  console.error(err.message);
+  console.error('FATAL:', err.message);
   process.exit(1);
 }
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
+const db = admin.firestore();
+const vision = new ImageAnnotatorClient();
 
-// ---------- GOOGLE VISION ----------
-const client = new vision.ImageAnnotatorClient(); // uses same key if needed
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+app.use(fileUpload());
 
-// ---------- MULTER ----------
-const upload = multer({ storage: multer.memoryStorage() });
-
-// ---------- ROUTES ----------
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+// SERVE UI — THIS IS THE FIX
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.post('/api/upload', upload.single('image'), async (req, res) => {
+// YOUR API ROUTES (inventory, shopping, etc.)
+app.get('/inventory', async (req, res) => {
   try {
-    const [result] = await client.labelDetection(req.file.buffer);
-    const labels = result.labelAnnotations.map(l => l.description);
-    res.json({ labels });
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const doc = await db.collection('users').doc(decoded.uid).get();
+    res.json({ items: doc.data()?.inventory || [] });
+  } catch { res.json({ items: [] }); }
+});
+
+app.post('/inventory', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const { barcode, quantity, expiration } = req.body;
+    const userRef = db.collection('users').doc(decoded.uid);
+    await userRef.set({
+      inventory: admin.firestore.FieldValue.arrayUnion({
+        barcode,
+        name: barcode,
+        quantity,
+        expiration,
+        addedAt: new Date().toISOString()
+      })
+    }, { merge: true });
+    res.json({ success: true });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ---------- SERVE FRONTEND ----------
-const frontendPath = path.join(__dirname, '../public');
-app.use(express.static(frontendPath));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(frontendPath, 'index.html'));
-});
+// Add your other routes here (shopping, scan, etc.)
 
-// ---------- START ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`PantryPal LIVE at https://pantrypal-zdi4.onrender.com`);
 });
