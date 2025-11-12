@@ -39,7 +39,7 @@ app.get('*', (req, res, next) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// API ROUTES
+// USER INFO
 app.get('/user-info', async (req, res) => {
   try {
     const token = req.headers.authorization?.split('Bearer ')[1];
@@ -52,6 +52,7 @@ app.get('/user-info', async (req, res) => {
   }
 });
 
+// INVENTORY
 app.get('/inventory', async (req, res) => {
   try {
     const token = req.headers.authorization?.split('Bearer ')[1];
@@ -85,6 +86,7 @@ app.post('/inventory', async (req, res) => {
   }
 });
 
+// SHOPPING
 app.get('/shopping', async (req, res) => {
   try {
     const token = req.headers.authorization?.split('Bearer ')[1];
@@ -116,6 +118,7 @@ app.post('/shopping', async (req, res) => {
   }
 });
 
+// AI SCAN
 app.post('/scan', async (req, res) => {
   try {
     const token = req.headers.authorization?.split('Bearer ')[1];
