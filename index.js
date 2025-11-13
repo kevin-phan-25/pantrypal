@@ -5,12 +5,10 @@ require('dotenv').config();
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
 const path = require('path');
-const https = require('https');
-const http = require('http');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '12mb' })); // Increased for URLs
+app.use(express.json({ limit: '10mb' }));
 app.use(fileUpload());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -31,42 +29,13 @@ const db = admin.firestore();
 // ========== GOOGLE VISION (your existing GCLOUD_KEY_JSON) ==========
 let visionKey;
 try {
-  visionKey = JSON.parse(process.env.GCLOUD_KEY_JSON);
+  visionKey = JSON.parse(process.env.GCLOUD_KEY_JSON);  // ← THIS IS YOUR ORIGINAL NAME
   console.log('Google Vision loaded:', visionKey.project_id);
 } catch (err) {
   console.error('FATAL: GCLOUD_KEY_JSON missing or invalid');
   process.exit(1);
 }
 const vision = new ImageAnnotatorClient({ credentials: visionKey });
-
-// ========== DOWNLOAD IMAGE FROM URL ==========
-function downloadImage(url) {
-  return new Promise((resolve, reject) => {
-    const client = url.startsWith('https') ? https : http;
-    const request = client.get(url, { timeout: 10000 }, (resp) => {
-      if (resp.statusCode !== 200) {
-        return reject(new Error(`HTTP ${resp.statusCode} from ${url}`));
-      }
-
-      const chunks = [];
-      resp.on('data', chunk => chunks.push(chunk));
-      resp.on('end', () => {
-        const buffer = Buffer.concat(chunks);
-        if (buffer.length === 0) {
-          reject(new Error('Empty image downloaded'));
-        } else {
-          resolve(buffer);
-        }
-      });
-    });
-
-    request.on('error', reject);
-    request.on('timeout', () => {
-      request.destroy();
-      reject(new Error('Download timeout'));
-    });
-  });
-}
 
 // ========== SERVE UI ==========
 app.get('*', (req, res, next) => {
@@ -153,63 +122,30 @@ app.post('/api/shopping', async (req, res) => {
   }
 });
 
-// ========== AI SCAN (Google Vision) – NOW SUPPORTS URL ==========
+// ========== AI SCAN (Google Vision) ==========
 app.post('/api/scan', async (req, res) => {
   try {
-    // ---- Auth ----
     const token = req.headers.authorization?.split('Bearer ')[1];
     if (!token) return res.status(401).json({ error: 'No token' });
+
     const decoded = await admin.auth().verifyIdToken(token);
+    if (!req.files?.image) return res.status(400).json({ error: 'No image' });
 
-    // ---- Get image buffer (file OR URL) ----
-    let imageBuffer;
+    const [result] = await vision.labelDetection(req.files.image.data);
+    const labels = result.labelAnnotations.map(a => a.description);
 
-    if (req.files?.image) {
-      console.log('Scan: Using uploaded file');
-      imageBuffer = req.files.image.data;
-    } 
-    else if (req.body.imageUrl) {
-      const url = req.body.imageUrl.trim();
-      if (!/^https?:\/\//i.test(url)) {
-        return res.status(400).json({ error: 'Invalid URL format' });
-      }
-      console.log('Scan: Downloading image from URL:', url);
-      imageBuffer = await downloadImage(url);
-    } 
-    else {
-      return res.status(400).json({ error: 'No image provided (use file upload or imageUrl)' });
-    }
-
-    // ---- Validate buffer ----
-    if (!imageBuffer || imageBuffer.length === 0) {
-      return res.status(400).json({ error: 'Empty image data' });
-    }
-
-    // ---- Run Google Vision ----
-    console.log(`Scan: Sending ${imageBuffer.length} bytes to Google Vision...`);
-    const [result] = await vision.labelDetection(imageBuffer);
-    const labels = result.labelAnnotations?.map(a => a.description) || [];
-
-    // ---- Update scan count ----
     await db.collection('users').doc(decoded.uid).update({
       scans: admin.firestore.FieldValue.increment(1)
     });
 
-    console.log('Scan successful:', labels.slice(0, 5).join(', '));
     res.json({ labels });
-
   } catch (err) {
     console.error('Vision error:', err.message);
-    res.status(500).json({ 
-      error: 'Scan failed', 
-      details: err.message 
-    });
+    res.status(500).json({ error: 'Scan failed', details: err.message });
   }
 });
 
-// ========== START SERVER ==========
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`PantryPal Pro LIVE → https://pantrypal-zdi4.onrender.com`);
-  console.log(`Server running on port ${PORT}`);
 });
