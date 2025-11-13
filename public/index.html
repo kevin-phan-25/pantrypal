@@ -1,382 +1,381 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PantryPal Pro</title>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/ui/6.0.1/firebase-ui-auth.js"></script>
-  <link rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.1/firebase-ui-auth.css"/>
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/annyang@2.6.1/annyang.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
   <style>
-    body { font-family: 'Inter', sans-serif; }
-    .glass { background: rgba(255,255,255,0.15); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.2); }
-    .dark .glass { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); }
-    .tab-active { @apply bg-white text-purple-600 dark:bg-gray-800 dark:text-purple-400; }
-    .delete-btn { @apply text-red-500 hover:text-red-700 font-bold text-sm; }
+    body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+    .card { border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .btn-primary { background: #0d6efd; border: none; }
+    .btn-primary:hover { background: #0b5ed7; }
+    .preview-img { max-height: 200px; object-fit: contain; border-radius: 8px; }
+    .url-input { border-radius: 8px; }
+    .scan-section { margin-bottom: 2rem; }
+    .result-badge { font-size: 0.9rem; }
+    .loading { opacity: 0.7; }
+    .btn-sm { font-size: 0.85rem; }
   </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 text-gray-900 dark:text-white transition-colors">
-  <!-- AUTH -->
-  <div id="auth-section" class="flex items-center justify-center min-h-screen">
-    <div class="glass p-10 rounded-3xl shadow-2xl max-w-md w-full">
-      <h1 class="text-4xl font-bold text-center mb-8">PantryPal Pro</h1>
-      <div id="firebaseui-auth-container"></div>
-      <p class="text-center mt-4 text-sm opacity-70">Sign in to unlock Pro features</p>
+<body>
+  <div class="container py-5">
+    <div class="text-center mb-5">
+      <h1 class="display-5 fw-bold text-primary">PantryPal Pro</h1>
+      <p class="text-muted">Scan items, manage inventory, and build your shopping list.</p>
+    </div>
+
+    <!-- ========== AUTH STATUS ========== -->
+    <div id="authSection" class="text-center mb-4">
+      <button id="loginBtn" class="btn btn-outline-primary">Sign in with Google</button>
+      <div id="userInfo" class="d-none mt-3">
+        <p><strong id="userEmail"></strong> <span id="proBadge" class="badge bg-success d-none">PRO</span></p>
+        <button id="logoutBtn" class="btn btn-sm btn-outline-danger">Logout</button>
+      </div>
+    </div>
+
+    <!-- ========== SCAN SECTION ========== -->
+    <div id="scanSection" class="d-none card p-4 scan-section">
+      <h4 class="mb-3">Scan Item</h4>
+
+      <!-- File Upload -->
+      <div class="mb-3">
+        <input type="file" id="fileInput" accept="image/*" class="form-control form-control-sm" />
+        <button id="scanFileBtn" class="btn btn-primary w-100 mt-2">
+          <i class="bi bi-camera"></i> Scan from Photo
+        </button>
+      </div>
+
+      <!-- OR Separator -->
+      <div class="text-center my-3 text-muted fw-bold">— OR —</div>
+
+      <!-- URL Input -->
+      <div class="mb-3">
+        <div class="input-group">
+          <input type="url" id="urlInput" class="form-control" placeholder="https://example.com/item.jpg" />
+          <button id="scanUrlBtn" class="btn btn-outline-primary">
+            <i class="bi bi-link-45deg"></i>
+          </button>
+        </div>
+        <div class="form-text">Paste a direct image link</div>
+      </div>
+
+      <!-- Preview -->
+      <div id="preview" class="text-center mb-3 d-none">
+        <img id="previewImg" class="preview-img img-fluid" alt="Preview" />
+        <p class="text-muted mt-2">Ready to scan</p>
+      </div>
+
+      <!-- Result -->
+      <div id="scanResult" class="d-none mt-4"></div>
+    </div>
+
+    <!-- ========== INVENTORY & SHOPPING ========== -->
+    <div id="mainApp" class="d-none row g-4 mt-3">
+      <!-- Inventory -->
+      <div class="col-lg-6">
+        <div class="card h-100 p-4">
+          <h5>Inventory</h5>
+          <div id="inventoryList" class="mb-3"></div>
+          <button id="addManualBtn" class="btn btn-sm btn-outline-secondary w-100">+ Add Item Manually</button>
+        </div>
+      </div>
+
+      <!-- Shopping List -->
+      <div class="col-lg-6">
+        <div class="card h-100 p-4">
+          <h5>Shopping List</h5>
+          <div id="shoppingList" class="mb-3"></div>
+          <div class="input-group">
+            <input id="newItemInput" class="form-control form-control-sm" placeholder="Add new item..." />
+            <button id="addShoppingBtn" class="btn btn-sm btn-success">Add</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- MAIN APP -->
-  <div id="app" class="hidden min-h-screen">
-    <header class="glass sticky top-0 z-50 shadow-lg">
-      <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center space-x-4">
-          <h1 class="text-3xl font-bold">PantryPal Pro</h1>
-          <span id="userEmail" class="text-sm opacity-80"></span>
-        </div>
-        <div class="flex items-center space-x-4">
-          <span id="scanCounter" class="text-sm font-medium bg-yellow-400 text-black px-3 py-1 rounded-full"></span>
-          <button id="darkModeBtn" class="p-2 rounded-lg glass">Dark Mode</button>
-          <button id="signOutBtn" class="px-6 py-2 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600">Sign Out</button>
-        </div>
-      </div>
-    </header>
-
-    <main class="max-w-6xl mx-auto px-6 py-10">
-      <!-- TABS -->
-      <div class="flex space-x-4 mb-8 overflow-x-auto">
-        <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="inventory">Inventory</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="shopping">Shopping List</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="scanner">Scanner</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="voice">Voice</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="ai">AI Scan (Pro)</button>
-      </div>
-
-      <!-- INVENTORY -->
-      <section id="inventory">
-        <div class="glass p-8 rounded-3xl">
-          <h2 class="text-2xl font-bold mb-6">Add to Inventory</h2>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <input id="invBarcode" type="text" placeholder="Barcode" class="px-4 py-3 rounded-xl glass"/>
-            <input id="invQty" type="number" value="1" min="1" class="px-4 py-3 rounded-xl glass"/>
-            <input id="invExp" type="date" class="px-4 py-3 rounded-xl glass"/>
-          </div>
-          <button id="addToInventory" class="px-8 py-4 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600">Add Item</button>
-          <div id="inventoryList" class="mt-8 space-y-4"></div>
-        </div>
-      </section>
-
-      <!-- SHOPPING -->
-      <section id="shopping" class="hidden">
-        <div class="glass p-8 rounded-3xl">
-          <h2 class="text-2xl font-bold mb-6">Shopping List</h2>
-          <div class="flex space-x-4 mb-6">
-            <input id="shopName" type="text" placeholder="Item name" class="flex-1 px-4 py-3 rounded-xl glass"/>
-            <input id="shopNeeded" type="number" value="1" min="1" class="w-24 px-4 py-3 rounded-xl glass"/>
-          </div>
-          <button id="addToShopping" class="px-8 py-4 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600">Add to List</button>
-          <div id="shoppingList" class="mt-8 space-y-4"></div>
-        </div>
-      </section>
-
-      <!-- SCANNER -->
-      <section id="scanner" class="hidden">
-        <div class="glass p-8 rounded-3xl text-center">
-          <h2 class="text-2xl font-bold mb-6">Scan Barcode / QR</h2>
-          <video id="video" width="100%" class="rounded-xl mb-6" autoplay playsinline></video>
-          <button id="startScanner" class="px-8 py-4 bg-purple-500 text-white rounded-xl font-bold hover:bg-purple-600">Start Scanner</button>
-          <p id="scanResult" class="mt-6 text-xl font-mono break-all"></p>
-        </div>
-      </section>
-
-      <!-- VOICE -->
-      <section id="voice" class="hidden">
-        <div class="glass p-8 rounded-3xl text-center">
-          <h2 class="text-2xl font-bold mb-6">Voice Add to Shopping</h2>
-          <button id="voiceBtn" class="w-24 h-24 bg-red-500 rounded-full text-white text-4xl hover:bg-red-600">Microphone</button>
-          <p class="mt-6">Hold to speak: "Add milk quantity 2"</p>
-          <p id="voiceResult" class="mt-6 text-xl text-green-400"></p>
-        </div>
-      </section>
-
-      <!-- AI SCAN -->
-      <section id="ai" class="hidden">
-        <div class="glass p-8 rounded-3xl text-center">
-          <h2 class="text-2xl font-bold mb-6">AI Photo Scan (Pro)</h2>
-          <input type="file" id="aiImage" accept="image/*" capture="camera" class="mb-6"/>
-          <button id="aiScanBtn" class="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-bold">Scan Photo</button>
-          <div id="aiResult" class="mt-8 text-left"></div>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <!-- SCAN TO INVENTORY + SHOPPING MODAL -->
-  <div id="scanModal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 p-6">
-    <div class="glass p-8 rounded-3xl max-w-sm w-full text-center">
-      <h3 class="text-2xl font-bold mb-4">Scanned!</h3>
-      <p class="text-lg mb-6 break-all font-mono" id="modalBarcode"></p>
-      <p class="text-sm opacity-70 mb-6">Added to <strong>Inventory</strong></p>
-      <div class="space-y-3">
-        <button id="addToShoppingBtn" class="w-full px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600">
-          Add to Shopping List
-        </button>
-        <button id="closeModalBtn" class="w-full px-6 py-3 bg-gray-500 text-white rounded-xl font-bold hover:bg-gray-600">
-          Done
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 
   <script>
-    lucide.createIcons();
-    const API_BASE = window.location.origin;
-
+    // ========== REPLACE WITH YOUR FIREBASE CONFIG ==========
     const firebaseConfig = {
-      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-      authDomain: "pantrypal-6e410.firebaseapp.com",
-      projectId: "pantrypal-6e410",
-      storageBucket: "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdef123456"
     };
+    // =======================================================
 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
-    const ui = new firebaseui.auth.AuthUI(auth);
+    const db = firebase.firestore();
+
+    // ========== DOM ELEMENTS ==========
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const userEmail = document.getElementById('userEmail');
+    const proBadge = document.getElementById('proBadge');
+    const authSection = document.getElementById('authSection');
+    const userInfo = document.getElementById('userInfo');
+    const scanSection = document.getElementById('scanSection');
+    const mainApp = document.getElementById('mainApp');
+
+    const fileInput = document.getElementById('fileInput');
+    const scanFileBtn = document.getElementById('scanFileBtn');
+    const urlInput = document.getElementById('urlInput');
+    const scanUrlBtn = document.getElementById('scanUrlBtn');
+    const preview = document.getElementById('preview');
+    const previewImg = document.getElementById('previewImg');
+    const scanResult = document.getElementById('scanResult');
+
+    const inventoryList = document.getElementById('inventoryList');
+    const shoppingList = document.getElementById('shoppingList');
+    const addManualBtn = document.getElementById('addManualBtn');
+    const newItemInput = document.getElementById('newItemInput');
+    const addShoppingBtn = document.getElementById('addShoppingBtn');
 
     let idToken = null;
-    const $ = s => document.querySelector(s);
 
-    // === AUTH ===
+    // ========== AUTH ==========
+    const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+    loginBtn.addEventListener('click', () => auth.signInWithPopup(googleProvider));
+    logoutBtn.addEventListener('click', () => auth.signOut());
+
     auth.onAuthStateChanged(async (user) => {
       if (user) {
         idToken = await user.getIdToken();
-        $('#userEmail').textContent = user.email || user.displayName || 'User';
-        $('#auth-section').classList.add('hidden');
-        $('#app').classList.remove('hidden');
-        await Promise.all([loadInventory(), loadShopping(), loadScanCount()]);
+        userEmail.textContent = user.email;
+        userInfo.classList.remove('d-none');
+        loginBtn.classList.add('d-none');
+        loadUserData();
+        scanSection.classList.remove('d-none');
+        mainApp.classList.remove('d-none');
       } else {
         idToken = null;
-        $('#auth-section').classList.remove('hidden');
-        $('#app').classList.add('hidden');
-        ui.start('#firebaseui-auth-container', {
-          signInFlow: 'popup',
-          signInOptions: [
-            firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-            firebase.auth.EmailAuthProvider.PROVIDER_ID
-          ],
-          callbacks: { signInSuccessWithAuthResult: () => false }
+        userInfo.classList.add('d-none');
+        loginBtn.classList.remove('d-none');
+        scanSection.classList.add('d-none');
+        mainApp.classList.add('d-none');
+      }
+    });
+
+    // ========== USER DATA ==========
+    async function loadUserData() {
+      try {
+        const res = await fetch('/api/user-info', {
+          headers: { Authorization: `Bearer ${idToken}` }
         });
-      }
-    });
-
-    $('#signOutBtn').onclick = () => auth.signOut();
-
-    // === API ===
-    async function api(path, opts = {}) {
-      if (!idToken) return null;
-      const res = await fetch(API_BASE + path, {
-        ...opts,
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json',
-          ...opts.headers
-        }
-      });
-      return res.ok ? await res.json() : null;
-    }
-
-    // === TABS ===
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.onclick = () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-        btn.classList.add('tab-active');
-        document.querySelectorAll('section[id]').forEach(s => s.classList.add('hidden'));
-        $(`#${btn.dataset.tab}`).classList.remove('hidden');
-      };
-    });
-
-    // === INVENTORY ===
-    $('#addToInventory').onclick = async () => {
-      const barcode = $('#invBarcode').value.trim();
-      const qty = parseInt($('#invQty').value) || 1;
-      const exp = $('#invExp').value;
-      if (!barcode) return alert('Enter barcode');
-      await addToInventory(barcode, qty, exp);
-      $('#invBarcode').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
-      loadInventory();
-    };
-
-    async function addToInventory(barcode, qty = 1, exp = '') {
-      const res = await api('/api/inventory', {
-        method: 'POST',
-        body: JSON.stringify({ barcode, quantity: qty, expiration: exp })
-      });
-      if (res?.success) {
-        $('#scanResult').textContent = `Added: ${barcode}`;
-        showScanModal(barcode);
+        const data = await res.json();
+        proBadge.classList.toggle('d-none', !data.isPro);
+        loadInventory();
+        loadShopping();
+      } catch (err) {
+        console.error('Failed to load user info:', err);
       }
     }
 
+    // ========== INVENTORY ==========
     async function loadInventory() {
-      const data = await api('/api/inventory');
-      const list = $('#inventoryList');
-      list.innerHTML = '';
-      (data?.items || []).forEach((item, i) => {
-        const div = document.createElement('div');
-        div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
-        div.innerHTML = `
-          <div>
-            <span class="font-bold">${item.name || item.barcode}</span>
-            <span class="text-sm opacity-80">x${item.quantity}</span>
-            ${item.expiration ? `<span class="text-xs opacity-70">| Exp: ${item.expiration}</span>` : ''}
-          </div>
-          <button class="delete-btn" data-type="inventory" data-index="${i}">Delete</button>
-        `;
-        list.appendChild(div);
-      });
-    }
+      try {
+        const res = await fetch('/api/inventory', {
+          headers: { Authorization: `Bearer ${idToken}` }
+        });
+        const { items } = await res.json();
+        inventoryList.innerHTML = items.length ? '' : '<p class="text-muted">No items yet</p>';
+        items.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'd-flex justify-content-between align-items-center border-bottom py-2';
+          div.innerHTML = `
+            <div>
+              <strong>${escapeHtml(item.name || item.barcode)}</strong><br>
+              <small>Qty: ${item.quantity} ${item.expiration ? `| Exp: ${escapeHtml(item.expiration)}` : ''}</small>
+            </div>
+            <button class="btn btn-sm btn-outline-danger" data-barcode="${item.barcode}">Remove</button>
+          `;
+          inventoryList.appendChild(div);
+        });
 
-    // === SHOPPING ===
-    $('#addToShopping').onclick = async () => {
-      const name = $('#shopName').value.trim();
-      const needed = parseInt($('#shopNeeded').value) || 1;
-      if (!name) return alert('Enter item name');
-      await addToShoppingList(name, needed);
-      $('#shopName').value = ''; $('#shopNeeded').value = 1;
-      loadShopping();
-    };
-
-    async function addToShoppingList(name, needed = 1) {
-      const res = await api('/api/shopping', {
-        method: 'POST',
-        body: JSON.stringify({ itemName: name, needed })
-      });
-      if (res?.success) {
-        $('#voiceResult').textContent = `Added: ${name} x${needed}`;
+        // Attach remove listeners
+        document.querySelectorAll('#inventoryList button').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const barcode = btn.dataset.barcode;
+            await removeFromInventory(barcode);
+          });
+        });
+      } catch (err) {
+        inventoryList.innerHTML = '<p class="text-danger">Failed to load inventory</p>';
       }
     }
 
+    async function removeFromInventory(barcode) {
+      try {
+        const res = await fetch('/api/inventory', { headers: { Authorization: `Bearer ${idToken}` } });
+        const { items } = await res.json();
+        const updated = items.filter(i => i.barcode !== barcode);
+        await fetch('/api/inventory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ items: updated })
+        });
+        loadInventory();
+      } catch (err) {
+        alert('Failed to remove item');
+      }
+    }
+
+    addManualBtn.addEventListener('click', () => {
+      const barcode = prompt('Enter barcode or name:');
+      if (barcode) addToInventory(barcode.trim());
+    });
+
+    async function addToInventory(barcode, quantity = 1, expiration = null) {
+      try {
+        await fetch('/api/inventory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ barcode, quantity, expiration })
+        });
+        loadInventory();
+      } catch (err) {
+        alert('Failed to add item');
+      }
+    }
+
+    // ========== SHOPPING LIST ==========
     async function loadShopping() {
-      const data = await api('/api/shopping');
-      const list = $('#shoppingList');
-      list.innerHTML = '';
-      (data?.list || []).forEach((item, i) => {
-        const div = document.createElement('div');
-        div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
-        div.innerHTML = `
-          <span>${item.itemName} <span class="text-sm opacity-80">(x${item.needed})</span></span>
-          <button class="delete-btn" data-type="shopping" data-index="${i}">Delete</button>
-        `;
-        list.appendChild(div);
-      });
+      try {
+        const res = await fetch('/api/shopping', {
+          headers: { Authorization: `Bearer ${idToken}` }
+        });
+        const { list } = await res.json();
+        shoppingList.innerHTML = list.length ? '' : '<p class="text-muted">List is empty</p>';
+        list.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'form-check';
+          div.innerHTML = `
+            <input class="form-check-input" type="checkbox" id="shop${item.addedAt}">
+            <label class="form-check-label" for="shop${item.addedAt}">
+              ${escapeHtml(item.itemName)} ${item.needed > 1 ? `(x${item.needed})` : ''}
+            </label>
+          `;
+          shoppingList.appendChild(div);
+        });
+      } catch (err) {
+        shoppingList.innerHTML = '<p class="text-danger">Failed to load list</p>';
+      }
     }
 
-    // === DELETE ===
-    document.addEventListener('click', async (e) => {
-      if (!e.target.classList.contains('delete-btn')) return;
-      const type = e.target.dataset.type;
-      const index = parseInt(e.target.dataset.index);
-      if (!confirm('Delete this item?')) return;
-
-      const data = type === 'inventory' ? (await api('/api/inventory')) : (await api('/api/shopping'));
-      const array = type === 'inventory' ? data?.items : data?.list;
-      if (!array || index >= array.length) return;
-
-      array.splice(index, 1);
-
-      const res = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
+    addShoppingBtn.addEventListener('click', () => {
+      const name = newItemInput.value.trim();
+      if (!name) return;
+      fetch('/api/shopping', {
         method: 'POST',
-        body: JSON.stringify(type === 'inventory' ? { inventory: array } : { shopping: array })
-      });
-
-      if (res?.success) {
-        type === 'inventory' ? loadInventory() : loadShopping();
-      }
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ itemName: name })
+      }).then(() => {
+        newItemInput.value = '';
+        loadShopping();
+      }).catch(() => alert('Failed to add item'));
     });
 
-    async function loadScanCount() {
-      const d = await api('/api/user-info');
-      $('#scanCounter').textContent = d?.isPro ? 'Unlimited AI Scans (Pro)' : `Free scans: ${d?.scans || 0}/10`;
-    }
-
-    // === SCANNER ===
-    let codeReader;
-    let lastScanned = null;
-    $('#startScanner').onclick = () => {
-      if (codeReader) {
-        codeReader.reset(); codeReader = null;
-        $('#startScanner').textContent = 'Start Scanner';
-        $('#video').srcObject = null;
-        return;
-      }
-      codeReader = new ZXing.BrowserMultiFormatReader();
-      codeReader.decodeFromVideoDevice(null, 'video', async (result) => {
-        if (result && result.getText() !== lastScanned) {
-          lastScanned = result.getText();
-          $('#scanResult').textContent = `Scanned: ${lastScanned}`;
-          await addToInventory(lastScanned, 1, '');
-          codeReader.reset(); codeReader = null;
-          $('#startScanner').textContent = 'Start Scanner';
-          $('#video').srcObject = null;
-        }
-      });
-      $('#startScanner').textContent = 'Stop Scanner';
-    };
-
-    // === SCAN MODAL ===
-    function showScanModal(barcode) {
-      $('#modalBarcode').textContent = barcode;
-      $('#scanModal').classList.remove('hidden');
-
-      $('#addToShoppingBtn').onclick = async () => {
-        await addToShoppingList(barcode, 1);
-        $('#scanModal').classList.add('hidden');
-      };
-
-      $('#closeModalBtn').onclick = () => {
-        $('#scanModal').classList.add('hidden');
-      };
-    }
-
-    // === VOICE → SHOPPING ONLY ===
-    if (annyang) {
-      annyang.addCommands({
-        'add *item quantity *qty': async (item, qty) => {
-          await addToShoppingList(item, qty || 1);
-        }
-      });
-      $('#voiceBtn').onmousedown = $('#voiceBtn').ontouchstart = () => annyang.start({ autoRestart: false });
-      $('#voiceBtn').onmouseup = $('#voiceBtn').ontouchend = () => annyang.abort();
-    }
-
-    // === AI SCAN ===
-    $('#aiScanBtn').onclick = async () => {
-      const file = $('#aiImage').files[0];
-      if (!file) return alert('Take a photo first');
-      const form = new FormData();
-      form.append('image', file);
-      $('#aiResult').innerHTML = '<p class="text-yellow-300">Scanning...</p>';
-      const res = await fetch(API_BASE + '/api/scan', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` }, body: form });
-      const data = await res.json();
-      $('#aiResult').innerHTML = data.labels?.length
-        ? `<p class="text-green-400 font-bold mb-4">Found:</p>${data.labels.map(l => `<div class="p-3 glass rounded-lg inline-block mr-2 mb-2">${l}</div>`).join('')}`
-        : '<p class="text-red-400">Nothing detected. Try again!</p>';
-    };
-
-    // Init
-    ui.start('#firebaseui-auth-container', {
-      signInFlow: 'popup',
-      signInOptions: [firebase.auth.GoogleAuthProvider.PROVIDER_ID, firebase.auth.EmailAuthProvider.PROVIDER_ID],
-      callbacks: { signInSuccessWithAuthResult: () => false }
+    // Enter key in shopping input
+    newItemInput.addEventListener('keypress', e => {
+      if (e.key === 'Enter') addShoppingBtn.click();
     });
+
+    // ========== SCAN LOGIC ==========
+    function showPreview(src) {
+      previewImg.src = src;
+      preview.classList.remove('d-none');
+    }
+
+    function hidePreview() {
+      preview.classList.add('d-none');
+      previewImg.src = '';
+    }
+
+    function showResult(labels) {
+      scanResult.classList.remove('d-none', 'loading');
+      scanResult.innerHTML = `
+        <h6>Detected:</h6>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          ${labels.slice(0, 8).map(l => `<span class="badge bg-primary result-badge">${escapeHtml(l)}</span>`).join('')}
+        </div>
+        <button class="btn btn-sm btn-success" id="addFromScanBtn">
+          Add "${escapeHtml(labels[0] || 'Item')}" to Inventory
+        </button>
+      `;
+
+      document.getElementById('addFromScanBtn')?.addEventListener('click', () => {
+        addToInventory(labels[0] || 'Unknown Item');
+        scanResult.classList.add('d-none');
+        hidePreview();
+      });
+    }
+
+    async function performScan(body) {
+      scanResult.className = 'd-none';
+      scanResult.innerHTML = `<p class="text-muted loading"><i class="bi bi-hourglass-split"></i> Scanning...</p>`;
+      scanResult.classList.remove('d-none');
+
+      try {
+        const res = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${idToken}` },
+          body
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error + (data.details ? `: ${data.details}` : ''));
+        showResult(data.labels);
+      } catch (err) {
+        scanResult.innerHTML = `<p class="text-danger">Scan failed: ${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    // File Scan
+    scanFileBtn.addEventListener('click', () => {
+      const file = fileInput.files[0];
+      if (!file) return alert('Please select an image');
+      const reader = new FileReader();
+      reader.onload = e => {
+        showPreview(e.target.result);
+        const form = new FormData();
+        form.append('image', file);
+        performScan(form);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // URL Scan
+    scanUrlBtn.addEventListener('click', () => {
+      const url = urlInput.value.trim();
+      if (!url) return alert('Enter a valid image URL');
+      if (!/^https?:\/\//i.test(url)) return alert('URL must start with http:// or https://');
+
+      showPreview(url);
+      performScan(JSON.stringify({ imageUrl: url }));
+      urlInput.value = '';
+    });
+
+    // Enter key in URL
+    urlInput.addEventListener('keypress', e => {
+      if (e.key === 'Enter') scanUrlBtn.click();
+    });
+
+    // Safe HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
   </script>
 </body>
 </html>
