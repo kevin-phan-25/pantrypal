@@ -1,13 +1,12 @@
-const CACHE_NAME = 'pantrypal-v1';
+const CACHE_NAME = 'pantrypal-v2'; // Updated version
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png',
-  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
-  'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js'
+  // Add icons if you have them
+  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js', // If switching scanner
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js'
 ];
 
 self.addEventListener('install', event => {
@@ -31,6 +30,6 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
     caches.match(event.request)
-      .then(response => response || fetch(event.request))
+      .then(response => response || fetch(event.request).catch(() => caches.match('/index.html'))) // Offline fallback
   );
 });
