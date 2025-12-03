@@ -7,12 +7,15 @@ const fileUpload = require('express-fileupload');
 const path = require('path');
 
 const app = express();
-app.use(cors());
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors({ origin: true })); // Allow all for dev - restrict in prod
 app.use(express.json({ limit: '10mb' }));
-app.use(fileUpload());
+app.use(fileUpload({ limits: { fileSize: 5 * 1024 * 1024 } })); // 5MB images
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ========== FIREBASE ADMIN (new key) ==========
+// ========== FIREBASE ADMIN ==========
 let firebaseKey;
 try {
   firebaseKey = JSON.parse(process.env.FIREBASE_ADMIN_KEY);
@@ -26,10 +29,10 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
-// ========== GOOGLE VISION (your existing GCLOUD_KEY_JSON) ==========
+// ========== GOOGLE VISION ==========
 let visionKey;
 try {
-  visionKey = JSON.parse(process.env.GCLOUD_KEY_JSON);  // ← THIS IS YOUR ORIGINAL NAME
+  visionKey = JSON.parse(process.env.GCLOUD_KEY_JSON);
   console.log('Google Vision loaded:', visionKey.project_id);
 } catch (err) {
   console.error('FATAL: GCLOUD_KEY_JSON missing or invalid');
@@ -72,21 +75,40 @@ app.post('/api/inventory', async (req, res) => {
   try {
     const token = req.headers.authorization?.split('Bearer ')[1];
     const decoded = await admin.auth().verifyIdToken(token);
-    const { barcode, quantity = 1, expiration } = req.body;
-
+    const { barcode, quantity = 1, expiration, name } = req.body;
     await db.collection('users').doc(decoded.uid).set({
       inventory: admin.firestore.FieldValue.arrayUnion({
+        id: Date.now().toString(), // New: Unique ID
         barcode,
-        name: barcode,
+        name: name || barcode,
         quantity,
         expiration: expiration || null,
-        addedAt: new Date().toISOString()
+        addedAt: admin.firestore.FieldValue.serverTimestamp()
       })
     }, { merge: true });
     res.json({ success: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Save failed' });
+  }
+});
+
+// New: Delete by ID
+app.post('/api/inventory/delete', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const { id } = req.body;
+    const docRef = db.collection('users').doc(decoded.uid);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.json({ success: false });
+    let inventory = doc.data().inventory || [];
+    inventory = inventory.filter(item => item.id !== id);
+    await docRef.update({ inventory });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Delete failed' });
   }
 });
 
@@ -107,12 +129,12 @@ app.post('/api/shopping', async (req, res) => {
     const token = req.headers.authorization?.split('Bearer ')[1];
     const decoded = await admin.auth().verifyIdToken(token);
     const { itemName, needed = 1 } = req.body;
-
     await db.collection('users').doc(decoded.uid).set({
       shopping: admin.firestore.FieldValue.arrayUnion({
+        id: Date.now().toString(), // New: Unique ID
         itemName,
         needed,
-        addedAt: new Date().toISOString()
+        addedAt: admin.firestore.FieldValue.serverTimestamp()
       })
     }, { merge: true });
     res.json({ success: true });
@@ -122,22 +144,37 @@ app.post('/api/shopping', async (req, res) => {
   }
 });
 
-// ========== AI SCAN (Google Vision) ==========
+// New: Delete by ID
+app.post('/api/shopping/delete', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    const { id } = req.body;
+    const docRef = db.collection('users').doc(decoded.uid);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.json({ success: false });
+    let shopping = doc.data().shopping || [];
+    shopping = shopping.filter(item => item.id !== id);
+    await docRef.update({ shopping });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Delete failed' });
+  }
+});
+
+// ========== AI SCAN ==========
 app.post('/api/scan', async (req, res) => {
   try {
     const token = req.headers.authorization?.split('Bearer ')[1];
     if (!token) return res.status(401).json({ error: 'No token' });
-
     const decoded = await admin.auth().verifyIdToken(token);
     if (!req.files?.image) return res.status(400).json({ error: 'No image' });
-
     const [result] = await vision.labelDetection(req.files.image.data);
-    const labels = result.labelAnnotations.map(a => a.description);
-
-    await db.collection('users').doc(decoded.uid).update({
+    const labels = result.labelAnnotations?.slice(0, 5).map(a => a.description).filter(l => l.length > 2); // Top 5 relevant
+    await db.collection('users').doc(decoded.uid).set({
       scans: admin.firestore.FieldValue.increment(1)
-    });
-
+    }, { merge: true });
     res.json({ labels });
   } catch (err) {
     console.error('Vision error:', err.message);
@@ -145,7 +182,6 @@ app.post('/api/scan', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`PantryPal Pro LIVE → https://pantrypal-zdi4.onrender.com`);
+  console.log(`PantryPal Pro LIVE on port ${PORT}`);
 });
