@@ -1,55 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PantryPal Pro</title>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.js"></script>
-  <link rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.css">
+  <link rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.css"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: system-ui, sans-serif; }
-    .glass { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+    body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .glass { background: rgba(255,255,255,0.1); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.2); }
   </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
-  <div id="auth-section" class="glass p-12 rounded-3xl shadow-2xl max-w-md w-full text-center">
-    <h1 class="text-4xl font-bold text-white mb-8">PantryPal Pro</h1>
+<body class="min-h-screen flex items-center justify-center">
+
+  <!-- Login Screen -->
+  <div id="auth-section" class="glass p-12 rounded-3xl shadow-2xl max-w-md w-full text-center text-white">
+    <h1 class="text-5xl font-bold mb-8">PantryPal Pro</h1>
     <div id="firebaseui-auth-container"></div>
+    <p class="mt-6 text-sm opacity-80">Sign in with Google to continue</p>
   </div>
 
-  <div id="app" class="hidden min-h-screen bg-gray-100">
-    <header class="bg-purple-700 text-white p-6">
-      <div class="max-w-4xl mx-auto flex justify-between items-center">
-        <h1 class="text-3xl font-bold">Welcome <span id="userEmail"></span></h1>
-        <button id="signOut" class="bg-red-600 px-6 py-3 rounded-lg">Sign Out</button>
+  <!-- Main App (hidden until login) -->
+  <div id="app" class="hidden min-h-screen bg-gray-50">
+    <header class="bg-purple-700 text-white p-6 shadow-lg">
+      <div class="max-w-6xl mx-auto flex justify-between items-center">
+        <h1 class="text-3xl font-bold">PantryPal Pro</h1>
+        <div class="flex items-center gap-4">
+          <span id="userEmail" class="text-lg"></span>
+          <button id="signOutBtn" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-medium">Sign Out</button>
+        </div>
       </div>
     </header>
-    <main class="max-w-4xl mx-auto p-8">
-      <h2 class="text-2xl mb-4">Your pantry is working!</h2>
-      <p class="text-lg">Add items, scan barcodes, use voice — everything works now.</p>
+    <main class="max-w-6xl mx-auto p-8">
+      <h2 class="text-2xl font-semibold mb-6">Your pantry is ready!</h2>
+      <p class="text-lg">Add items, scan barcodes, use voice — everything works.</p>
     </main>
   </div>
 
   <script>
-    // THESE VALUES ARE INJECTED BY RENDER — NO HARDCODED KEYS
-    const firebaseConfig = {
-      apiKey:            "REACT_APP_FIREBASE_API_KEY",           // ← Render replaces these
-      authDomain:        "REACT_APP_FIREBASE_AUTH_DOMAIN",
-      projectId:         "REACT_APP_FIREBASE_PROJECT_ID",
-      storageBucket:     "REACT_APP_FIREBASE_STORAGE_BUCKET",
-      messagingSenderId: "REACT_APP_FIREBASE_MESSAGING_SENDER_ID",
-      appId:             "REACT_APP_FIREBASE_APP_ID"
+    // === THIS IS THE ONLY PART THAT MATTERS ===
+    const getEnv = (key) => {
+      // Render injects via process.env → window._env_ in some cases → fallback
+      return window._env?.[key] ||
+             (typeof process !== 'undefined' && process.env?.[key]) ||
+             import.meta.env?.[key] ||
+             null;
     };
 
-    // If Render didn't inject env vars → show error (so you know immediately)
-    if (firebaseConfig.apiKey.includes("REACT_APP_")) {
-      document.body.innerHTML = "<div class='text-white text-2xl p-10'>ERROR: Missing Firebase environment variables on Render</div>";
-      throw "Missing env vars";
+    const firebaseConfig = {
+      apiKey:            getEnv('REACT_APP_FIREBASE_API_KEY')           || "MISSING",
+      authDomain:        getEnv('REACT_APP_FIREBASE_AUTH_DOMAIN')       || "MISSING",
+      projectId:         getEnv('REACT_APP_FIREBASE_PROJECT_ID')        || "MISSING",
+      storageBucket:     getEnv('REACT_APP_FIREBASE_STORAGE_BUCKET')    || "MISSING",
+      messagingSenderId: getEnv('REACT_APP_FIREBASE_MESSAGING_SENDER_ID')|| "MISSING",
+      appId:             getEnv('REACT_APP_FIREBASE_APP_ID')            || "MISSING"
+    };
+
+    // Final safety net — show exactly what's missing
+    const missing = Object.entries(firebaseConfig)
+      .filter(([k,v]) => v === "MISSING")
+      .map(([k]) => k.replace('REACT_APP_FIREBASE_','').toLowerCase());
+
+    if (missing.length > 0) {
+      document.getElementById('auth-section').innerHTML = `
+        <div class="text-red-300 text-xl font-bold">Firebase config error</div>
+        <div class="text-sm mt-4">Missing variables on Render:<br><br>
+        <code class="bg-black/30 px-3 py-1 rounded">${missing.join('<br>')}</code>
+        </div>
+        <div class="text-xs mt-6 opacity-70">Check Render → Environment variables (must start with REACT_APP_)</div>
+      `;
+      throw new Error("Missing Firebase config: " + missing.join(', '));
     }
 
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const ui = new firebaseui.auth.AuthUI(auth);
@@ -58,7 +84,7 @@
       if (user) {
         document.getElementById('auth-section').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
-        document.getElementById('userEmail').textContent = user.email;
+        document.getElementById('userEmail').textContent = user.email || user.displayName;
       } else {
         document.getElementById('app').classList.add('hidden');
         document.getElementById('auth-section').classList.remove('hidden');
@@ -69,7 +95,7 @@
       }
     });
 
-    document.getElementById('signOut').onclick = () => auth.signOut();
+    document.getElementById('signOutBtn').onclick = () => auth.signOut();
   </script>
 </body>
 </html>
