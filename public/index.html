@@ -20,6 +20,8 @@
     .dark .glass { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); }
     .tab-active { @apply bg-white text-purple-600 dark:bg-gray-800 dark:text-purple-400; }
     .delete-btn { @apply text-red-500 hover:text-red-700 font-bold text-sm; }
+    .expiring-soon { @apply text-red-500 bg-red-100 dark:bg-red-900 px-2 py-1 rounded }; /* New: Expiry alert */
+    .loading { @apply opacity-50 cursor-not-allowed }; /* New: Loading state */
   </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 text-gray-900 dark:text-white transition-colors">
@@ -31,7 +33,6 @@
       <p class="text-center mt-4 text-sm opacity-70">Sign in to unlock Pro features</p>
     </div>
   </div>
-
   <!-- MAIN APP -->
   <div id="app" class="hidden min-h-screen">
     <header class="glass sticky top-0 z-50 shadow-lg">
@@ -42,12 +43,11 @@
         </div>
         <div class="flex items-center space-x-4">
           <span id="scanCounter" class="text-sm font-medium bg-yellow-400 text-black px-3 py-1 rounded-full"></span>
-          <button id="darkModeBtn" class="p-2 rounded-lg glass">Dark Mode</button>
+          <button id="darkModeBtn" class="p-2 rounded-lg glass">🌙 Dark Mode</button> <!-- Fixed toggle text -->
           <button id="signOutBtn" class="px-6 py-2 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600">Sign Out</button>
         </div>
       </div>
     </header>
-
     <main class="max-w-6xl mx-auto px-6 py-10">
       <!-- TABS -->
       <div class="flex space-x-4 mb-8 overflow-x-auto">
@@ -57,13 +57,12 @@
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="voice">Voice</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="ai">AI Scan (Pro)</button>
       </div>
-
       <!-- INVENTORY -->
       <section id="inventory">
         <div class="glass p-8 rounded-3xl">
           <h2 class="text-2xl font-bold mb-6">Add to Inventory</h2>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <input id="invBarcode" type="text" placeholder="Barcode" class="px-4 py-3 rounded-xl glass"/>
+            <input id="invBarcode" type="text" placeholder="Barcode or Name" class="px-4 py-3 rounded-xl glass"/>
             <input id="invQty" type="number" value="1" min="1" class="px-4 py-3 rounded-xl glass"/>
             <input id="invExp" type="date" class="px-4 py-3 rounded-xl glass"/>
           </div>
@@ -71,7 +70,6 @@
           <div id="inventoryList" class="mt-8 space-y-4"></div>
         </div>
       </section>
-
       <!-- SHOPPING -->
       <section id="shopping" class="hidden">
         <div class="glass p-8 rounded-3xl">
@@ -84,7 +82,6 @@
           <div id="shoppingList" class="mt-8 space-y-4"></div>
         </div>
       </section>
-
       <!-- SCANNER -->
       <section id="scanner" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
@@ -94,17 +91,16 @@
           <p id="scanResult" class="mt-6 text-xl font-mono break-all"></p>
         </div>
       </section>
-
       <!-- VOICE -->
       <section id="voice" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">Voice Add to Shopping</h2>
-          <button id="voiceBtn" class="w-24 h-24 bg-red-500 rounded-full text-white text-4xl hover:bg-red-600">Microphone</button>
+          <button id="voiceBtn" class="w-24 h-24 bg-red-500 rounded-full text-white text-4xl hover:bg-red-600">🎤</button> <!-- Icon update -->
           <p class="mt-6">Hold to speak: "Add milk quantity 2"</p>
           <p id="voiceResult" class="mt-6 text-xl text-green-400"></p>
+          <p id="voiceError" class="mt-2 text-red-400 hidden"></p> <!-- New: Error display -->
         </div>
       </section>
-
       <!-- AI SCAN -->
       <section id="ai" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
@@ -116,8 +112,7 @@
       </section>
     </main>
   </div>
-
-  <!-- SCAN TO INVENTORY + SHOPPING MODAL -->
+  <!-- SCAN MODAL -->
   <div id="scanModal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 p-6">
     <div class="glass p-8 rounded-3xl max-w-sm w-full text-center">
       <h3 class="text-2xl font-bold mb-4">Scanned!</h3>
@@ -133,26 +128,38 @@
       </div>
     </div>
   </div>
-
   <script>
     lucide.createIcons();
     const API_BASE = window.location.origin;
 
+    // Secure Firebase Config from Env (Fallback to old for local testing - REMOVE IN PROD)
     const firebaseConfig = {
-      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-      authDomain: "pantrypal-6e410.firebaseapp.com",
-      projectId: "pantrypal-6e410",
-      storageBucket: "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
+      apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", // ← REGENERATE!
+      authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "pantrypal-6e410.firebaseapp.com",
+      projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "pantrypal-6e410",
+      storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "pantrypal-6e410.appspot.com",
+      messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "592127259891",
+      appId: process.env.REACT_APP_FIREBASE_APP_ID || "1:592127259891:web:fcc158b7b1c35ce0b3b386"
     };
+    console.warn('Using env config for Firebase - ensure keys are restricted!'); // Debug log
 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const ui = new firebaseui.auth.AuthUI(auth);
-
     let idToken = null;
     const $ = s => document.querySelector(s);
+
+    // Dark Mode Toggle (Fixed)
+    $('#darkModeBtn').onclick = () => {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      $('#darkModeBtn').textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+      localStorage.setItem('darkMode', isDark);
+    };
+    if (localStorage.getItem('darkMode') === 'true') {
+      document.documentElement.classList.add('dark');
+      $('#darkModeBtn').textContent = '☀️ Light Mode';
+    }
 
     // === AUTH ===
     auth.onAuthStateChanged(async (user) => {
@@ -176,21 +183,26 @@
         });
       }
     });
-
     $('#signOutBtn').onclick = () => auth.signOut();
 
     // === API ===
     async function api(path, opts = {}) {
       if (!idToken) return null;
-      const res = await fetch(API_BASE + path, {
-        ...opts,
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json',
-          ...opts.headers
-        }
-      });
-      return res.ok ? await res.json() : null;
+      try {
+        const res = await fetch(API_BASE + path, {
+          ...opts,
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+            ...opts.headers
+          }
+        });
+        return res.ok ? await res.json() : null;
+      } catch (err) {
+        console.error('API Error:', err);
+        alert('Network error - check console');
+        return null;
+      }
     }
 
     // === TABS ===
@@ -203,25 +215,41 @@
       };
     });
 
+    // Product Name Lookup (New)
+    async function getProductName(barcode) {
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        const data = await res.json();
+        return data.status === 1 ? data.product.product_name || barcode : barcode;
+      } catch {
+        return barcode;
+      }
+    }
+
     // === INVENTORY ===
     $('#addToInventory').onclick = async () => {
       const barcode = $('#invBarcode').value.trim();
       const qty = parseInt($('#invQty').value) || 1;
       const exp = $('#invExp').value;
-      if (!barcode) return alert('Enter barcode');
-      await addToInventory(barcode, qty, exp);
+      if (!barcode) return alert('Enter barcode or name');
+      $('#addToInventory').classList.add('loading'); // Loading
+      const name = await getProductName(barcode);
+      await addToInventory(barcode, qty, exp, name);
+      $('#addToInventory').classList.remove('loading');
       $('#invBarcode').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
       loadInventory();
     };
 
-    async function addToInventory(barcode, qty = 1, exp = '') {
+    async function addToInventory(barcode, qty = 1, exp = '', name = '') {
       const res = await api('/api/inventory', {
         method: 'POST',
-        body: JSON.stringify({ barcode, quantity: qty, expiration: exp })
+        body: JSON.stringify({ barcode, quantity: qty, expiration: exp, name: name || barcode })
       });
       if (res?.success) {
-        $('#scanResult').textContent = `Added: ${barcode}`;
-        showScanModal(barcode);
+        $('#scanResult').textContent = `Added: ${name || barcode}`;
+        showScanModal(barcode, name || barcode);
+      } else {
+        alert('Add failed - check console');
       }
     }
 
@@ -231,14 +259,15 @@
       list.innerHTML = '';
       (data?.items || []).forEach((item, i) => {
         const div = document.createElement('div');
-        div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
+        const isExpiring = item.expiration && new Date(item.expiration) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // <7 days
+        div.className = `glass rounded-2xl p-4 flex justify-between items-center ${isExpiring ? 'expiring-soon' : ''}`;
         div.innerHTML = `
           <div>
-            <span class="font-bold">${item.name || item.barcode}</span>
+            <span class="font-bold">${item.name}</span>
             <span class="text-sm opacity-80">x${item.quantity}</span>
             ${item.expiration ? `<span class="text-xs opacity-70">| Exp: ${item.expiration}</span>` : ''}
           </div>
-          <button class="delete-btn" data-type="inventory" data-index="${i}">Delete</button>
+          <button class="delete-btn" data-type="inventory" data-id="${item.barcode || i}">Delete</button> <!-- Use ID -->
         `;
         list.appendChild(div);
       });
@@ -273,30 +302,22 @@
         div.className = 'glass rounded-2xl p-4 flex justify-between items-center';
         div.innerHTML = `
           <span>${item.itemName} <span class="text-sm opacity-80">(x${item.needed})</span></span>
-          <button class="delete-btn" data-type="shopping" data-index="${i}">Delete</button>
+          <button class="delete-btn" data-type="shopping" data-id="${item.itemName || i}">Delete</button> <!-- Use ID -->
         `;
         list.appendChild(div);
       });
     }
 
-    // === DELETE ===
+    // === DELETE (Fixed - No Mutation) ===
     document.addEventListener('click', async (e) => {
       if (!e.target.classList.contains('delete-btn')) return;
       const type = e.target.dataset.type;
-      const index = parseInt(e.target.dataset.index);
+      const id = e.target.dataset.id;
       if (!confirm('Delete this item?')) return;
-
-      const data = type === 'inventory' ? (await api('/api/inventory')) : (await api('/api/shopping'));
-      const array = type === 'inventory' ? data?.items : data?.list;
-      if (!array || index >= array.length) return;
-
-      array.splice(index, 1);
-
-      const res = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
+      const res = await api(type === 'inventory' ? '/api/inventory/delete' : '/api/shopping/delete', {
         method: 'POST',
-        body: JSON.stringify(type === 'inventory' ? { inventory: array } : { shopping: array })
+        body: JSON.stringify({ id })
       });
-
       if (res?.success) {
         type === 'inventory' ? loadInventory() : loadShopping();
       }
@@ -307,7 +328,7 @@
       $('#scanCounter').textContent = d?.isPro ? 'Unlimited AI Scans (Pro)' : `Free scans: ${d?.scans || 0}/10`;
     }
 
-    // === SCANNER ===
+    // === SCANNER (Improved Mobile) ===
     let codeReader;
     let lastScanned = null;
     $('#startScanner').onclick = () => {
@@ -318,56 +339,82 @@
         return;
       }
       codeReader = new ZXing.BrowserMultiFormatReader();
-      codeReader.decodeFromVideoDevice(null, 'video', async (result) => {
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(stream => {
+        $('#video').srcObject = stream;
+      }).catch(err => alert('Camera access denied: ' + err));
+      codeReader.decodeFromVideoDevice(null, 'video', async (result, err) => {
         if (result && result.getText() !== lastScanned) {
           lastScanned = result.getText();
           $('#scanResult').textContent = `Scanned: ${lastScanned}`;
-          await addToInventory(lastScanned, 1, '');
+          const name = await getProductName(lastScanned);
+          await addToInventory(lastScanned, 1, '', name);
           codeReader.reset(); codeReader = null;
           $('#startScanner').textContent = 'Start Scanner';
           $('#video').srcObject = null;
+        } else if (err && !err.name.includes('NotAllowedError')) {
+          console.error('Scanner error:', err);
         }
       });
       $('#startScanner').textContent = 'Stop Scanner';
     };
 
     // === SCAN MODAL ===
-    function showScanModal(barcode) {
-      $('#modalBarcode').textContent = barcode;
+    function showScanModal(barcode, name) {
+      $('#modalBarcode').textContent = name || barcode;
       $('#scanModal').classList.remove('hidden');
-
       $('#addToShoppingBtn').onclick = async () => {
-        await addToShoppingList(barcode, 1);
+        await addToShoppingList(name || barcode, 1);
         $('#scanModal').classList.add('hidden');
       };
-
       $('#closeModalBtn').onclick = () => {
         $('#scanModal').classList.add('hidden');
       };
     }
 
-    // === VOICE → SHOPPING ONLY ===
+    // === VOICE (Improved Error Handling) ===
     if (annyang) {
       annyang.addCommands({
-        'add *item quantity *qty': async (item, qty) => {
-          await addToShoppingList(item, qty || 1);
+        'add *item quantity *qty': async (item, qtyStr) => {
+          const qty = parseInt(qtyStr) || 1;
+          await addToShoppingList(item, qty);
+          $('#voiceResult').textContent = `Added: ${item} x${qty}`;
         }
       });
-      $('#voiceBtn').onmousedown = $('#voiceBtn').ontouchstart = () => annyang.start({ autoRestart: false });
-      $('#voiceBtn').onmouseup = $('#voiceBtn').ontouchend = () => annyang.abort();
+      const voiceBtn = $('#voiceBtn');
+      voiceBtn.onmousedown = voiceBtn.ontouchstart = () => {
+        if (annyang) {
+          annyang.start({ autoRestart: false });
+          $('#voiceError').classList.add('hidden');
+        } else {
+          $('#voiceError').textContent = 'Voice not supported in this browser';
+          $('#voiceError').classList.remove('hidden');
+        }
+      };
+      voiceBtn.onmouseup = voiceBtn.ontouchend = () => {
+        if (annyang) annyang.abort();
+      };
+      annyang.error = (err) => {
+        $('#voiceError').textContent = 'Voice error: ' + err.error;
+        $('#voiceError').classList.remove('hidden');
+      };
+    } else {
+      $('#voiceBtn').textContent = '❌';
+      $('#voiceResult').textContent = 'Voice recognition not available. Use Chrome.';
     }
 
-    // === AI SCAN ===
+    // === AI SCAN (Clickable Results) ===
     $('#aiScanBtn').onclick = async () => {
       const file = $('#aiImage').files[0];
       if (!file) return alert('Take a photo first');
+      $('#aiScanBtn').classList.add('loading');
       const form = new FormData();
       form.append('image', file);
       $('#aiResult').innerHTML = '<p class="text-yellow-300">Scanning...</p>';
       const res = await fetch(API_BASE + '/api/scan', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` }, body: form });
       const data = await res.json();
+      $('#aiScanBtn').classList.remove('loading');
       $('#aiResult').innerHTML = data.labels?.length
-        ? `<p class="text-green-400 font-bold mb-4">Found:</p>${data.labels.map(l => `<div class="p-3 glass rounded-lg inline-block mr-2 mb-2">${l}</div>`).join('')}`
+        ? `<p class="text-green-400 font-bold mb-4">Found: Click to add</p>${data.labels.map(l => `<div class="p-3 glass rounded-lg inline-block mr-2 mb-2 cursor-pointer hover:bg-purple-600" onclick="addToInventory('',1,'','${l}')">${l}</div>`).join('')}`
         : '<p class="text-red-400">Nothing detected. Try again!</p>';
     };
 
