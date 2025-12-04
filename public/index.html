@@ -1,61 +1,30 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>PantryPal Pro</title>
-  <link rel="manifest" href="data:application/manifest+json,{
-    \"name\":\"PantryPal Pro\",
-    \"short_name\":\"PantryPal\",
-    \"start_url\":\".\",
-    \"display\":\"standalone\",
-    \"background_color\":\"#667eea\",
-    \"theme_color\":\"#8b5cf6\",
-    \"icons\":[{\"src\":\"https://cdn-icons-png.flaticon.com/512/107/107827.png\",\"sizes\":\"192x192\"},{\"src\":\"https://cdn-icons-png.flaticon.com/512/107/107827.png\",\"sizes\":\"512x512\"}]
-  }">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pantrypal Pro</title>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.1/umd/index.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/annyang@2.6.1/annyang.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=swap" rel="stylesheet"/>
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    .glass { background: rgba(255,255,255,0.15); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
-    .dark .glass { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: white; }
-    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); animation: gradient 15s ease infinite; }
-    @keyframes gradient { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-    .dark .gradient-bg { background: #0a0118; }
-    .btn-glow { box-shadow: 0 0 20px rgba(139,92,246,0.5); transition: all 0.3s; }
-    .btn-glow:hover { box-shadow: 0 0 30px rgba(139,92,246,0.8); transform: translateY(-2px); }
-    .tab-active { background: rgba(255,255,255,0.2); color: white; }
-    .exp-soon { background: #f59e0b; color: black; }
-    .exp-today { background: #ef4444; color: white; animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
-    .pro-badge { background: linear-gradient(90deg, #10b981, #059669); color: white; }
-  </style>
+  <style>body{font-family:Inter,sans-serif}.glass{background:rgba(255,255,255,0.15);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.2)}.gradient-bg{background:linear-gradient(135deg,#667eea 0%,#764ba2 50%,#f093fb 100%);animation:gradient 15s ease infinite}@keyframes gradient{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}</style>
 </head>
-<body class="min-h-screen gradient-bg text-gray-900 dark:text-white">
-
-  <!-- AUTH -->
+<body class="min-h-screen gradient-bg text-gray-900">
   <div id="auth-section" class="flex items-center justify-center min-h-screen p-6">
     <div class="glass p-12 rounded-3xl shadow-2xl max-w-md w-full text-center">
-      <h1 class="text-5xl font-bold mb-6 text-white">PantryPal Pro</h1>
-      <p class="text-lg mb-8 opacity-80 text-white">Scan, track, shop</p>
-      <button id="googleSignIn" class="w-full py-4 bg-white text-gray-800 rounded-2xl font-bold shadow-xl btn-glow flex items-center justify-center gap-3">
+      <h1 class="text-5xl font-bold mb-6 text-white">Pantrypal Pro</h1>
+      <button id="googleSignIn" class="w-full py-4 bg-white text-gray-800 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3 mx-auto">
         <img src="https://developers.google.com/identity/images/g-logo.png" class="w-8 h-8" alt="G">
         Sign in with Google
       </button>
     </div>
   </div>
 
-  <!-- MAIN APP -->
   <div id="app" class="hidden min-h-screen">
     <header class="glass sticky top-0 z-50 shadow-lg border-b border-white/10">
       <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
         <div class="flex items-center gap-4">
-          <h1 class="text-3xl font-bold text-white">PantryPal Pro</h1>
+          <h1 class="text-3xl font-bold text-white">Pantrypal Pro</h1>
           <span id="userEmail" class="text-sm opacity-80 text-white"></span>
         </div>
         <div class="flex items-center gap-4">
@@ -74,21 +43,20 @@
         <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="ai">AI Scan</button>
       </div>
 
-      <!-- INVENTORY -->
       <section id="inventory">
         <div class="glass p-8 rounded-3xl mb-8">
-          <input type="text" id="inventorySearch" placeholder="Search inventory..." class="w-full px-4 py-3 rounded-xl mb-6 text-gray-900"/>
+          <input type="text" id="inventorySearch" placeholder="Search inventory..." class="w-full px-4 py-3 rounded-xl mb-6 text-gray-900">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div class="relative">
-              <input id="invBarcode" type="text" placeholder="Barcode / Name" class="w-full px-4 py-3 rounded-xl pr-10 text-gray-900"/>
-              <button id="scanBtn" class="absolute right-2 top-2 p-1 text-2xl btn-glow">📷</button>
+              <input id="invBarcode" type="text" placeholder="Barcode / Name" class="w-full px-4 py-3 rounded-xl pr-10 text-gray-900">
+              <button id="scanBtn" class="absolute right-2 top-2 p-1 text-2xl">📷</button>
             </div>
             <div>
-              <input id="invQty" type="number" value="1" min="1" class="w-full px-4 py-3 rounded-xl text-gray-900"/>
+              <input id="invQty" type="number" value="1" min="1" class="w-full px-4 py-3 rounded-xl text-gray-900">
               <label class="block text-xs opacity-70 mt-1">Quantity</label>
             </div>
             <div>
-              <input id="invExp" type="date" class="w-full px-4 py-3 rounded-xl text-gray-900"/>
+              <input id="invExp" type="date" class="w-full px-4 py-3 rounded-xl text-gray-900">
               <label class="block text-xs opacity-70 mt-1">Expiration Date</label>
             </div>
             <div>
@@ -99,20 +67,18 @@
         <div id="inventoryList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
       </section>
 
-      <!-- SHOPPING -->
       <section id="shopping" class="hidden">
         <div class="glass p-8 rounded-3xl mb-8">
-          <input type="text" id="shoppingSearch" placeholder="Search shopping list..." class="w-full px-4 py-3 rounded-xl mb-6 text-gray-900"/>
+          <input type="text" id="shoppingSearch" placeholder="Search shopping list..." class="w-full px-4 py-3 rounded-xl mb-6 text-gray-900">
           <div class="flex gap-4 mb-6">
-            <input id="shopName" type="text" placeholder="Item name" class="flex-1 px-4 py-3 rounded-xl text-gray-900"/>
-            <input id="shopNeeded" type="number" value="1" min="1" class="w-20 px-4 py-3 rounded-xl text-gray-900"/>
+            <input id="shopName" type="text" placeholder="Item name" class="flex-1 px-4 py-3 rounded-xl text-gray-900">
+            <input id="shopNeeded" type="number" value="1" min="1" class="w-20 px-4 py-3 rounded-xl text-gray-900">
             <button id="addToShopping" class="px-4 py-3 bg-blue-500 text-white rounded-xl font-bold">+</button>
           </div>
         </div>
         <div id="shoppingList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
       </section>
 
-      <!-- SCANNER -->
       <section id="scanner" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6 text-white">Scanner</h2>
@@ -122,7 +88,6 @@
         </div>
       </section>
 
-      <!-- VOICE -->
       <section id="voice" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6 text-white">Voice</h2>
@@ -132,11 +97,10 @@
         </div>
       </section>
 
-      <!-- AI SCAN -->
       <section id="ai" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6 text-white">AI Scan</h2>
-          <input type="file" id="aiImage" accept="image/*" capture="camera" class="mb-6 px-4 py-3 rounded-xl text-gray-900"/>
+          <input type="file" id="aiImage" accept="image/*" capture="camera" class="mb-6 px-4 py-3 rounded-xl text-gray-900">
           <button id="aiScanBtn" class="px-8 py-3 bg-indigo-500 text-white rounded-xl font-bold">Scan</button>
           <div id="aiResult" class="mt-8 text-left text-white"></div>
         </div>
@@ -252,173 +216,9 @@
         });
       }).catch(() => {
         const items = load('inventory');
-        // Render items from local
         const list = $('#inventoryList'); list.innerHTML = '';
         items.forEach((item, i) => {
           const card = document.createElement('div');
           card.className = 'item-card glass rounded-2xl p-4 shadow-xl flex gap-4';
           card.innerHTML = `
-            ${item.image ? `<img src="${item.image}" class="w-16 h-16 rounded-lg object-cover shadow-lg">` : '<div class="w-16 h-16 bg-gray-400 rounded-lg flex items-center justify-center text-2xl">?</div>'}
-            <div class="flex-1">
-              <div class="font-bold text-base">${item.name}</div>
-              <div class="text-sm opacity-70">${item.brand || ''}</div>
-              <div class="text-sm">x${item.quantity}</div>
-              <div class="text-xs mt-1">${getExpBadge(item.expiration)}</div>
-            </div>
-            <button class="delete-btn text-red-400 font-bold ml-auto" data-type="inventory" data-index="${i}">Delete</button>
-          `;
-          list.appendChild(card);
-        });
-      });
-    }
-
-    // ADD SHOPPING
-    $('#addToShopping').onclick = async () => {
-      const name = $('#shopName').value.trim();
-      if (!name) return alert('Enter name');
-      const product = name.length > 7 && !isNaN(name) ? await lookupProduct(name) : { name, image: null };
-      const item = { id: Date.now(), itemName: product.name, image: product.image, needed: parseInt($('#shopNeeded').value) || 1 };
-      const res = await fetch(API_BASE + '/api/shopping', { method: 'POST', headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
-      if (!res.ok) save('shopping', [...load('shopping'), item]);
-      $('#shopName').value = ''; $('#shopNeeded').value = 1;
-      loadShopping();
-    };
-
-    // LOAD SHOPPING
-    function loadShopping() {
-      fetch(API_BASE + '/api/shopping', { headers: { Authorization: `Bearer ${idToken}` } }).then(r => r.json()).then(data => {
-        const items = data?.list || load('shopping');
-        const list = $('#shoppingList'); list.innerHTML = '';
-        items.forEach((item, i) => {
-          const card = document.createElement('div');
-          card.className = 'item-card glass rounded-2xl p-4 shadow-xl flex gap-4';
-          card.innerHTML = `
-            ${item.image ? `<img src="${item.image}" class="w-16 h-16 rounded-lg object-cover shadow-lg">` : '<div class="w-16 h-16 bg-gray-400 rounded-lg flex items-center justify-center text-2xl">?</div>'}
-            <div class="flex-1">
-              <div class="font-bold text-base">${item.itemName}</div>
-              <div class="text-sm">x${item.needed}</div>
-            </div>
-            <button class="delete-btn text-red-400 font-bold ml-auto" data-type="shopping" data-index="${i}">Delete</button>
-          `;
-          list.appendChild(card);
-        });
-      }).catch(() => {
-        const items = load('shopping');
-        const list = $('#shoppingList'); list.innerHTML = '';
-        items.forEach((item, i) => {
-          const card = document.createElement('div');
-          card.className = 'item-card glass rounded-2xl p-4 shadow-xl flex gap-4';
-          card.innerHTML = `
-            ${item.image ? `<img src="${item.image}" class="w-16 h-16 rounded-lg object-cover shadow-lg">` : '<div class="w-16 h-16 bg-gray-400 rounded-lg flex items-center justify-center text-2xl">?</div>'}
-            <div class="flex-1">
-              <div class="font-bold text-base">${item.itemName}</div>
-              <div class="text-sm">x${item.needed}</div>
-            </div>
-            <button class="delete-btn text-red-400 font-bold ml-auto" data-type="shopping" data-index="${i}">Delete</button>
-          `;
-          list.appendChild(card);
-        });
-      });
-    }
-
-    // DELETE (FIXED)
-    document.addEventListener('click', async e => {
-      if (!e.target.matches('.delete-btn')) return;
-      const type = e.target.dataset.type;
-      const index = parseInt(e.target.dataset.index);
-      if (!confirm('Delete?')) return;
-      const res = await fetch(API_BASE + (type === 'inventory' ? '/api/inventory' : '/api/shopping'), { headers: { Authorization: `Bearer ${idToken}` } });
-      const data = await res.json();
-      const arr = type === 'inventory' ? data?.items : data?.list;
-      if (arr) {
-        arr.splice(index, 1);
-        await fetch(API_BASE + (type === 'inventory' ? '/api/inventory' : '/api/shopping'), {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(type === 'inventory' ? { inventory: arr } : { shopping: arr })
-        });
-      } else {
-        let items = load(type);
-        items.splice(index, 1);
-        save(type, items);
-      }
-      type === 'inventory' ? loadInventory() : loadShopping();
-    });
-
-    // SCANNER
-    let codeReader;
-    $('#startScanner').onclick = () => {
-      if (codeReader) {
-        codeReader.reset();
-        codeReader = null;
-        $('#startScanner').textContent = 'Start Scanner';
-        $('#video').srcObject = null;
-        return;
-      }
-      codeReader = new ZXing.BrowserMultiFormatReader();
-      codeReader.decodeFromVideoDevice(null, 'video', async (result) => {
-        if (result) {
-          $('#invBarcode').value = result.getText();
-          $('#addToInventory').click();
-          codeReader.reset();
-          $('#startScanner').textContent = 'Start Scanner';
-          $('#video').srcObject = null;
-        }
-      });
-      $('#startScanner').textContent = 'Stop Scanner';
-    };
-
-    // VOICE
-    if (annyang) {
-      annyang.addCommands({
-        'add *item quantity *qty': (item, qty) => {
-          $('#shopName').value = item;
-          $('#shopNeeded').value = qty || 1;
-          $('#addToShopping').click();
-        }
-      });
-      $('#voiceBtn').onmousedown = () => annyang.start({ autoRestart: false });
-      $('#voiceBtn').onmouseup = () => annyang.abort();
-    }
-
-    // AI SCAN
-    $('#aiScanBtn').onclick = async () => {
-      const data = await fetch(API_BASE + '/api/user-info', { headers: { Authorization: `Bearer ${idToken}` } }).then(r => r.json());
-      const isPro = data?.isPro || false;
-      if (!isPro && aiScansLeft <= 0) return alert('Upgrade to Pro');
-      const file = $('#aiImage').files[0];
-      if (!file) return alert('Take photo');
-      aiScansLeft--;
-      const form = new FormData();
-      form.append('image', file);
-      const res = await fetch(API_BASE + '/api/scan', { method: 'POST', headers: { Authorization: `Bearer ${idToken}` }, body: form });
-      const result = await res.json();
-      $('#aiResult').innerHTML = result.labels ? result.labels.map(l => `<button onclick="$('#shopName').value='${l}'; $('#addToShopping').click()">+ ${l}</button>`).join(' ') : 'Nothing detected';
-    };
-
-    // SHARE
-    $('#shareListBtn').onclick = () => {
-      const url = location.href;
-      $('#shareLink').value = url;
-      new QRCode('qrCode', { text: url, width: 200, height: 200 });
-      $('#shareModal').classList.remove('hidden');
-    };
-    $('#closeShare').onclick = () => $('#shareModal').classList.add('hidden');
-
-    // EXP BADGE
-    function getExpBadge(date) {
-      if (!date) return '<span class="px-3 py-1 rounded-full bg-gray-500 text-xs font-bold">No expiry</span>';
-      const days = Math.ceil((new Date(date) - new Date()) / 86400000);
-      if (days < 0) return '<span class="px-3 py-1 rounded-full bg-red-600 text-xs font-bold">Expired</span>';
-      if (days === 0) return '<span class="px-3 py-1 rounded-full bg-red-500 text-white exp-today text-xs font-bold">Today!</span>';
-      if (days <= 3) return `<span class="px-3 py-1 rounded-full bg-orange-500 text-black exp-soon text-xs">${days}d left</span>';
-      return `<span class="px-3 py-1 rounded-full bg-green-600 text-xs font-bold">${days}d</span>`;
-    };
-
-    // Load
-    loadProStatus();
-    loadInventory();
-    loadShopping();
-  </script>
-</body>
-</html>
+            ${item.image ? `<img src="${item.image}" class="w-16 h-16 rounded-lg object-cover shadow-lg">` : '<div class="w-16 h-16 bg-gray-400 rounded-lg flex items-center justify-center text
