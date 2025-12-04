@@ -107,7 +107,7 @@
       try {
         await Notification.requestPermission();
         const token = await messaging.getToken({
-          vapidKey: "YOUR_VAPID_KEY_HERE"  // ← Step 3 below
+          vapidKey: "BH44gQOOoOwrAiKdQ2AV8becnuiSvDCRVFRTiYB77iiPGLb_hyw4XJLnwpKIEN8xtpkaRRZM6mu3xpMpXT4tr-8"
         });
         console.log("Push token:", token);
         // Send this token to your backend to save
