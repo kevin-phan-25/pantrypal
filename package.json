@@ -1,17 +1,21 @@
 {
-  "name": "pantrypal",
+  "name": "pantrypal-backend",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "firebase-admin": "^12.5.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5"
+    "firebase-admin": "^12.5.0",
+    "@google-cloud/vision": "^4.2.0",
+    "dotenv": "^16.4.5",
+    "express-fileupload": "^1.4.3"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }
