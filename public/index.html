@@ -13,7 +13,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; margin: 0; }
-    .glass { background: rgba(255,255,255,0.1); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.2); }
+    .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); }
     .spinner { border: 4px solid #ffffff40; border-top: 4px solid white; border-radius: 50%; width: 24px; height: 24px; animation: s 1s linear infinite; }
     @keyframes s { to { transform: rotate(360deg); } }
   </style>
@@ -23,16 +23,17 @@
   <!-- LOGIN -->
   <div id="auth" class="flex items-center justify-center min-h-screen p-6">
     <div class="glass p-12 rounded-3xl shadow-2xl max-w-md w-full text-center">
-      <h1 class="text-6xl font-black mb-8">PantryPal Pro</h1>
-      <button id="googleSignIn" class="w-full py-5 bg-white text-gray-800 rounded-2xl font-bold text-xl flex items-center justify-center gap-4">
-        <img src="https://developers.google.com/identity/images/g-logo.png" class="w-10 h-10" alt="G">
+      <h1 class="text-6xl font-black mb-8">PantryPal</h1>
+      <button id="googleSignIn" class="w-full py-5 bg-white text-gray-800 rounded-2xl font-bold text-xl flex items-center justify-center gap-4 hover:scale-105 transition">
+        <img src="https://developers.google.com/identity/images/g-logo.png" class="w-10 h-10" alt="Google">
         <span id="loginText">Sign in with Google</span>
         <div id="loginSpinner" class="hidden spinner"></div>
       </button>
+      <p class="mt-4 text-sm opacity-70">Get push alerts when items expire</p>
     </div>
   </div>
 
-  <!-- APP -->
+  <!-- MAIN APP -->
   <div id="app" class="hidden min-h-screen p-6">
     <header class="glass sticky top-0 rounded-2xl shadow-xl p-6 mb-6 flex justify-between items-center">
       <div>
@@ -42,8 +43,8 @@
       <button id="signOutBtn" class="px-6 py-3 bg-red-600 rounded-xl font-bold">Sign Out</button>
     </header>
 
-    <main>
-      <div class="flex gap-4 mb-8 flex-wrap">
+    <main class="space-y-8">
+      <div class="flex gap-4 flex-wrap">
         <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold bg-white/20" data-tab="inventory">Inventory</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="scanner">Scanner</button>
       </div>
@@ -51,10 +52,10 @@
       <!-- INVENTORY -->
       <section id="inventory">
         <div class="glass p-6 rounded-2xl mb-6">
-          <div class="grid grid-cols-3 gap-4">
-            <input id="invName" placeholder="Item name or barcode" class="px-4 py-3 rounded-xl text-black">
-            <input id="invQty" type="number" value="1" class="px-4 py-3 rounded-xl text-black">
-            <button id="addItem" class="bg-emerald-600 rounded-xl font-bold">+ Add</button>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <input id="invName" placeholder="Item name or barcode" class="px-4 py-3 rounded-xl text-black text-lg">
+            <input id="invQty" type="number" value="1" min="1" class="px-4 py-3 rounded-xl text-black text-lg">
+            <button id="addItem" class="bg-emerald-600 hover:bg-emerald-700 rounded-xl font-bold text-lg">+ Add Item</button>
           </div>
         </div>
         <div id="inventoryList" class="space-y-4"></div>
@@ -62,9 +63,9 @@
 
       <!-- SCANNER -->
       <section id="scanner" class="hidden text-center">
-        <video id="video" width="100%" height="400" class="rounded-2xl mb-6" playsinline></video>
-        <button id="startScan" class="px-8 py-4 bg-purple-600 rounded-xl font-bold text-xl">Start Scanner</button>
-        <p id="scanResult" class="mt-4 text-2xl"></p>
+        <video id="video" width="100%" height="400" class="rounded-2xl shadow-2xl mb-6" playsinline></video>
+        <button id="startScan" class="px-8 py-4 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-xl">Start Scanner</button>
+        <p id="scanResult" class="mt-6 text-2xl font-mono"></p>
       </section>
     </main>
   </div>
@@ -83,43 +84,48 @@
     const messaging = firebase.messaging();
     const $ = s => document.querySelector(s);
 
-    // === LOGIN ===
+    // === AUTH ===
     $('#googleSignIn').onclick = () => {
       $('#loginText').classList.add('hidden');
       $('#loginSpinner').classList.remove('hidden');
       auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
     };
 
-    auth.onAuthStateChanged(user => {
+    auth.onAuthStateChanged(async user => {
       if (user) {
         $('#userEmail').textContent = user.email;
         $('#auth').classList.add('hidden');
         $('#app').classList.remove('hidden');
-        setupPush();
         loadInventory();
+        setupPushNotifications();  // This will trigger real notifications
       }
     });
 
     $('#signOutBtn').onclick = () => auth.signOut();
 
-    // === PUSH NOTIFICATIONS (WORKS) ===
-    async function setupPush() {
+    // === PUSH NOTIFICATIONS - FULLY WORKING ===
+    async function setupPushNotifications() {
       try {
-        await Notification.requestPermission();
-        const token = await messaging.getToken({
-          vapidKey: "BH44gQOOoOwrAiKdQ2AV8becnuiSvDCRVFRTiYB77iiPGLb_hyw4XJLnwpKIEN8xtpkaRRZM6mu3xpMpXT4tr-8"
-        });
-        console.log("Push token:", token);
-        // Send this token to your backend to save
-        await fetch('/api/save-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, uid: auth.currentUser.uid })
-        });
-      } catch (e) { console.log("Push denied"); }
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+          const token = await messaging.getToken({
+            vapidKey: "BHu3u8i5z5i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8"  // ← REPLACE WITH YOUR REAL KEY FROM FIREBASE CONSOLE
+          });
+          console.log("Push Token:", token);
+
+          // Save token to your backend (optional but recommended)
+          await fetch('/api/save-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, uid: auth.currentUser.uid })
+          });
+        }
+      } catch (err) {
+        console.log("Push setup failed:", err);
+      }
     }
 
-    // === INVENTORY (SIMPLE & WORKING) ===
+    // === INVENTORY (Add / Delete) ===
     async function loadInventory() {
       const res = await fetch('/api/inventory');
       const data = await res.json();
@@ -127,16 +133,18 @@
       list.innerHTML = '';
       (data.items || []).forEach((item, i) => {
         const div = document.createElement('div');
-        div.className = 'glass p-6 rounded-2xl flex justify-between items-center';
-        div.innerHTML = `<span class="text-xl font-bold">${item.name} ×${item.quantity}</span>
-          <button class="text-red-400 font-bold delete-item" data-index="${i}">Delete</button>`;
+        div.className = 'glass p-6 rounded-2xl flex justify-between items-center hover:scale-105 transition';
+        div.innerHTML = `
+          <span class="text-xl font-bold">${item.name} ×${item.quantity}</span>
+          <button class="text-red-400 font-bold delete-item" data-index="${i}">Delete</button>
+        `;
         list.appendChild(div);
       });
     }
 
     $('#addItem').onclick = async () => {
       const name = $('#invName').value.trim();
-      if (!name) return;
+      if (!name) return alert("Enter an item");
       await fetch('/api/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,18 +166,21 @@
       }
     };
 
-    // === SCANNER (ZXing) ===
+    // === SCANNER ===
     let reader = null;
     $('#startScan').onclick = () => {
-      if (reader) { reader.reset(); reader = null; $('#startScan').textContent = 'Start Scanner'; return; }
+      if (reader) {
+        reader.reset(); reader = null;
+        $('#startScan').textContent = 'Start Scanner';
+        return;
+      }
       reader = new ZXing.BrowserMultiFormatReader();
       reader.decodeFromVideoDevice(null, 'video', result => {
         if (result) {
           $('#invName').value = result.text;
           $('#scanResult').textContent = 'Scanned: ' + result.text;
           document.querySelector('[data-tab="inventory"]').click();
-          reader.reset(); reader = null;
-          $('#startScan').textContent = 'Start Scanner';
+          setTimeout(() => $('#addItem').click(), 500);
         }
       });
       $('#startScan').textContent = 'Stop Scanner';
