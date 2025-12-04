@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -10,189 +10,390 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js"></script>
   <script src="https://unpkg.com/@zxing/browser@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/annyang@2.6.1/annyang.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
   <style>
-    body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; margin: 0; }
-    .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); }
-    .spinner { border: 4px solid #ffffff40; border-top: 4px solid white; border-radius: 50%; width: 24px; height: 24px; animation: s 1s linear infinite; }
-    @keyframes s { to { transform: rotate(360deg); } }
+    body { font-family: 'Inter', sans-serif; }
+    .glass { background: rgba(255,255,255,0.15); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
+    .dark .glass { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: white; }
+    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); animation: gradient 15s ease infinite; }
+    @keyframes gradient { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+    .dark .gradient-bg { background: #0a0118; }
+    .btn-glow { box-shadow: 0 0 20px rgba(139,92,246,0.5); transition: all 0.3s; }
+    .btn-glow:hover { box-shadow: 0 0 30px rgba(139,92,246,0.8); transform: translateY(-2px); }
+    .tab-active { background: rgba(255,255,255,0.2); color: white; }
+    .exp-soon { background: #f59e0b; color: black; }
+    .exp-today { background: #ef4444; color: white; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+    .spinner { border: 4px solid #ffffff40; border-top: 4px solid white; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .install-btn { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
+    .pro-badge { background: linear-gradient(90deg, #10b981, #059669); color: white; }
   </style>
 </head>
-<body class="text-white">
+<body class="min-h-screen gradient-bg text-gray-900 dark:text-white transition-colors duration-500">
+
+  <!-- PWA INSTALL BUTTON -->
+  <button id="installBtn" class="hidden install-btn glass p-4 rounded-full shadow-2xl btn-glow text-lg font-bold">
+    📱 Install App
+  </button>
 
   <!-- LOGIN -->
-  <div id="auth" class="flex items-center justify-center min-h-screen p-6">
-    <div class="glass p-12 rounded-3xl shadow-2xl max-w-md w-full text-center">
-      <h1 class="text-6xl font-black mb-8">PantryPal</h1>
-      <button id="googleSignIn" class="w-full py-5 bg-white text-gray-800 rounded-2xl font-bold text-xl flex items-center justify-center gap-4 hover:scale-105 transition">
-        <img src="https://developers.google.com/identity/images/g-logo.png" class="w-10 h-10" alt="Google">
+  <div id="auth-section" class="flex items-center justify-center min-h-screen p-6">
+    <div class="glass p-14 rounded-3xl shadow-2xl max-w-md w-full text-center">
+      <h1 class="text-7xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">PantryPal Pro</h1>
+      <p class="text-2xl mb-12 opacity-90">The smartest pantry app of 2025</p>
+      <button id="googleSignIn" class="w-full py-6 rounded-2xl bg-white text-gray-800 font-bold text-2xl shadow-2xl flex items-center justify-center gap-5">
+        <img src="https://developers.google.com/identity/images/g-logo.png" class="w-10 h-10" alt="G">
         <span id="loginText">Sign in with Google</span>
         <div id="loginSpinner" class="hidden spinner"></div>
       </button>
-      <p class="mt-4 text-sm opacity-70">Get push alerts when items expire</p>
     </div>
   </div>
 
   <!-- MAIN APP -->
-  <div id="app" class="hidden min-h-screen p-6">
-    <header class="glass sticky top-0 rounded-2xl shadow-xl p-6 mb-6 flex justify-between items-center">
-      <div>
-        <h1 class="text-4xl font-black">PantryPal</h1>
-        <p id="userEmail" class="opacity-80"></p>
+  <div id="app" class="hidden min-h-screen pb-24">
+    <header class="glass sticky top-0 z-50 shadow-2xl border-b border-white/10">
+      <div class="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-6">
+          <h1 class="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">PantryPal Pro</h1>
+          <span id="userEmail" class="bg-white/20 px-4 py-2 rounded-full font-medium"></span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span id="scanCounter" class="px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 font-bold shadow-lg">Pro: Unlimited</span>
+          <button id="shareListBtn" class="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-bold btn-glow">Share List</button>
+          <button id="darkModeBtn" class="px-5 py-3 rounded-xl glass btn-glow font-bold">Dark Mode</button>
+          <button id="signOutBtn" class="px-8 py-3 bg-gradient-to-r from-red-500 to-pink-600 rounded-xl font-bold btn-glow">Sign Out</button>
+        </div>
       </div>
-      <button id="signOutBtn" class="px-6 py-3 bg-red-600 rounded-xl font-bold">Sign Out</button>
     </header>
 
-    <main class="space-y-8">
-      <div class="flex gap-4 flex-wrap">
-        <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold bg-white/20" data-tab="inventory">Inventory</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="scanner">Scanner</button>
+    <main class="max-w-6xl mx-auto px-6 py-10">
+      <div class="flex gap-4 mb-8 overflow-x-auto pb-4">
+        <button class="tab-btn tab-active px-8 py-4 rounded-2xl font-bold text-lg" data-tab="inventory">Inventory</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg" data-tab="shopping">Shopping List</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg" data-tab="scanner">Scanner</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg" data-tab="voice">Voice</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg" data-tab="ai">AI Scan</button>
       </div>
 
       <!-- INVENTORY -->
       <section id="inventory">
-        <div class="glass p-6 rounded-2xl mb-6">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input id="invName" placeholder="Item name or barcode" class="px-4 py-3 rounded-xl text-black text-lg">
-            <input id="invQty" type="number" value="1" min="1" class="px-4 py-3 rounded-xl text-black text-lg">
-            <button id="addItem" class="bg-emerald-600 hover:bg-emerald-700 rounded-xl font-bold text-lg">+ Add Item</button>
+        <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
+          <input type="text" id="inventorySearch" placeholder="🔍 Search inventory..." class="w-full px-6 py-4 rounded-2xl glass text-lg mb-6 focus:outline-none focus:ring-4 ring-purple-500/30"/>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="relative">
+              <input id="invBarcode" type="text" placeholder="Scan barcode" class="w-full px-6 py-4 rounded-2xl glass text-lg pr-12"/>
+              <button id="scanBtn" class="absolute right-3 top-3 text-2xl btn-glow">📷</button>
+            </div>
+            <div>
+              <input id="invQty" type="number" value="1" min="1" class="w-full px-6 py-4 rounded-2xl glass text-lg"/>
+              <label class="block text-center text-sm mt-1 opacity-80">Quantity</label>
+            </div>
+            <div>
+              <input id="invExp" type="date" class="w-full px-6 py-4 rounded-2xl glass text-lg"/>
+              <label class="block text-center text-sm mt-1 opacity-80">Expiration Date</label>
+            </div>
+            <div>
+              <button id="addToInventory" class="w-full px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-bold btn-glow hover:from-emerald-600">Add Item</button>
+            </div>
           </div>
         </div>
-        <div id="inventoryList" class="space-y-4"></div>
+        <div id="inventoryList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      </section>
+
+      <!-- SHOPPING LIST -->
+      <section id="shopping" class="hidden">
+        <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
+          <input type="text" id="shoppingSearch" placeholder="🔍 Search shopping list..." class="w-full px-6 py-4 rounded-2xl glass text-lg mb-6 focus:outline-none focus:ring-4 ring-purple-500/30"/>
+          <div class="flex gap-4 mb-8">
+            <input id="shopName" type="text" placeholder="Item name (or barcode)" class="flex-1 px-6 py-4 rounded-2xl glass text-lg"/>
+            <input id="shopNeeded" type="number" value="1" min="1" class="w-28 px-6 py-4 rounded-2xl glass text-lg"/>
+            <button id="addToShopping" class="px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-2xl font-bold btn-glow hover:from-blue-600">Add to List</button>
+          </div>
+        </div>
+        <div id="shoppingList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
       </section>
 
       <!-- SCANNER -->
-      <section id="scanner" class="hidden text-center">
-        <video id="video" width="100%" height="400" class="rounded-2xl shadow-2xl mb-6" playsinline></video>
-        <button id="startScan" class="px-8 py-4 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-xl">Start Scanner</button>
-        <p id="scanResult" class="mt-6 text-2xl font-mono"></p>
+      <section id="scanner" class="hidden">
+        <div class="glass p-10 rounded-3xl text-center shadow-2xl">
+          <h2 class="text-3xl font-bold mb-6">Barcode Scanner</h2>
+          <video id="video" width="100%" height="300" class="rounded-2xl mb-6" autoplay playsinline muted></video>
+          <button id="startScanner" class="px-8 py-4 bg-gradient-to-r from-purple-500 to-violet-500 text-white rounded-xl font-bold hover:from-purple-600">Start Scanner</button>
+          <p id="scanResult" class="mt-6 text-xl font-mono break-all"></p>
+        </div>
+      </section>
+
+      <!-- VOICE -->
+      <section id="voice" class="hidden">
+        <div class="glass p-10 rounded-3xl text-center shadow-2xl">
+          <h2 class="text-3xl font-bold mb-6">Voice Add to Shopping</h2>
+          <button id="voiceBtn" class="w-24 h-24 bg-gradient-to-r from-red-500 to-pink-500 rounded-full text-white text-4xl font-bold hover:from-red-600 mb-6">🎤</button>
+          <p class="mb-4 text-lg">Hold to speak: "Add milk quantity 2"</p>
+          <p id="voiceResult" class="mt-6 text-xl text-green-400"></p>
+        </div>
+      </section>
+
+      <!-- AI SCAN -->
+      <section id="ai" class="hidden">
+        <div class="glass p-10 rounded-3xl text-center shadow-2xl">
+          <h2 class="text-3xl font-bold mb-6">AI Photo Scan (Pro)</h2>
+          <input type="file" id="aiImage" accept="image/*" capture="camera" class="mb-6 p-2 rounded-xl glass"/>
+          <button id="aiScanBtn" class="px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-bold hover:from-indigo-600">Scan Photo</button>
+          <div id="aiResult" class="mt-8 text-left space-y-2"></div>
+        </div>
       </section>
     </main>
   </div>
 
+  <!-- SHARE MODAL -->
+  <div id="shareModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-6">
+    <div class="glass p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl">
+      <h3 class="text-2xl font-bold mb-4">Share Shopping List</h3>
+      <div id="qrCode" class="mb-6 mx-auto"></div>
+      <input type="text" id="shareLink" class="w-full px-6 py-3 rounded-xl glass text-center font-mono mb-4" readonly/>
+      <button id="copyLink" class="w-full px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl font-bold text-white mb-2">Copy Link</button>
+      <button id="closeShare" class="text-white/70 hover:text-white">Close</button>
+    </div>
+  </div>
+
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-      authDomain: "pantrypal-6e410.firebaseapp.com",
-      projectId: "pantrypal-6e410",
-      storageBucket: "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
-    };
+    const API = window.location.origin;
+    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const messaging = firebase.messaging();
+    let idToken = null;
     const $ = s => document.querySelector(s);
 
     // === AUTH ===
     $('#googleSignIn').onclick = () => {
       $('#loginText').classList.add('hidden');
       $('#loginSpinner').classList.remove('hidden');
-      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => {
+        alert('Login failed: ' + e.message);
+        $('#loginText').classList.remove('hidden');
+        $('#loginSpinner').classList.add('hidden');
+      });
     };
 
     auth.onAuthStateChanged(async user => {
       if (user) {
+        idToken = await user.getIdToken();
         $('#userEmail').textContent = user.email;
-        $('#auth').classList.add('hidden');
+        $('#auth-section').classList.add('hidden');
         $('#app').classList.remove('hidden');
+        loadProStatus();
         loadInventory();
-        setupPushNotifications();  // This will trigger real notifications
+        loadShopping();
+        initVoice();
+        setupPush();
       }
     });
 
     $('#signOutBtn').onclick = () => auth.signOut();
 
-    // === PUSH NOTIFICATIONS - FULLY WORKING ===
-    async function setupPushNotifications() {
+    // === PRO STATUS ===
+    async function loadProStatus() {
+      const data = await api('/api/user-info');
+      const isPro = data?.isPro || false;
+      $('#scanCounter').textContent = isPro ? 'Pro: Unlimited Scans' : 'Free: 10 Scans Left';
+    }
+
+    // === API HELPER ===
+    async function api(path, opts = {}) {
+      if (!idToken) return null;
       try {
-        const permission = await Notification.requestPermission();
-        if (permission === "granted") {
-          const token = await messaging.getToken({
-            vapidKey: "BHu3u8i5z5i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8i8"  // ← REPLACE WITH YOUR REAL KEY FROM FIREBASE CONSOLE
-          });
-          console.log("Push Token:", token);
+        const res = await fetch(API + path, { ...opts, headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json', ...opts.headers } });
+        return res.ok ? await res.json() : null;
+      } catch (e) { console.error('API error:', e); return null; }
+    }
 
-          // Save token to your backend (optional but recommended)
-          await fetch('/api/save-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, uid: auth.currentUser.uid })
-          });
+    // === OPEN FOOD FACTS ===
+    async function lookupProduct(barcode) {
+      if (!barcode || barcode.length < 7) return { name: barcode, image: null };
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        const data = await res.json();
+        if (data.status === 1) {
+          const p = data.product;
+          const name = p.product_name || p.brands || barcode;
+          const image = p.image_front_small_url || p.image_front_url || null;
+          return { name, image, brand: p.brands };
         }
-      } catch (err) {
-        console.log("Push setup failed:", err);
-      }
+      } catch (e) {}
+      return { name: barcode, image: null };
     }
 
-    // === INVENTORY (Add / Delete) ===
-    async function loadInventory() {
-      const res = await fetch('/api/inventory');
-      const data = await res.json();
-      const list = $('#inventoryList');
-      list.innerHTML = '';
-      (data.items || []).forEach((item, i) => {
-        const div = document.createElement('div');
-        div.className = 'glass p-6 rounded-2xl flex justify-between items-center hover:scale-105 transition';
-        div.innerHTML = `
-          <span class="text-xl font-bold">${item.name} ×${item.quantity}</span>
-          <button class="text-red-400 font-bold delete-item" data-index="${i}">Delete</button>
-        `;
-        list.appendChild(div);
-      });
-    }
+    // === TABS ===
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        btn.classList.add('tab-active');
+        document.querySelectorAll('section[id]').forEach(s => s.classList.add('hidden'));
+        $(`#${btn.dataset.tab}`).classList.remove('hidden');
+      };
+    });
 
-    $('#addItem').onclick = async () => {
-      const name = $('#invName').value.trim();
-      if (!name) return alert("Enter an item");
-      await fetch('/api/inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, quantity: +$('#invQty').value || 1 })
-      });
-      $('#invName').value = ''; $('#invQty').value = 1;
+    // === ADD INVENTORY ===
+    $('#addToInventory').onclick = async () => {
+      const barcode = $('#invBarcode').value.trim();
+      if (!barcode) return alert('Enter barcode or name');
+      $('#addToInventory').innerHTML = '<div class="spinner"></div>';
+      const product = await lookupProduct(barcode);
+      const item = {
+        barcode, name: product.name, image: product.image, brand: product.brand,
+        quantity: parseInt($('#invQty').value) || 1, expiration: $('#invExp').value || null
+      };
+      const res = await api('/api/inventory', { method: 'POST', body: JSON.stringify(item) });
+      $('#addToInventory').innerHTML = 'Add Item';
+      $('#invBarcode').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
       loadInventory();
     };
 
-    $('#inventoryList').onclick = async e => {
-      if (e.target.classList.contains('delete-item')) {
-        const i = e.target.dataset.index;
-        await fetch('/api/inventory', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deleteIndex: +i })
-        });
-        loadInventory();
-      }
+    // === LOAD INVENTORY ===
+    async function loadInventory() {
+      const data = await api('/api/inventory');
+      const list = $('#inventoryList'); list.innerHTML = '';
+      (data?.items || []).forEach((item, i) => {
+        const card = document.createElement('div');
+        card.className = 'glass rounded-3xl p-6 shadow-xl flex gap-4 hover-lift';
+        card.innerHTML = `
+          ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg">` : '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">?</div>'}
+          <div class="flex-1">
+            <h3 class="text-2xl font-bold">${item.name}</h3>
+            <p class="text-xl opacity-80">x${item.quantity}</p>
+            ${getExpBadge(item.expiration)}
+          </div>
+          <button class="text-red-400 font-bold text-xl delete-btn" data-type="inventory" data-index="${i}">Delete</button>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    // === ADD SHOPPING ===
+    $('#addToShopping').onclick = async () => {
+      const name = $('#shopName').value.trim();
+      if (!name) return alert('Enter name');
+      $('#addToShopping').innerHTML = '<div class="spinner"></div>';
+      const product = name.length > 7 && !isNaN(name) ? await lookupProduct(name) : { name, image: null };
+      const item = { itemName: product.name, image: product.image, needed: parseInt($('#shopNeeded').value) || 1 };
+      await api('/api/shopping', { method: 'POST', body: JSON.stringify(item) });
+      $('#addToShopping').innerHTML = 'Add to List';
+      $('#shopName').value = ''; $('#shopNeeded').value = 1;
+      loadShopping();
     };
+
+    // === LOAD SHOPPING ===
+    async function loadShopping() {
+      const data = await api('/api/shopping');
+      const list = $('#shoppingList'); list.innerHTML = '';
+      (data?.list || []).forEach((item, i) => {
+        const card = document.createElement('div');
+        card.className = 'glass rounded-3xl p-6 shadow-xl flex gap-4 hover-lift';
+        card.innerHTML = `
+          ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg">` : '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">?</div>'}
+          <div class="flex-1">
+            <h3 class="text-2xl font-bold">${item.itemName}</h3>
+            <p class="text-xl opacity-80">x${item.needed}</p>
+          </div>
+          <button class="text-red-400 font-bold text-xl delete-btn" data-type="shopping" data-index="${i}">Delete</button>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    // === DELETE ===
+    document.addEventListener('click', async e => {
+      if (!e.target.matches('.delete-btn')) return;
+      const type = e.target.dataset.type;
+      const i = parseInt(e.target.dataset.index);
+      if (!confirm('Delete?')) return;
+      const data = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping');
+      const arr = type === 'inventory' ? data?.items : data?.list;
+      arr.splice(i, 1);
+      await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', { method: 'POST', body: JSON.stringify(type === 'inventory' ? { inventory: arr } : { shopping: arr }) });
+      type === 'inventory' ? loadInventory() : loadShopping();
+    });
 
     // === SCANNER ===
-    let reader = null;
-    $('#startScan').onclick = () => {
-      if (reader) {
-        reader.reset(); reader = null;
-        $('#startScan').textContent = 'Start Scanner';
+    let codeReader;
+    $('#scanBtn').onclick = () => document.querySelector('[data-tab="scanner"]').click();
+    $('#startScanner').onclick = () => {
+      if (codeReader) {
+        codeReader.reset();
+        codeReader = null;
+        $('#startScanner').textContent = 'Start Scanner';
+        $('#video').srcObject = null;
         return;
       }
-      reader = new ZXing.BrowserMultiFormatReader();
-      reader.decodeFromVideoDevice(null, 'video', result => {
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      codeReader.decodeFromVideoDevice(null, 'video', async (result) => {
         if (result) {
-          $('#invName').value = result.text;
-          $('#scanResult').textContent = 'Scanned: ' + result.text;
-          document.querySelector('[data-tab="inventory"]').click();
-          setTimeout(() => $('#addItem').click(), 500);
+          $('#invBarcode').value = result.getText();
+          $('#addToInventory').click();
+          codeReader.reset();
+          $('#startScanner').textContent = 'Start Scanner';
+          $('#video').srcObject = null;
         }
       });
-      $('#startScan').textContent = 'Stop Scanner';
+      $('#startScanner').textContent = 'Stop Scanner';
     };
 
-    // === TABS ===
-    document.querySelectorAll('.tab-btn').forEach(b => b.onclick = () => {
-      document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('tab-active', 'bg-white/20'));
-      b.classList.add('tab-active', 'bg-white/20');
-      document.querySelectorAll('section[id]').forEach(s => s.classList.add('hidden'));
-      $(`#${b.dataset.tab}`).classList.remove('hidden');
-    });
+    // === VOICE ===
+    if (annyang) {
+      annyang.addCommands({
+        'add *item quantity *qty': (item, qty) => {
+          $('#shopName').value = item;
+          $('#shopNeeded').value = qty || 1;
+          $('#addToShopping').click();
+          $('#voiceResult').textContent = `Added ${item} x${qty || 1}`;
+        }
+      });
+      $('#voiceBtn').onmousedown = () => annyang.start({ autoRestart: false });
+      $('#voiceBtn').onmouseup = () => annyang.abort();
+    } else {
+      $('#voiceBtn').textContent = '❌';
+    }
+
+    // === AI SCAN ===
+    $('#aiScanBtn').onclick = async () => {
+      const file = $('#aiImage').files[0];
+      if (!file) return alert('Select photo');
+      $('#aiScanBtn').innerHTML = '<div class="spinner"></div>';
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch(API + '/api/scan', { method: 'POST', headers: { Authorization: `Bearer ${idToken}` }, body: form });
+      const data = await res.json();
+      $('#aiResult').innerHTML = data.labels ? data.labels.map(l => `<button class="px-4 py-2 bg-purple-600 rounded-xl font-bold m-2" onclick="$('#shopName').value='${l}'; $('#addToShopping').click()">+ ${l}</button>`).join('') : '<p>Nothing detected</p>';
+      $('#aiScanBtn').innerHTML = 'Scan Photo';
+    };
+
+    // === EXPIRATION BADGE ===
+    function getExpBadge(dateStr) {
+      if (!dateStr) return '<span class="px-3 py-1 rounded-full bg-gray-600 text-xs font-bold">No expiry</span>';
+      const days = Math.ceil((new Date(dateStr) - new Date()) / 86400000);
+      if (days < 0) return '<span class="px-3 py-1 rounded-full badge-expired">Expired</span>';
+      if (days === 0) return '<span class="px-3 py-1 rounded-full badge-today">Today!</span>';
+      if (days <= 3) return `<span class="px-3 py-1 rounded-full badge-soon">${days}d left</span>`;
+      return `<span class="px-3 py-1 rounded-full badge-safe">${days}d</span>`;
+    }
+
+    // === SHARE ===
+    $('#shareListBtn').onclick = () => {
+      const url = location.href;
+      $('#shareLink').value = url;
+      new QRCode('qrCode', { text: url, width: 200, height: 200 });
+      $('#shareModal').classList.remove('hidden');
+    };
+    $('#closeShare').onclick = () => $('#shareModal').classList.add('hidden');
+
+    // === LOAD ON START ===
+    loadProStatus();
+    loadInventory();
+    loadShopping();
   </script>
 </body>
 </html>
