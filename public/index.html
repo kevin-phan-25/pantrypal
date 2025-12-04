@@ -1,224 +1,319 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pantrypal Pro</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PantryPal Pro</title>
+  <link rel="manifest" href="data:application/manifest+json,{
+    \"name\":\"PantryPal Pro\",\"short_name\":\"PantryPal\",\"start_url\":\".\",\"display\":\"standalone\",
+    \"background_color\":\"#667eea\",\"theme_color\":\"#8b5cf6\",
+    \"icons\":[{\"src\":\"https://cdn-icons-png.flaticon.com/512/107/107827.png\",\"sizes\":\"192x192\"},{\"src\":\"https://cdn-icons-png.flaticon.com/512/107/107827.png\",\"sizes\":\"512x512\"}]
+  }">
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <!-- ZXing Barcode Scanner -->
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.1/umd/index.min.js"></script>
+  <!-- Tailwind + Font -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>body{font-family:Inter,sans-serif}.glass{background:rgba(255,255,255,0.15);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.2)}.gradient-bg{background:linear-gradient(135deg,#667eea 0%,#764ba2 50%,#f093fb 100%);animation:gradient 15s ease infinite}@keyframes gradient{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}</style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=swap" rel="stylesheet"/>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .glass { background: rgba(255,255,255,0.15); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
+    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); animation: g 15s ease infinite; }
+    @keyframes g { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+    .dark .gradient-bg { background: #0a0118; }
+    .tab-active { @apply bg-white/30 text-white font-bold; }
+  </style>
 </head>
-<body class="min-h-screen gradient-bg text-gray-900">
-  <div id="auth-section" class="flex items-center justify-center min-h-screen p-6">
+<body class="min-h-screen gradient-bg text-white">
+
+  <!-- LOGIN -->
+  <div id="auth" class="flex items-center justify-center min-h-screen p-6">
     <div class="glass p-12 rounded-3xl shadow-2xl max-w-md w-full text-center">
-      <h1 class="text-5xl font-bold mb-6 text-white">Pantrypal Pro</h1>
-      <button id="googleSignIn" class="w-full py-4 bg-white text-gray-800 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3 mx-auto">
-        <img src="https://developers.google.com/identity/images/g-logo.png" class="w-8 h-8" alt="G">
+      <h1 class="text-6xl font-black mb-6">PantryPal Pro</h1>
+      <button id="googleSignIn" class="w-full py-5 bg-white text-gray-800 rounded-2xl font-bold text-xl shadow-2xl flex items-center justify-center gap-4">
+        <img src="https://developers.google.com/identity/images/g-logo.png" class="w-9 h-9" alt="G">
         Sign in with Google
       </button>
     </div>
   </div>
 
-  <div id="app" class="hidden min-h-screen">
-    <header class="glass sticky top-0 z-50 shadow-lg border-b border-white/10">
-      <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center gap-4">
-          <h1 class="text-3xl font-bold text-white">Pantrypal Pro</h1>
-          <span id="userEmail" class="text-sm opacity-80 text-white"></span>
+  <!-- MAIN APP -->
+  <div id="app" class="hidden min-h-screen pb-20">
+    <header class="glass sticky top-0 z-50 shadow-2xl">
+      <div class="max-w-6xl mx-auto px-6 py-5 flex justify-between items-center">
+        <div class="flex items-center gap-6">
+          <h1 class="text-4xl font-black">PantryPal Pro</h1>
+          <span id="userEmail" class="text-lg"></span>
         </div>
         <div class="flex items-center gap-4">
-          <span id="scanCounter" class="px-4 py-2 rounded-full bg-purple-500 font-bold text-white">Pro: Unlimited</span>
-          <button id="darkModeBtn" class="px-4 py-2 rounded-xl glass font-bold text-white">Dark Mode</button>
-          <button id="signOutBtn" class="px-6 py-2 bg-red-500 text-white rounded-xl font-bold">Sign Out</button>
+          <span id="scanCounter" class="px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 font-bold">Pro: Unlimited</span>
+          <button id="signOutBtn" class="px-8 py-3 bg-red-600 rounded-xl font-bold">Sign Out</button>
         </div>
       </div>
     </header>
+
     <main class="max-w-6xl mx-auto px-6 py-10">
-      <div class="flex gap-3 mb-8 overflow-x-auto pb-2">
-        <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold text-white" data-tab="inventory">Inventory</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="shopping">Shopping</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="scanner">Scanner</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="voice">Voice</button>
-        <button class="tab-btn px-6 py-3 rounded-xl font-bold" data-tab="ai">AI Scan</button>
+      <div class="flex gap-4 mb-8 overflow-x-auto">
+        <button class="tab-btn tab-active px-8 py-4 rounded-2xl font-bold text-lg" data-tab="inventory">Inventory</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg" data-tab="shopping">Shopping List</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg" data-tab="scanner">Scanner</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg" data-tab="ai">AI Scan</button>
       </div>
 
+      <!-- INVENTORY -->
       <section id="inventory">
         <div class="glass p-8 rounded-3xl mb-8">
-          <input type="text" id="inventorySearch" placeholder="Search inventory..." class="w-full px-4 py-3 rounded-xl mb-6 text-gray-900">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="relative">
-              <input id="invBarcode" type="text" placeholder="Barcode / Name" class="w-full px-4 py-3 rounded-xl pr-10 text-gray-900">
-              <button id="scanBtn" class="absolute right-2 top-2 p-1 text-2xl">📷</button>
+              <input id="invBarcode" type="text" placeholder="Barcode or name" class="w-full px-5 py-4 rounded-2xl text-gray-900 text-lg">
+              <button id="openScanner" class="absolute right-3 top-3 text-3xl">Camera</button>
             </div>
-            <div>
-              <input id="invQty" type="number" value="1" min="1" class="w-full px-4 py-3 rounded-xl text-gray-900">
-              <label class="block text-xs opacity-70 mt-1">Quantity</label>
-            </div>
-            <div>
-              <input id="invExp" type="date" class="w-full px-4 py-3 rounded-xl text-gray-900">
-              <label class="block text-xs opacity-70 mt-1">Expiration Date</label>
-            </div>
-            <div>
-              <button id="addToInventory" class="w-full h-full px-4 py-3 bg-green-500 text-white rounded-xl font-bold">+</button>
-            </div>
+            <input id="invQty" type="number" value="1" min="1" class="px-5 py-4 rounded-2xl text-gray-900">
+            <input id="invExp" type="date" class="px-5 py-4 rounded-2xl text-gray-900">
+            <button id="addItem" class="bg-emerald-600 hover:bg-emerald-700 px-6 py-4 rounded-2xl font-bold text-xl">+</button>
           </div>
         </div>
-        <div id="inventoryList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        <div id="inventoryList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
       </section>
 
+      <!-- SHOPPING LIST -->
       <section id="shopping" class="hidden">
         <div class="glass p-8 rounded-3xl mb-8">
-          <input type="text" id="shoppingSearch" placeholder="Search shopping list..." class="w-full px-4 py-3 rounded-xl mb-6 text-gray-900">
-          <div class="flex gap-4 mb-6">
-            <input id="shopName" type="text" placeholder="Item name" class="flex-1 px-4 py-3 rounded-xl text-gray-900">
-            <input id="shopNeeded" type="number" value="1" min="1" class="w-20 px-4 py-3 rounded-xl text-gray-900">
-            <button id="addToShopping" class="px-4 py-3 bg-blue-500 text-white rounded-xl font-bold">+</button>
+          <div class="flex gap-4">
+            <input id="shopItem" type="text" placeholder="Add item..." class="flex-1 px-5 py-4 rounded-2xl text-gray-900">
+            <button id="addShop" class="bg-blue-600 hover:bg-blue-700 px-8 py-4 rounded-2xl font-bold">+</button>
           </div>
         </div>
-        <div id="shoppingList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        <div id="shoppingList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
       </section>
 
+      <!-- BARCODE SCANNER -->
       <section id="scanner" class="hidden">
-        <div class="glass p-8 rounded-3xl text-center">
-          <h2 class="text-2xl font-bold mb-6 text-white">Scanner</h2>
-          <video id="video" width="100%" height="300" class="rounded-xl mb-6"></video>
-          <button id="startScanner" class="px-8 py-3 bg-purple-500 text-white rounded-xl font-bold">Start</button>
-          <p id="scanResult" class="mt-6 text-lg text-white"></p>
+        <div class="glass p-10 rounded-3xl text-center">
+          <h2 class="text-3xl font-bold mb-8">Scan Barcode</h2>
+          <video id="video" width="100%" height="400" class="rounded-2xl shadow-2xl mb-6" autoplay playsinline></video>
+          <button id="startScan" class="px-12 py-5 bg-purple-600 hover:bg-purple-700 rounded-2xl font-bold text-xl">Start Scanning</button>
+          <p id="result" class="mt-6 text-2xl font-mono"></p>
         </div>
       </section>
 
-      <section id="voice" class="hidden">
-        <div class="glass p-8 rounded-3xl text-center">
-          <h2 class="text-2xl font-bold mb-6 text-white">Voice</h2>
-          <button id="voiceBtn" class="w-24 h-24 bg-red-500 rounded-full text-white text-3xl font-bold mb-4">🎤</button>
-          <p class="mb-4 text-white">Hold and speak: "Add milk quantity 2"</p>
-          <p id="voiceResult" class="text-lg text-green-500"></p>
-        </div>
-      </section>
-
+      <!-- AI SCAN -->
       <section id="ai" class="hidden">
-        <div class="glass p-8 rounded-3xl text-center">
-          <h2 class="text-2xl font-bold mb-6 text-white">AI Scan</h2>
-          <input type="file" id="aiImage" accept="image/*" capture="camera" class="mb-6 px-4 py-3 rounded-xl text-gray-900">
-          <button id="aiScanBtn" class="px-8 py-3 bg-indigo-500 text-white rounded-xl font-bold">Scan</button>
-          <div id="aiResult" class="mt-8 text-left text-white"></div>
+        <div class="glass p-10 rounded-3xl text-center">
+          <h2 class="text-3xl font-bold mb-8">AI Photo Scan</h2>
+          <input type="file" id="aiPhoto" accept="image/*" capture="camera" class="mb-6">
+          <button id="aiScanBtn" class="px-12 py-5 bg-indigo-600 hover:bg-indigo-700 rounded-2xl font-bold text-xl">Scan Photo</button>
+          <div id="aiResult" class="mt-8 text-left space-y-3"></div>
         </div>
       </section>
     </main>
   </div>
 
   <script>
-    const API_BASE = window.location.origin;
-    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
+    const API = window.location.origin;
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
+    };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
-    let idToken = null;
+    let token = null;
     const $ = s => document.querySelector(s);
 
-    // OPEN FOOD FACTS
-    async function lookupProduct(barcode) {
-      if (!barcode || barcode.length < 7) return { name: barcode, image: null };
-      try {
-        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-        const data = await res.json();
-        if (data.status === 1) {
-          const p = data.product;
-          return { name: p.product_name || p.brands || barcode, image: p.image_front_small_url || p.image_front_url, brand: p.brands };
-        }
-      } catch (e) {}
-      return { name: barcode, image: null };
-    }
-
-    // AUTH
-    $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => alert('Login failed: ' + e.message));
+    // === AUTH ===
+    $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
     auth.onAuthStateChanged(async user => {
       if (user) {
-        idToken = await user.getIdToken();
+        token = await user.getIdToken();
         $('#userEmail').textContent = user.email;
-        $('#auth-section').classList.add('hidden');
+        $('#auth').classList.add('hidden');
         $('#app').classList.remove('hidden');
-        loadProStatus();
+        checkProStatus();
         loadInventory();
         loadShopping();
       }
     });
     $('#signOutBtn').onclick = () => auth.signOut();
 
-    // PRO STATUS
-    async function loadProStatus() {
-      const data = await fetch(API_BASE + '/api/user-info', { headers: { Authorization: `Bearer ${idToken}` } }).then(r => r.json()).catch(() => ({ isPro: false }));
-      const isPro = data?.isPro || false;
-      $('#scanCounter').textContent = isPro ? 'Pro: Unlimited' : 'Free: 10 Scans';
+    // === PRO STATUS ===
+    async function checkProStatus() {
+      const res = await fetch(API + '/api/user-info', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      $('#scanCounter').textContent = data.isPro ? 'Pro: Unlimited Scans' : 'Free: 10 Scans Left';
     }
 
-    // DARK MODE
-    $('#darkModeBtn').onclick = () => {
-      document.documentElement.classList.toggle('dark');
-      $('#darkModeBtn').textContent = document.documentElement.classList.contains('dark') ? 'Light' : 'Dark';
-    };
-
-    // TABS
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.onclick = () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-      btn.classList.add('tab-active');
+    // === TABS ===
+    document.querySelectorAll('.tab-btn').forEach(b => b.onclick = () => {
+      document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('tab-active'));
+      b.classList.add('tab-active');
       document.querySelectorAll('section[id]').forEach(s => s.classList.add('hidden'));
-      $(`#${btn.dataset.tab}`).classList.remove('hidden');
+      $(`#${b.dataset.tab}`).classList.remove('hidden');
     });
 
-    // LOCAL STORAGE
-    const save = (key, data) => localStorage.setItem(key, JSON.stringify(data));
-    const load = (key) => JSON.parse(localStorage.getItem(key) || '[]');
+    // === OPEN FOOD FACTS LOOKUP ===
+    async function lookup(barcode) {
+      if (!barcode || barcode.length < 7) return { name: barcode };
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+      const data = await res.json();
+      if (data.status === 1) {
+        const p = data.product;
+        return { name: p.product_name || p.brands || barcode, image: p.image_front_small_url || p.image_front_url };
+      }
+      return { name: barcode };
+    }
 
-    // ADD INVENTORY
-    $('#addToInventory').onclick = async () => {
+    // === ADD TO INVENTORY ===
+    $('#addItem').onclick = async () => {
       const barcode = $('#invBarcode').value.trim();
-      if (!barcode) return alert('Enter barcode');
-      $('#addToInventory').textContent = '...';
-      const product = await lookupProduct(barcode);
+      if (!barcode) return alert('Enter a barcode or name');
+      const product = await lookup(barcode);
       const item = {
         id: Date.now(),
-        barcode, name: product.name, image: product.image, brand: product.brand,
-        quantity: parseInt($('#invQty').value) || 1, expiration: $('#invExp').value || null
+        name: product.name,
+        image: product.image || null,
+        quantity: +$('#invQty').value || 1,
+        expiration: $('#invExp').value || null
       };
-      const res = await fetch(API_BASE + '/api/inventory', { method: 'POST', headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
-      if (!res.ok) save('inventory', [...load('inventory'), item]);
-      $('#addToInventory').textContent = 'Add Item';
+      await fetch(API + '/api/inventory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(item)
+      });
       $('#invBarcode').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
       loadInventory();
     };
 
-    // SCAN BUTTON
-    $('#scanBtn').onclick = () => {
-      document.querySelector('[data-tab="scanner"]').click();
-      setTimeout(() => $('#startScanner').click(), 300);
+    // === LOAD INVENTORY ===
+    async function loadInventory() {
+      const res = await fetch(API + '/api/inventory', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      const items = data.items || [];
+      const list = $('#inventoryList');
+      list.innerHTML = '';
+      items.forEach((item, i) => {
+        const card = document.createElement('div');
+        card.className = 'glass rounded-3xl p-6 shadow-xl flex gap-5';
+        card.innerHTML = `
+          ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-xl object-cover shadow-lg">` : '<div class="w-24 h-24 bg-gray-600 rounded-xl flex items-center justify-center text-4xl">?</div>'}
+          <div class="flex-1">
+            <h3 class="text-xl font-bold">${item.name}</h3>
+            <p class="text-lg opacity-80">x${item.quantity}</p>
+            ${item.expiration ? `<p class="text-sm mt-2">${new Date(item.expiration).toLocaleDateString()}</p>` : ''}
+          </div>
+          <button class="text-red-400 font-bold text-lg delete-inv" data-index="${i}">Delete</button>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    // === DELETE FROM INVENTORY ===
+    $('#inventoryList').onclick = async e => {
+      if (!e.target.classList.contains('delete-inv')) return;
+      if (!confirm('Delete this item?')) return;
+      const i = e.target.dataset.index;
+      const res = await fetch(API + '/api/inventory', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      data.items.splice(i, 1);
+      await fetch(API + '/api/inventory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inventory: data.items })
+      });
+      loadInventory();
     };
 
-    // LOAD INVENTORY
-    function loadInventory() {
-      fetch(API_BASE + '/api/inventory', { headers: { Authorization: `Bearer ${idToken}` } }).then(r => r.json()).then(data => {
-        const items = data?.items || load('inventory');
-        const list = $('#inventoryList'); list.innerHTML = '';
-        items.forEach((item, i) => {
-          const card = document.createElement('div');
-          card.className = 'item-card glass rounded-2xl p-4 shadow-xl flex gap-4';
-          card.innerHTML = `
-            ${item.image ? `<img src="${item.image}" class="w-16 h-16 rounded-lg object-cover shadow-lg">` : '<div class="w-16 h-16 bg-gray-400 rounded-lg flex items-center justify-center text-2xl">?</div>'}
-            <div class="flex-1">
-              <div class="font-bold text-base">${item.name}</div>
-              <div class="text-sm opacity-70">${item.brand || ''}</div>
-              <div class="text-sm">x${item.quantity}</div>
-              <div class="text-xs mt-1">${getExpBadge(item.expiration)}</div>
-            </div>
-            <button class="delete-btn text-red-400 font-bold ml-auto" data-type="inventory" data-index="${i}">Delete</button>
-          `;
-          list.appendChild(card);
-        });
-      }).catch(() => {
-        const items = load('inventory');
-        const list = $('#inventoryList'); list.innerHTML = '';
-        items.forEach((item, i) => {
-          const card = document.createElement('div');
-          card.className = 'item-card glass rounded-2xl p-4 shadow-xl flex gap-4';
-          card.innerHTML = `
-            ${item.image ? `<img src="${item.image}" class="w-16 h-16 rounded-lg object-cover shadow-lg">` : '<div class="w-16 h-16 bg-gray-400 rounded-lg flex items-center justify-center text
+    // === SHOPPING LIST (simplified) ===
+    $('#addShop').onclick = async () => {
+      const name = $('#shopItem').value.trim();
+      if (!name) return;
+      await fetch(API + '/api/shopping', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemName: name, needed: 1 })
+      });
+      $('#shopItem').value = '';
+      loadShopping();
+    };
+
+    async function loadShopping() {
+      const res = await fetch(API + '/api/shopping', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      const list = $('#shoppingList');
+      list.innerHTML = '';
+      (data.list || []).forEach((item, i) => {
+        const card = document.createElement('div');
+        card.className = 'glass rounded-3xl p-6 shadow-xl flex justify-between items-center';
+        card.innerHTML = `<span class="text-xl">${item.itemName} ×${item.needed}</span>
+          <button class="text-red-400 font-bold delete-shop" data-index="${i}">Delete</button>`;
+        list.appendChild(card);
+      });
+    }
+    $('#shoppingList').onclick = async e => {
+      if (!e.target.classList.contains('delete-shop')) return;
+      if (!confirm('Remove?')) return;
+      const i = e.target.dataset.index;
+      const res = await fetch(API + '/api/shopping', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      data.list.splice(i, 1);
+      await fetch(API + '/api/shopping', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shopping: data.list })
+      });
+      loadShopping();
+    };
+
+    // === BARCODE SCANNER (ZXing) ===
+    let codeReader = null;
+    $('#openScanner').onclick = () => document.querySelector('[data-tab="scanner"]').click();
+    $('#startScan').onclick = () => {
+      if (codeReader) {
+        codeReader.reset();
+        codeReader = null;
+        $('#startScan').textContent = 'Start Scanning';
+        $('#video').srcObject = null;
+        return;
+      }
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
+        if (result) {
+          $('#invBarcode').value = result.text;
+          $('#result').textContent = 'Found: ' + result.text;
+          setTimeout(() => {
+            document.querySelector('[data-tab="inventory"]').click();
+            $('#addItem').click();
+            codeReader.reset();
+            codeReader = null;
+            $('#startScan').textContent = 'Start Scanning';
+            $('#video').srcObject = null;
+          }, 1000);
+        }
+      });
+      $('#startScan').textContent = 'Stop Scanning';
+    };
+
+    // === AI SCAN (photo) ===
+    $('#aiScanBtn').onclick = async () => {
+      const file = $('#aiPhoto').files[0];
+      if (!file) return alert('Take a photo first');
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch(API + '/api/scan', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
+      const data = await res.json();
+      $('#aiResult').innerHTML = data.labels?.map(l => 
+        `<button class="m-2 px-5 py-3 bg-purple-600 rounded-xl" onclick="$('#shopItem').value='${l}';$('#addShop').click()">+ ${l}</button>`
+      ).join('') || 'Nothing detected';
+    };
+  </script>
+</body>
+</html>
