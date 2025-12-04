@@ -28,13 +28,13 @@
   <div id="auth-section" class="flex items-center justify-center min-h-screen">
     <div class="glass p-10 rounded-3xl shadow-2xl max-w-md w-full">
       <h1 class="text-4xl font-bold text-center mb-8">PantryPal Pro</h1>
-      <!-- Add explicit sign-in button to trigger UI (avoids auto-popup block) -->
+      <!-- Explicit sign-in button to trigger UI (avoids auto-popup block) -->
       <button id="startSignIn" class="w-full px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 mb-4">Sign In with Google</button>
       <div id="firebaseui-auth-container"></div>
       <p class="text-center mt-4 text-sm opacity-70">Sign in to unlock Pro features</p>
     </div>
   </div>
-  <!-- MAIN APP (unchanged) -->
+  <!-- MAIN APP -->
   <div id="app" class="hidden min-h-screen">
     <header class="glass sticky top-0 z-50 shadow-lg">
       <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -50,7 +50,7 @@
       </div>
     </header>
     <main class="max-w-6xl mx-auto px-6 py-10">
-      <!-- TABS (unchanged) -->
+      <!-- TABS -->
       <div class="flex space-x-4 mb-8 overflow-x-auto">
         <button class="tab-btn tab-active px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="inventory">Inventory</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="shopping">Shopping List</button>
@@ -58,7 +58,7 @@
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="voice">Voice</button>
         <button class="tab-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap" data-tab="ai">AI Scan (Pro)</button>
       </div>
-      <!-- INVENTORY (unchanged) -->
+      <!-- INVENTORY -->
       <section id="inventory">
         <div class="glass p-8 rounded-3xl">
           <h2 class="text-2xl font-bold mb-6">Add to Inventory</h2>
@@ -71,7 +71,7 @@
           <div id="inventoryList" class="mt-8 space-y-4"></div>
         </div>
       </section>
-      <!-- SHOPPING (unchanged) -->
+      <!-- SHOPPING -->
       <section id="shopping" class="hidden">
         <div class="glass p-8 rounded-3xl">
           <h2 class="text-2xl font-bold mb-6">Shopping List</h2>
@@ -83,7 +83,7 @@
           <div id="shoppingList" class="mt-8 space-y-4"></div>
         </div>
       </section>
-      <!-- SCANNER (unchanged) -->
+      <!-- SCANNER -->
       <section id="scanner" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">Scan Barcode / QR</h2>
@@ -92,16 +92,16 @@
           <p id="scanResult" class="mt-6 text-xl font-mono break-all"></p>
         </div>
       </section>
-      <!-- VOICE (unchanged) -->
+      <!-- VOICE -->
       <section id="voice" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">Voice Add to Shopping</h2>
-          <button id="voiceBtn" class="w-24 h-24 bg-red-500 rounded-full text-white text-4xl hover:bg-red-600">Microphone</button>
+          <button id="voiceBtn" class="w-24 h-24 bg-red-500 rounded-full text-white text-4xl hover:bg-red-600">🎤</button>
           <p class="mt-6">Hold to speak: "Add milk quantity 2"</p>
           <p id="voiceResult" class="mt-6 text-xl text-green-400"></p>
         </div>
       </section>
-      <!-- AI SCAN (unchanged) -->
+      <!-- AI SCAN -->
       <section id="ai" class="hidden">
         <div class="glass p-8 rounded-3xl text-center">
           <h2 class="text-2xl font-bold mb-6">AI Photo Scan (Pro)</h2>
@@ -112,7 +112,7 @@
       </section>
     </main>
   </div>
-  <!-- SCAN MODAL (unchanged) -->
+  <!-- SCAN MODAL -->
   <div id="scanModal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 p-6">
     <div class="glass p-8 rounded-3xl max-w-sm w-full text-center">
       <h3 class="text-2xl font-bold mb-4">Scanned!</h3>
@@ -132,62 +132,69 @@
     lucide.createIcons();
     const API_BASE = window.location.origin;
 
-    // Use env vars on Render (set as Environment Variables in Dashboard)
-    // Fallback to old config for local testing - REGENERATE THESE!
-    window.firebaseConfig = {
-      apiKey: process.env.FIREBASE_API_KEY || "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", // ← REGENERATE!
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN || "pantrypal-6e410.firebaseapp.com",
-      projectId: process.env.FIREBASE_PROJECT_ID || "pantrypal-6e410",
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "592127259891",
-      appId: process.env.FIREBASE_APP_ID || "1:592127259891:web:fcc158b7b1c35ce0b3b386"
+    // HARDCODED CONFIG - REGENERATE IN FIREBASE CONSOLE IF COMPROMISED! Restrict to your domain.
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
     };
 
     // Initialize Firebase
-    firebase.initializeApp(window.firebaseConfig);
+    firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const ui = new firebaseui.auth.AuthUI(auth);
     let idToken = null;
     const $ = s => document.querySelector(s);
 
-    // === AUTH - Wrapped in click to avoid popup block ===
-    $('#startSignIn').onclick = () => {
-      ui.start('#firebaseui-auth-container', {
-        signInFlow: 'popup', // Enforce popup
+    // === AUTH - Click-triggered to avoid popup block ===
+    $('#startSignIn').addEventListener('click', (e) => {
+      console.log('Sign-in button clicked'); // Debug
+      e.preventDefault();
+      const container = $('#firebaseui-auth-container');
+      if (!container) {
+        console.error('Container missing');
+        return;
+      }
+      ui.start(container, {
+        signInFlow: 'popup',
         signInOptions: [
           firebase.auth.GoogleAuthProvider.PROVIDER_ID,
           firebase.auth.EmailAuthProvider.PROVIDER_ID
         ],
         callbacks: {
-          signInSuccessWithAuthResult: () => false // Stay on page
+          signInSuccessWithAuthResult: () => {
+            console.log('Sign-in success');
+            return false;
+          },
+          signInFailure: (error) => console.error('Sign-in failed:', error)
         }
-      });
-    };
+      }).catch(err => console.error('UI start failed:', err));
+    });
 
     auth.onAuthStateChanged(async (user) => {
       if (user) {
-        try {
-          idToken = await user.getIdToken();
-          $('#userEmail').textContent = user.email || user.displayName || 'User';
-          $('#auth-section').classList.add('hidden');
-          $('#app').classList.remove('hidden');
-          await Promise.all([loadInventory(), loadShopping(), loadScanCount()]);
-        } catch (error) {
-          console.error('Auth state error:', error); // Log for debug
-        }
+        console.log('User signed in:', user.email);
+        idToken = await user.getIdToken();
+        $('#userEmail').textContent = user.email || user.displayName || 'User';
+        $('#auth-section').classList.add('hidden');
+        $('#app').classList.remove('hidden');
+        await Promise.all([loadInventory(), loadShopping(), loadScanCount()]);
       } else {
+        console.log('No user - show auth');
         idToken = null;
         $('#auth-section').classList.remove('hidden');
         $('#app').classList.add('hidden');
-        // Don't auto-start UI - wait for button click
       }
     });
 
-    $('#signOutBtn').onclick = () => {
-      auth.signOut().catch(console.error);
-    };
+    $('#signOutBtn').addEventListener('click', () => {
+      auth.signOut().then(() => console.log('Signed out')).catch(console.error);
+    });
 
-    // === API (unchanged, but added error log) ===
+    // === API ===
     async function api(path, opts = {}) {
       if (!idToken) return null;
       try {
@@ -199,7 +206,7 @@
             ...opts.headers
           }
         });
-        if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+        if (!res.ok) throw new Error(`API ${path}: ${res.status}`);
         return await res.json();
       } catch (error) {
         console.error('API error:', error);
@@ -207,26 +214,26 @@
       }
     }
 
-    // === TABS (unchanged) ===
+    // === TABS ===
     document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.onclick = () => {
+      btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
         btn.classList.add('tab-active');
         document.querySelectorAll('section[id]').forEach(s => s.classList.add('hidden'));
         $(`#${btn.dataset.tab}`).classList.remove('hidden');
-      };
+      });
     });
 
-    // === INVENTORY (fixed delete mutation) ===
-    $('#addToInventory').onclick = async () => {
+    // === INVENTORY ===
+    $('#addToInventory').addEventListener('click', async () => {
       const barcode = $('#invBarcode').value.trim();
       const qty = parseInt($('#invQty').value) || 1;
       const exp = $('#invExp').value;
       if (!barcode) return alert('Enter barcode');
       await addToInventory(barcode, qty, exp);
-      $('#invBarcode').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
+      $('#invBarcode').value = ''; $('#invQty').value = '1'; $('#invExp').value = '';
       loadInventory();
-    };
+    });
 
     async function addToInventory(barcode, qty = 1, exp = '') {
       const res = await api('/api/inventory', {
@@ -260,15 +267,15 @@
       });
     }
 
-    // === SHOPPING (fixed delete mutation) ===
-    $('#addToShopping').onclick = async () => {
+    // === SHOPPING ===
+    $('#addToShopping').addEventListener('click', async () => {
       const name = $('#shopName').value.trim();
       const needed = parseInt($('#shopNeeded').value) || 1;
       if (!name) return alert('Enter item name');
       await addToShoppingList(name, needed);
-      $('#shopName').value = ''; $('#shopNeeded').value = 1;
+      $('#shopName').value = ''; $('#shopNeeded').value = '1';
       loadShopping();
-    };
+    });
 
     async function addToShoppingList(name, needed = 1) {
       const res = await api('/api/shopping', {
@@ -297,16 +304,16 @@
       });
     }
 
-    // === DELETE (fixed: copy array to avoid mutation) ===
+    // === DELETE (Fixed mutation) ===
     document.addEventListener('click', async (e) => {
       if (!e.target.classList.contains('delete-btn')) return;
       const type = e.target.dataset.type;
       const index = parseInt(e.target.dataset.index);
       if (!confirm('Delete this item?')) return;
-      const data = type === 'inventory' ? (await api('/api/inventory')) : (await api('/api/shopping'));
+      const data = type === 'inventory' ? await api('/api/inventory') : await api('/api/shopping');
       const array = type === 'inventory' ? data?.items : data?.list;
       if (!array || index >= array.length) return;
-      const newArray = [...array]; // ← FIX: Copy before splice
+      const newArray = [...array]; // Copy to avoid mutation
       newArray.splice(index, 1);
       const res = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
         method: 'POST',
@@ -324,10 +331,10 @@
       $('#scanCounter').textContent = d?.isPro ? 'Unlimited AI Scans (Pro)' : `Free scans: ${d?.scans || 0}/10`;
     }
 
-    // === SCANNER (unchanged) ===
+    // === SCANNER ===
     let codeReader;
     let lastScanned = null;
-    $('#startScanner').onclick = () => {
+    $('#startScanner').addEventListener('click', () => {
       if (codeReader) {
         codeReader.reset(); codeReader = null;
         $('#startScanner').textContent = 'Start Scanner';
@@ -344,11 +351,11 @@
           $('#startScanner').textContent = 'Start Scanner';
           $('#video').srcObject = null;
         }
-      });
+      }).catch(err => console.error('Scanner error:', err));
       $('#startScanner').textContent = 'Stop Scanner';
-    };
+    });
 
-    // === SCAN MODAL (unchanged) ===
+    // === SCAN MODAL ===
     function showScanModal(barcode) {
       $('#modalBarcode').textContent = barcode;
       $('#scanModal').classList.remove('hidden');
@@ -356,42 +363,58 @@
         await addToShoppingList(barcode, 1);
         $('#scanModal').classList.add('hidden');
       };
-      $('#closeModalBtn').onclick = () => {
-        $('#scanModal').classList.add('hidden');
-      };
+      $('#closeModalBtn').onclick = () => $('#scanModal').classList.add('hidden');
     }
 
-    // === VOICE (unchanged) ===
+    // === VOICE ===
     if (annyang) {
       annyang.addCommands({
         'add *item quantity *qty': async (item, qty) => {
-          await addToShoppingList(item, qty || 1);
+          await addToShoppingList(item, parseInt(qty) || 1);
+          $('#voiceResult').textContent = `Added: ${item} x${qty || 1}`;
         }
       });
-      $('#voiceBtn').onmousedown = $('#voiceBtn').ontouchstart = () => annyang.start({ autoRestart: false });
-      $('#voiceBtn').onmouseup = $('#voiceBtn').ontouchend = () => annyang.abort();
+      const voiceBtn = $('#voiceBtn');
+      voiceBtn.onmousedown = voiceBtn.ontouchstart = () => {
+        annyang.start({ autoRestart: false });
+        voiceBtn.classList.add('bg-red-600');
+      };
+      voiceBtn.onmouseup = voiceBtn.ontouchend = () => {
+        annyang.abort();
+        voiceBtn.classList.remove('bg-red-600');
+      };
+    } else {
+      $('#voiceBtn').textContent = '❌';
     }
 
-    // === AI SCAN (unchanged, but added labels to clickable) ===
-    $('#aiScanBtn').onclick = async () => {
+    // === AI SCAN ===
+    $('#aiScanBtn').addEventListener('click', async () => {
       const file = $('#aiImage').files[0];
       if (!file) return alert('Take a photo first');
       const form = new FormData();
       form.append('image', file);
       $('#aiResult').innerHTML = '<p class="text-yellow-300">Scanning...</p>';
-      const res = await fetch(API_BASE + '/api/scan', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` }, body: form });
+      const res = await fetch(API_BASE + '/api/scan', { 
+        method: 'POST', 
+        headers: { 'Authorization': `Bearer ${idToken}` }, 
+        body: form 
+      });
       const data = await res.json();
       if (data.labels?.length) {
-        $('#aiResult').innerHTML = '<p class="text-green-400 font-bold mb-4">Found:</p>' + data.labels.map(l => 
-          `<div class="p-3 glass rounded-lg inline-block mr-2 mb-2 cursor-pointer hover:bg-purple-600" onclick="addToShoppingList('${l}', 1)">${l}</div>`
-        ).join('');
+        $('#aiResult').innerHTML = '<p class="text-green-400 font-bold mb-4">Found:</p>' + 
+          data.labels.map(l => 
+            `<div class="p-3 glass rounded-lg inline-block mr-2 mb-2 cursor-pointer hover:bg-purple-600" onclick="addToShoppingList('${l}', 1)">${l}</div>`
+          ).join('');
       } else {
         $('#aiResult').innerHTML = '<p class="text-red-400">Nothing detected. Try again!</p>';
       }
-    };
+    });
 
-    // Dark mode toggle (bonus, if missing)
-    $('#darkModeBtn').onclick = () => document.documentElement.classList.toggle('dark');
+    // Dark mode
+    $('#darkModeBtn').addEventListener('click', () => document.documentElement.classList.toggle('dark'));
+
+    // Initial load
+    console.log('PantryPal loaded');
   </script>
 </body>
 </html>
