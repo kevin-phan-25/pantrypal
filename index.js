@@ -7,6 +7,7 @@ const { ImageAnnotatorClient } = require('@google-cloud/vision');
 require('dotenv').config();
 
 const app = express();
+
 app.use(cors({ origin: ['https://pantrypal-zdi4.onrender.com', 'http://localhost:3000'], credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(fileUpload());
@@ -15,10 +16,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 let serviceAccount;
 try {
   serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_KEY || require('./credentials.json'));
-} catch (e) { console.error('Invalid key'); process.exit(1); }
+} catch (e) {
+  console.error('Invalid FIREBASE_ADMIN_KEY');
+  process.exit(1);
+}
 
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
 const db = admin.firestore();
+
+// THIS LINE FIXES THE CRASH
 db.settings({ ignoreUndefinedProperties: true });
 
 const vision = new ImageAnnotatorClient({
@@ -36,21 +45,15 @@ async function verifyToken(req, res, next) {
   }
 }
 
-// GET INVENTORY & SHOPPING
 app.get('/api/inventory', verifyToken, async (req, res) => {
-  const doc = await db.collection('users').doc(req.user.uid).get();
-  res.json(doc.data()?.inventory || { items: [] });
+  const doc = await db.collection('inventories').doc(req.user.uid).get();
+  res.json(doc.exists ? doc.data() : { items: [] });
 });
 
-app.get('/api/shopping', verifyToken, async (req, res) => {
-  const doc = await db.collection('users').doc(req.user.uid).get();
-  res.json(doc.data()?.shopping || { list: [] });
-});
-
-// ADD ITEM
 app.post('/api/inventory', verifyToken, async (req, res) => {
   let { name, image, quantity = 1, expiration } = req.body;
-  name = (name || "Unknown Item").toString().trim() || "Unknown Item";
+  name = (name || "Unknown Item").toString().trim();
+  if (!name) name = "Unknown Item";
 
   const item = {
     name,
@@ -60,132 +63,68 @@ app.post('/api/inventory', verifyToken, async (req, res) => {
   if (image) item.image = image;
   if (expiration) item.expiration = expiration;
 
-  const userRef = db.collection('users').doc(req.user.uid);
-  await db.runTransaction(async t => {
-    const doc = await t.get(userRef);
-    const data = doc.exists ? doc.data() : {};
-    const items = (data.inventory?.items || []).concat(item);
-    t.set(userRef, { inventory: { items } }, { merge: true });
-  });
-  res.json({ success: true });
+  const ref = db.collection('inventories').doc(req.user.uid);
+  const doc = await ref.get();
+
+  try {
+    if (doc.exists) {
+      await ref.update({ items: admin.firestore.FieldValue.arrayUnion(item) });
+    } else {
+      await ref.set({ items: [item] });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Firestore error:', error);
+    res.status(500).json({ error: 'Failed to save' });
+  }
+});
+
+app.get('/api/shopping', verifyToken, async (req, res) => {
+  const doc = await db.collection('shopping').doc(req.user.uid).get();
+  res.json(doc.exists ? doc.data() : { list: [] });
 });
 
 app.post('/api/shopping', verifyToken, async (req, res) => {
   const { itemName } = req.body;
-  if (!itemName?.trim()) return res.status(400).json({ error: 'Invalid' });
+  if (!itemName || !itemName.trim()) return res.status(400).json({ error: 'Invalid' });
+
   const item = { itemName: itemName.trim(), addedAt: new Date().toISOString() };
-  const userRef = db.collection('users').doc(req.user.uid);
-  await db.runTransaction(async t => {
-    const doc = await t.get(userRef);
-    const data = doc.exists ? doc.data() : {};
-    const list = (data.shopping?.list || []).concat(item);
-    t.set(userRef, { shopping: { list } }, { merge: true });
-  });
-  res.json({ success: true });
-});
+  const ref = db.collection('shopping').doc(req.user.uid);
+  const doc = await ref.get();
 
-// EDIT ITEM (NEW)
-app.put('/api/inventory/:index', verifyToken, async (req, res) => {
-  const index = parseInt(req.params.index);
-  const { name, quantity, expiration } = req.body;
-  if (isNaN(index) || index < 0) return res.status(400).json({ error: 'Invalid index' });
-
-  const userRef = db.collection('users').doc(req.user.uid);
   try {
-    await db.runTransaction(async t => {
-      const doc = await t.get(userRef);
-      const items = doc.data()?.inventory?.items || [];
-      if (index >= items.length) throw new Error('Not found');
-      items[index] = {
-        ...items[index],
-        name: name?.trim() || items[index].name,
-        quantity: Number(quantity) || items[index].quantity,
-        expiration: expiration || null
-      };
-      t.update(userRef, { 'inventory.items': items });
-    });
+    if (doc.exists) {
+      await ref.update({ list: admin.firestore.FieldValue.arrayUnion(item) });
+    } else {
+      await ref.set({ list: [item] });
+    }
     res.json({ success: true });
-  } catch (e) {
+  } catch (error) {
+    console.error('Firestore error:', error);
     res.status(500).json({ error: 'Failed' });
   }
 });
 
-// DELETE SINGLE ITEM
-app.delete('/api/inventory/:index', verifyToken, async (req, res) => {
-  const index = parseInt(req.params.index);
-  if (isNaN(index)) return res.status(400).json({ error: 'Bad index' });
-  const userRef = db.collection('users').doc(req.user.uid);
-  await db.runTransaction(async t => {
-    const doc = await t.get(userRef);
-    const items = doc.data()?.inventory?.items || [];
-    items.splice(index, 1);
-    t.update(userRef, { 'inventory.items': items });
-  });
-  res.json({ success: true });
-});
-
-app.delete('/api/shopping/:index', verifyToken, async (req, res) => {
-  const index = parseInt(req.params.index);
-  if (isNaN(index)) return res.status(400).json({ error: 'Bad index' });
-  const userRef = db.collection('users').doc(req.user.uid);
-  await db.runTransaction(async t => {
-    const doc = await t.get(userRef);
-    const list = doc.data()?.shopping?.list || [];
-    list.splice(index, 1);
-    t.update(userRef, { 'shopping.list': list });
-  });
-  res.json({ success: true });
-});
-
-// BULK DELETE (NEW)
-app.post('/api/inventory/bulk-delete', verifyToken, async (req, res) => {
-  const { indices } = req.body;
-  if (!Array.isArray(indices)) return res.status(400).json({ error: 'Invalid' });
-
-  const userRef = db.collection('users').doc(req.user.uid);
-  await db.runTransaction(async t => {
-    const doc = await t.get(userRef);
-    let items = doc.data()?.inventory?.items || [];
-    indices.sort((a, b) => b - a).forEach(i => items.splice(i, 1));
-    t.update(userRef, { 'inventory.items': items });
-  });
-  res.json({ success: true });
-});
-
-app.post('/api/shopping/bulk-delete', verifyToken, async (req, res) => {
-  const { indices } = req.body;
-  if (!Array.isArray(indices)) return res.status(400).json({ error: 'Invalid' });
-
-  const userRef = db.collection('users').doc(req.user.uid);
-  await db.runTransaction(async t => {
-    const doc = await t.get(userRef);
-    let list = doc.data()?.shopping?.list || [];
-    indices.sort((a, b) => b - a).forEach(i => list.splice(i, 1));
-    t.update(userRef, { 'shopping.list': list });
-  });
-  res.json({ success: true });
-});
-
-// AI SCAN
 app.post('/api/scan', verifyToken, async (req, res) => {
   try {
-    if (!req.files?.image) return res.status(400).json({ error: 'No image' });
+    if (!req.files || !req.files.image) return res.status(400).json({ error: 'No image' });
     const [result] = await vision.labelDetection(req.files.image.data);
     const labels = result.labelAnnotations || [];
     const foodKeywords = ['food','fruit','vegetable','drink','snack','ingredient','produce','dairy','meat','bread','milk','egg','cheese','yogurt','chicken','beef','apple','banana','tomato','potato','rice','pasta','oil','butter','juice'];
     const detected = labels
       .filter(l => l.score > 0.7)
       .map(l => l.description.toLowerCase())
-      .filter(d => foodKeywords.some(k => d.includes(k)))
-      .map(d => d.charAt(0).toUpperCase() + d.slice(1))
+      .filter(desc => foodKeywords.some(k => desc.includes(k)))
+      .map(desc => desc.charAt(0).toUpperCase() + desc.slice(1))
       .slice(0, 15);
     res.json({ labels: detected.length > 0 ? detected : labels.slice(0, 8).map(l => l.description) });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'AI failed' });
+    console.error('Vision error:', err);
+    res.status(500).json({ error: 'AI scan failed' });
   }
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => console.log(`PantryPal Pro LIVE on port ${PORT}`));
