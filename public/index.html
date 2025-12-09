@@ -93,11 +93,28 @@
     const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
-    const messaging = firebase.messaging?.();
-
     const $ = s => document.querySelector(s);
     const $$ = s => document.querySelectorAll(s);
     let currentRoom = 'fridge';
+
+    // FIXED: Import Google Provider
+    const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+    async function lookupProduct(barcode) {
+      if (!barcode || barcode.length < 7) return { name: barcode || "Unknown Item", image: null };
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        const data = await res.json();
+        if (data.status === 1 && data.product) {
+          const img = data.product.image_front_url || data.product.image_front_small_url || data.product.image_url;
+          return {
+            name: data.product.product_name || data.product.brands || barcode || "Unknown Item",
+            image: img ? `${img}?size=full` : null
+          };
+        }
+      } catch (e) {}
+      return { name: barcode || "Unknown Item", image: null };
+    }
 
     async function api(path, opts = {}) {
       const token = await auth.currentUser?.getIdToken();
@@ -120,10 +137,10 @@
         return `
           <div class="glass rounded-3xl p-6 shadow-xl flex gap-4 items-center ${isExpired ? 'expired' : isExpiring ? 'expiring' : ''}">
             <input type="checkbox" class="w-6 h-6" data-index="${i}">
-            ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg">` : '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">Box</div>'}
+            ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl hidden">Box</div>'}
             <div class="flex-1">
               <h3 class="text-2xl font-bold">${item.name}</h3>
-              <p class="opacity-80">×${item.quantity} ${item.expiration ? '· ' + (isExpired ? 'Expired' : daysLeft + ' days') : ''}</p>
+              <p class="opacity-80">×${item.quantity} ${item.expiration ? '· ' + (isExpired ? 'Expired!' : daysLeft + ' days') : ''}</p>
             </div>
             <button onclick="deleteItem(${i})" class="text-red-400 font-bold hover:underline">Delete</button>
           </div>
@@ -143,42 +160,26 @@
 
     function checkExpirations(rooms) {
       const expiring = [];
-      Object.keys(rooms).forEach(room => {
-        rooms[room].forEach(item => {
-          if (item.expiration) {
-            const days = Math.ceil((new Date(item.expiration) - Date.now()) / 86400000);
-            if (days <= 3 && days >= 0) expiring.push(`${item.name} (${room}) expires in ${days} day${days === 1 ? '' : 's'}`);
-            if (days < 0) expiring.push(`${item.name} (${room}) is expired!`);
-          }
-        });
+      Object.values(rooms).flat().forEach(item => {
+        if (item.expiration) {
+          const days = Math.ceil((new Date(item.expiration) - Date.now()) / 86400000);
+          if (days <= 3 && days >= 0) expiring.push(`${item.name} expires in ${days} day${days > 1 ? 's' : ''}!`);
+          if (days < 0) expiring.push(`${item.name} is expired!`);
+        }
       });
-      if (expiring.length && Notification.permission === "granted") {
-        new Notification("PantryPal Alert", { body: expiring.join('\n'), icon: "/icon-192.png" });
-      }
+      if (expiring.length && Notification.permission === "granted") new Notification("Pantry Alert!", { body: expiring.join('\n'), icon: "/icon-192.png" });
     }
 
-    window.deleteItem = async (i) => {
-      if (!confirm('Delete?')) return;
-      await fetch(`/api/room/${currentRoom}/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } });
-      loadData();
-    };
-
-    window.deleteShopping = async (i) => {
-      if (!confirm('Delete?')) return;
-      await fetch(`/api/shopping/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } });
-      loadData();
-    };
+    window.deleteItem = async (i) => { if (!confirm('Delete?')) return; await fetch(`/api/room/${currentRoom}/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } }); loadData(); };
+    window.deleteShopping = async (i) => { if (!confirm('Delete?')) return; await fetch(`/api/shopping/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } }); loadData(); };
 
     $('#addItem').onclick = async () => {
       const name = $('#itemName').value.trim();
       if (!name) return alert('Enter item');
+      const product = await lookupProduct(name);
       await api(`/api/room/${$('#roomSelect').value}`, {
         method: 'POST',
-        body: JSON.stringify({
-          name,
-          quantity: $('#itemQty').value || 1,
-          expiration: $('#itemExp').value || null
-        })
+        body: JSON.stringify({ name: product.name, image: product.image, quantity: $('#itemQty').value || 1, expiration: $('#itemExp').value || null })
       });
       $('#itemName').value = ''; $('#itemQty').value = 1; $('#itemExp').value = '';
       loadData();
@@ -223,25 +224,15 @@
 
     document.addEventListener('change', e => e.target.type === 'checkbox' && updateBulkButton());
 
-    // Scanner, Voice, Dark Mode
-    let codeReader = null;
-    $('#itemName').addEventListener('click', async () => {
-      if (codeReader) return;
-      codeReader = new ZXing.BrowserMultiFormatReader();
+    // FIXED: Google Sign-In
+    $('#googleSignIn').onclick = async () => {
       try {
-        const result = await codeReader.decodeFromVideoDevice(null, null, () => {});
-        $('#itemName').value = result.text;
-        codeReader.reset();
-      } catch (e) {}
-    });
-
-    if (annyang) {
-      annyang.addCommands({ 'add *item': item => { $('#shopItem').value = item; $('#addShopping').click(); } });
-      document.body.addEventListener('click', () => annyang.isListening() || annyang.start({ autoRestart: false }));
-    }
-
-    $('#darkModeBtn').onclick = () => { document.body.classList.toggle('dark'); localStorage.setItem('dark', document.body.classList.contains('dark')); };
-    if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
+        await auth.signInWithPopup(googleProvider);
+      } catch (error) {
+        console.error('Sign-in error:', error);
+        alert('Sign-in failed. Check console for details.');
+      }
+    };
 
     auth.onAuthStateChanged(user => {
       if (user) {
@@ -250,11 +241,35 @@
         $('#app').classList.remove('hidden');
         loadData();
         if (Notification.permission === "default") Notification.requestPermission();
+      } else {
+        $('#auth').classList.remove('hidden');
+        $('#app').classList.add('hidden');
       }
     });
 
-    $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
     $('#signOutBtn').onclick = () => auth.signOut();
+
+    // Scanner (concise)
+    let codeReader;
+    $('#itemName').onclick = async () => {
+      if (codeReader) return;
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      try {
+        const result = await codeReader.decodeFromVideoDevice(null, null, () => {});
+        $('#itemName').value = result.text;
+        codeReader.reset();
+      } catch (e) { console.error(e); }
+    };
+
+    // Voice (concise)
+    if (annyang) {
+      annyang.addCommands({ 'add *item': item => { $('#shopItem').value = item; $('#addShopping').click(); } });
+      document.body.onclick = () => !annyang.isListening() && annyang.start({ autoRestart: false });
+    }
+
+    // Dark Mode
+    $('#darkModeBtn').onclick = () => { document.body.classList.toggle('dark'); localStorage.setItem('dark', document.body.classList.contains('dark')); };
+    if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
   </script>
 </body>
 </html>
