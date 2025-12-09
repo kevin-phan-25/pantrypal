@@ -7,7 +7,7 @@
   <link rel="manifest" href="/manifest.json">
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-  <script src="https://unpkg.com/@zxing/browser@latest"></script>
+  <script src="https://unpkg.com/@zxing/library@0.20.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/annyang@2.6.1/annyang.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -21,9 +21,11 @@
     .tab-active { background: rgba(255,255,255,0.3) !important; }
     .spinner { border: 4px solid #ffffff40; border-top: 4px solid white; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .dark .gradient-bg { background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); }
+    .dark .glass { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); }
   </style>
 </head>
-<body class="min-h-screen gradient-bg text-white">
+<body class="min-h-screen gradient-bg text-white transition-all duration-500">
 
   <!-- LOGIN -->
   <div id="auth" class="flex items-center justify-center min-h-screen p-6">
@@ -87,17 +89,21 @@
         <div id="shoppingList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
       </section>
 
-      <!-- OTHER SECTIONS (scanner, voice, ai) -->
+      <!-- SCANNER -->
       <section id="scanner" class="hidden text-center">
-        <video id="video" width="100%" height="400" class="rounded-3xl shadow-2xl mb-6" playsinline></video>
+        <video id="video" width="100%" height="400" class="rounded-3xl shadow-2xl mb-6" playsinline autoplay muted></video>
         <button id="startScan" class="px-12 py-6 bg-purple-600 rounded-2xl font-bold text-2xl btn-glow">Start Scanner</button>
+        <p id="scanResult" class="mt-4 text-xl"></p>
       </section>
 
+      <!-- VOICE -->
       <section id="voice" class="hidden text-center">
-        <button id="voiceBtn" class="w-32 h-32 bg-red-600 rounded-full text-6xl btn-glow">Microphone</button>
+        <button id="voiceBtn" class="w-32 h-32 bg-red-600 rounded-full text-6xl btn-glow hover:scale-110 transition">Microphone</button>
         <p class="mt-6 text-2xl">Say: "Add milk"</p>
+        <p id="voiceStatus" class="mt-4 text-lg"></p>
       </section>
 
+      <!-- AI SCAN -->
       <section id="ai" class="hidden text-center">
         <div class="glass p-10 rounded-3xl max-w-lg mx-auto">
           <h2 class="text-4xl font-black mb-6">AI Photo Scan</h2>
@@ -108,7 +114,6 @@
           <div id="preview" class="mt-8 hidden"><img id="previewImg" class="w-full rounded-2xl"></div>
           <button id="aiScanBtn" class="mt-6 px-12 py-6 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl font-bold text-2xl btn-glow hidden">Scan with AI</button>
           <div id="aiResult" class="mt-10"></div>
-          <p id="aiStatus" class="mt-6 text-lg"></p>
         </div>
       </section>
     </main>
@@ -126,12 +131,21 @@
   </div>
 
   <script>
-    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
+    };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
-    const $ = s => document.querySelector(s);
 
-    // Open Food Facts Lookup
+    const $ = s => document.querySelector(s);
+    const $$ = s => document.querySelectorAll(s);
+
+    // Open Food Facts
     async function lookupProduct(barcode) {
       if (!barcode || barcode.length < 7) return { name: barcode, image: null };
       try {
@@ -140,23 +154,29 @@
         if (data.status === 1) {
           return {
             name: data.product.product_name || data.product.brands || barcode,
-            image: data.product.image_front_small_url || data.product.image_front_url || null
+            image: data.product.image_front_url || data.product.image_front_small_url || null
           };
         }
-      } catch (e) {}
+      } catch (e) { console.error(e); }
       return { name: barcode, image: null };
     }
 
     async function api(path, opts = {}) {
       const token = await auth.currentUser?.getIdToken();
-      return fetch(path, { ...opts, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...opts.headers } })
-        .then(r => r.ok ? r.json() : null);
+      return fetch(path, {
+        ...opts,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          ...opts.headers
+        }
+      }).then(r => r.ok ? r.json() : null);
     }
 
     function showTab(tab) {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-      document.querySelectorAll('section[id]').forEach(s => s.classList.add('hidden'));
-      document.querySelector(`[data-tab="${tab}"]`).classList.add('tab-active');
+      $$('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+      $$('section[id]').forEach(s => s.classList.add('hidden'));
+      $(`[data-tab="${tab}"]`).classList.add('tab-active');
       $(`#${tab}`).classList.remove('hidden');
     }
 
@@ -164,12 +184,12 @@
       const data = await api('/api/inventory') || { items: [] };
       $('#inventoryList').innerHTML = data.items.map((item, i) => `
         <div class="glass rounded-3xl p-6 shadow-xl flex gap-4">
-          ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg">` : '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">Question</div>'}
+          ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg">` : '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">Package</div>'}
           <div class="flex-1">
             <h3 class="text-2xl font-bold">${item.name}</h3>
-            <p class="text-xl opacity-80">×${item.quantity} ${item.expiration ? '· Expires ' + item.expiration : ''}</p>
+            <p class="text-xl opacity-80">×${item.quantity} ${item.expiration ? '· Expires ' + new Date(item.expiration).toLocaleDateString() : ''}</p>
           </div>
-          <button onclick="deleteItem('inventory', ${i})" class="text-red-400 font-bold text-xl">Delete</button>
+          <button onclick="deleteItem('inventory', ${i})" class="text-red-400 font-bold text-xl hover:underline">Delete</button>
         </div>
       `).join('');
     }
@@ -179,39 +199,49 @@
       $('#shoppingList').innerHTML = data.list.map((item, i) => `
         <div class="glass rounded-3xl p-6 shadow-xl flex justify-between items-center">
           <span class="text-2xl font-bold">${item.itemName}</span>
-          <button onclick="deleteItem('shopping', ${i})" class="text-red-400 font-bold text-xl">Delete</button>
+          <button onclick="deleteItem('shopping', ${i})" class="text-red-400 font-bold text-xl hover:underline">Delete</button>
         </div>
       `).join('');
     }
 
     window.deleteItem = async (type, i) => {
-      if (!confirm('Delete?')) return;
+      if (!confirm('Delete this item?')) return;
       const data = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping');
       const arr = type === 'inventory' ? data.items : data.list;
       arr.splice(i, 1);
       await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
-        method: 'POST', body: JSON.stringify(type === 'inventory' ? { items: arr } : { list: arr })
+        method: 'POST',
+        body: JSON.stringify(type === 'inventory' ? { items: arr } : { list: arr })
       });
       type === 'inventory' ? loadInventory() : loadShopping();
     };
 
-    // AUTH & START
-    $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    // AUTH
+    $('#googleSignIn').onclick = () => {
+      $('#loginText').classList.add('hidden');
+      $('#loginSpinner').classList.remove('hidden');
+      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    };
+
     auth.onAuthStateChanged(user => {
       if (user) {
-        $('#userEmail').textContent = user.email;
+        $('#userEmail').textContent = user.email.split('@')[0];
         $('#auth').classList.add('hidden');
         $('#app').classList.remove('hidden');
         loadInventory();
         loadShopping();
+      } else {
+        $('#auth').classList.remove('hidden');
+        $('#app').classList.add('hidden');
       }
     });
+
     $('#signOutBtn').onclick = () => auth.signOut();
 
-    // ADD INVENTORY WITH OPEN FOOD FACTS
+    // ADD INVENTORY
     $('#addItem').onclick = async () => {
       const barcode = $('#invName').value.trim();
-      if (!barcode) return alert('Enter barcode or name');
+      if (!barcode) return alert('Enter a barcode or name');
       const product = await lookupProduct(barcode);
       await api('/api/inventory', {
         method: 'POST',
@@ -234,48 +264,76 @@
       loadShopping();
     };
 
-    document.querySelectorAll('.tab-btn').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+    $$('.tab-btn').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 
-    // SCANNER
-    let scanner;
-    $('#startScan').onclick = () => {
-      if (scanner) { scanner.reset(); scanner = null; $('#startScan').textContent = 'Start Scanner'; return; }
-      scanner = new ZXing.BrowserMultiFormatReader();
-      scanner.decodeFromVideoDevice(null, 'video', r => {
-        if (r) { $('#invName').value = r.text; showTab('inventory'); setTimeout(() => $('#addItem').click(), 300); }
-      });
+    // BARCODE SCANNER (ZXing)
+    let codeReader = null;
+    $('#startScan').onclick = async () => {
+      if (codeReader) {
+        codeReader.reset();
+        codeReader = null;
+        $('#startScan').textContent = 'Start Scanner';
+        $('#video').srcObject = null;
+        return;
+      }
+
       $('#startScan').textContent = 'Stop Scanner';
-    };
+      codeReader = new ZXing.BrowserMultiFormatReader();
 
-    // VOICE
-    if (annyang) {
-      annyang.addCommand('add *item', item => { $('#shopItem').value = item; $('#addShopping').click(); });
-      $('#voiceBtn').onclick = () => annyang.start();
-    }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        $('#video').srcObject = stream;
 
-    // AI SCAN (kept from previous fix)
-    $('#takePhotoBtn').onclick = () => $('#aiPhoto').click();
-    $('#aiPhoto').onchange = () => {
-      const file = $('#aiPhoto').files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = e => { $('#previewImg').src = e.target.result; $('#preview').classList.remove('hidden'); $('#aiScanBtn').classList.remove('hidden'); };
-        reader.readAsDataURL(file);
+        codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
+          if (result) {
+            $('#invName').value = result.text;
+            showTab('inventory');
+            setTimeout(() => $('#addItem').click(), 500);
+            codeReader.reset();
+            codeReader = null;
+            $('#startScan').textContent = 'Start Scanner';
+            $('#video').srcObject = null;
+          }
+        });
+      } catch (e) {
+        alert("Camera access denied or not available");
       }
     };
-    $('#aiScanBtn').onclick = async () => {
-      const file = $('#aiPhoto').files[0];
-      if (!file) return;
-      $('#aiScanBtn').innerHTML = '<div class="spinner"></div> Scanning...';
-      const form = new FormData();
-      form.append('image', file);
-      const res = await fetch('/api/scan', { method: 'POST', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }, body: form });
-      const data = await res.json();
-      $('#aiResult').innerHTML = data.labels?.map(l => `<button onclick="$('#shopItem').value='${l}'; showTab('shopping'); $('#addShopping').click();" class="p-4 bg-white/20 rounded-xl m-2 font-bold">+ ${l}</button>`).join('') || '<p>No items found</p>';
-      $('#aiScanBtn').innerHTML = 'Scan with AI';
+
+    // VOICE COMMANDS
+    if (annyang) {
+      const commands = {
+        'add *item': (item) => {
+          $('#shopItem').value = item;
+          $('#addShopping').click();
+          $('#voiceStatus').textContent = `Added: ${item}`;
+          setTimeout(() => $('#voiceStatus').textContent = '', 2000);
+        }
+      };
+      annyang.addCommands(commands);
+      $('#voiceBtn').onclick = () => {
+        if (annyang.isListening()) {
+          annyang.abort();
+          $('#voiceBtn').style.background = '#ef4444';
+        } else {
+          annyang.start({ autoRestart: false });
+          $('#voiceBtn').style.background = '#22c55e';
+          $('#voiceStatus').textContent = 'Listening...';
+        }
+      };
+    }
+
+    // DARK MODE
+    $('#darkModeBtn').onclick = () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
     };
 
-    // SHARE LIST
+    if (localStorage.getItem('darkMode') === 'true') {
+      document.documentElement.classList.add('dark');
+    }
+
+    // SHARE
     $('#shareBtn').onclick = () => {
       $('#shareLink').value = location.href;
       $('#qrCode').innerHTML = '';
@@ -283,9 +341,11 @@
       $('#shareModal').classList.remove('hidden');
     };
     $('#closeShare').onclick = () => $('#shareModal').classList.add('hidden');
-    $('#copyBtn').onclick = () => { $('#shareLink').select(); document.execCommand('copy'); alert('Copied!'); };
-
-    $('#darkModeBtn').onclick = () => document.documentElement.classList.toggle('dark');
+    $('#copyBtn').onclick = () => {
+      $('#shareLink').select();
+      document.execCommand('copy');
+      alert('Link copied!');
+    };
   </script>
 </body>
 </html>
