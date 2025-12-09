@@ -26,8 +26,6 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
-
-// THIS LINE FIXES THE CRASH
 db.settings({ ignoreUndefinedProperties: true });
 
 const vision = new ImageAnnotatorClient({
@@ -45,15 +43,22 @@ async function verifyToken(req, res, next) {
   }
 }
 
+// NEW: Get user's full document (inventory + shopping + pro status)
+app.get('/api/user', verifyToken, async (req, res) => {
+  const doc = await db.collection('users').doc(req.user.uid).get();
+  res.json(doc.exists ? doc.data() : { isPro: true, scans: 0, inventory: { items: [] }, shopping: { list: [] } });
+});
+
+// INVENTORY — NOW UNDER users/{uid}/inventory
 app.get('/api/inventory', verifyToken, async (req, res) => {
-  const doc = await db.collection('inventories').doc(req.user.uid).get();
-  res.json(doc.exists ? doc.data() : { items: [] });
+  const doc = await db.collection('users').doc(req.user.uid).get();
+  const data = doc.data() || {};
+  res.json(data.inventory || { items: [] });
 });
 
 app.post('/api/inventory', verifyToken, async (req, res) => {
   let { name, image, quantity = 1, expiration } = req.body;
-  name = (name || "Unknown Item").toString().trim();
-  if (!name) name = "Unknown Item";
+  name = (name || "Unknown Item").toString().trim() || "Unknown Item";
 
   const item = {
     name,
@@ -63,48 +68,51 @@ app.post('/api/inventory', verifyToken, async (req, res) => {
   if (image) item.image = image;
   if (expiration) item.expiration = expiration;
 
-  const ref = db.collection('inventories').doc(req.user.uid);
-  const doc = await ref.get();
+  const userRef = db.collection('users').doc(req.user.uid);
 
   try {
-    if (doc.exists) {
-      await ref.update({ items: admin.firestore.FieldValue.arrayUnion(item) });
-    } else {
-      await ref.set({ items: [item] });
-    }
+    await db.runTransaction(async (t) => {
+      const doc = await t.get(userRef);
+      const data = doc.exists ? doc.data() : {};
+      const items = (data.inventory?.items || []).concat(item);
+      t.set(userRef, { inventory: { items } }, { merge: true });
+    });
     res.json({ success: true });
   } catch (error) {
-    console.error('Firestore error:', error);
-    res.status(500).json({ error: 'Failed to save' });
-  }
-});
-
-app.get('/api/shopping', verifyToken, async (req, res) => {
-  const doc = await db.collection('shopping').doc(req.user.uid).get();
-  res.json(doc.exists ? doc.data() : { list: [] });
-});
-
-app.post('/api/shopping', verifyToken, async (req, res) => {
-  const { itemName } = req.body;
-  if (!itemName || !itemName.trim()) return res.status(400).json({ error: 'Invalid' });
-
-  const item = { itemName: itemName.trim(), addedAt: new Date().toISOString() };
-  const ref = db.collection('shopping').doc(req.user.uid);
-  const doc = await ref.get();
-
-  try {
-    if (doc.exists) {
-      await ref.update({ list: admin.firestore.FieldValue.arrayUnion(item) });
-    } else {
-      await ref.set({ list: [item] });
-    }
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Firestore error:', error);
+    console.error('Inventory error:', error);
     res.status(500).json({ error: 'Failed' });
   }
 });
 
+// SHOPPING — NOW UNDER users/{uid}/shopping
+app.get('/api/shopping', verifyToken, async (req, res) => {
+  const doc = await db.collection('users').doc(req.user.uid).get();
+  const data = doc.data() || {};
+  res.json(data.shopping || { list: [] });
+});
+
+app.post('/api/shopping', verifyToken, async (req, res) => {
+  const { itemName } = req.body;
+  if (!itemName?.trim()) return res.status(400).json({ error: 'Invalid' });
+
+  const item = { itemName: itemName.trim(), addedAt: new Date().toISOString() };
+  const userRef = db.collection('users').doc(req.user.uid);
+
+  try {
+    await db.runTransaction(async (t) => {
+      const doc = await t.get(userRef);
+      const data = doc.exists ? doc.data() : {};
+      const list = (data.shopping?.list || []).concat(item);
+      t.set(userRef, { shopping: { list } }, { merge: true });
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Shopping error:', error);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// AI SCAN (unchanged)
 app.post('/api/scan', verifyToken, async (req, res) => {
   try {
     if (!req.files || !req.files.image) return res.status(400).json({ error: 'No image' });
