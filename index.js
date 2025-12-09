@@ -15,12 +15,24 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let serviceAccount;
 try {
-  serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_KEY);
-} catch (e) { console.error('Invalid FIREBASE_ADMIN_KEY'); process.exit(1); }
+  serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_KEY || require('./credentials.json'));
+} catch (e) {
+  console.error('Invalid FIREBASE_ADMIN_KEY');
+  process.exit(1);
+}
 
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
 const db = admin.firestore();
-const vision = new ImageAnnotatorClient({ credentials: JSON.parse(process.env.GCLOUD_KEY_JSON) });
+
+// THIS LINE FIXES THE CRASH
+db.settings({ ignoreUndefinedProperties: true });
+
+const vision = new ImageAnnotatorClient({
+  credentials: JSON.parse(process.env.GCLOUD_KEY_JSON || '{}')
+});
 
 async function verifyToken(req, res, next) {
   const token = req.headers.authorization?.split('Bearer ')[1];
@@ -33,33 +45,40 @@ async function verifyToken(req, res, next) {
   }
 }
 
-// USER INFO
-app.get('/api/user-info', verifyToken, async (req, res) => {
-  const doc = await db.collection('users').doc(req.user.uid).get();
-  const data = doc.data() || {};
-  res.json({ isPro: data.isPro === true, scans: data.scans || 0 });
-});
-
-// INVENTORY
 app.get('/api/inventory', verifyToken, async (req, res) => {
   const doc = await db.collection('inventories').doc(req.user.uid).get();
   res.json(doc.exists ? doc.data() : { items: [] });
 });
 
 app.post('/api/inventory', verifyToken, async (req, res) => {
-  const { name, quantity = 1, expiration } = req.body;
-  const item = { name, quantity, expiration, addedAt: new Date().toISOString() };
+  let { name, image, quantity = 1, expiration } = req.body;
+  name = (name || "Unknown Item").toString().trim();
+  if (!name) name = "Unknown Item";
+
+  const item = {
+    name,
+    quantity: Number(quantity) || 1,
+    addedAt: new Date().toISOString()
+  };
+  if (image) item.image = image;
+  if (expiration) item.expiration = expiration;
+
   const ref = db.collection('inventories').doc(req.user.uid);
   const doc = await ref.get();
-  if (doc.exists) {
-    await ref.update({ items: admin.firestore.FieldValue.arrayUnion(item) });
-  } else {
-    await ref.set({ items: [item] });
+
+  try {
+    if (doc.exists) {
+      await ref.update({ items: admin.firestore.FieldValue.arrayUnion(item) });
+    } else {
+      await ref.set({ items: [item] });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Firestore error:', error);
+    res.status(500).json({ error: 'Failed to save' });
   }
-  res.json({ success: true });
 });
 
-// SHOPPING
 app.get('/api/shopping', verifyToken, async (req, res) => {
   const doc = await db.collection('shopping').doc(req.user.uid).get();
   res.json(doc.exists ? doc.data() : { list: [] });
@@ -67,18 +86,25 @@ app.get('/api/shopping', verifyToken, async (req, res) => {
 
 app.post('/api/shopping', verifyToken, async (req, res) => {
   const { itemName } = req.body;
-  const item = { itemName, addedAt: new Date().toISOString() };
+  if (!itemName || !itemName.trim()) return res.status(400).json({ error: 'Invalid' });
+
+  const item = { itemName: itemName.trim(), addedAt: new Date().toISOString() };
   const ref = db.collection('shopping').doc(req.user.uid);
   const doc = await ref.get();
-  if (doc.exists) {
-    await ref.update({ list: admin.firestore.FieldValue.arrayUnion(item) });
-  } else {
-    await ref.set({ list: [item] });
+
+  try {
+    if (doc.exists) {
+      await ref.update({ list: admin.firestore.FieldValue.arrayUnion(item) });
+    } else {
+      await ref.set({ list: [item] });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Firestore error:', error);
+    res.status(500).json({ error: 'Failed' });
   }
-  res.json({ success: true });
 });
 
-// AI SCAN - WORKING
 app.post('/api/scan', verifyToken, async (req, res) => {
   try {
     if (!req.files || !req.files.image) return res.status(400).json({ error: 'No image' });
@@ -98,7 +124,6 @@ app.post('/api/scan', verifyToken, async (req, res) => {
   }
 });
 
-// SERVE FRONTEND
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 const PORT = process.env.PORT || 3000;
