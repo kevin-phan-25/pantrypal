@@ -8,11 +8,10 @@
   <link rel="icon" href="/icon-192.png">
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js"></script>
   <script src="https://unpkg.com/@zxing/library@0.20.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/annyang@2.6.1/annyang.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
   <style>
     body { font-family: 'Inter', sans-serif; }
     .glass { background: rgba(255,255,255,0.15); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
@@ -20,9 +19,10 @@
     .btn-glow { box-shadow: 0 0 20px rgba(139,92,246,0.5); transition: all 0.3s; }
     .btn-glow:hover { box-shadow: 0 0 30px rgba(139,92,246,0.8); transform: translateY(-2px); }
     .tab-active { background: rgba(255,255,255,0.3) !important; }
-    .dark { background: #0f0f1e !important; }
     .dark .gradient-bg { background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); }
     .dark .glass { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.1); }
+    .expired { background: rgba(239,68,68,0.3) !important; }
+    .expiring { background: rgba(251,146,60,0.3) !important; }
   </style>
 </head>
 <body class="min-h-screen gradient-bg text-white">
@@ -44,9 +44,9 @@
           <h1 class="text-4xl font-black">PantryPal Pro</h1>
           <span id="userEmail" class="bg-white/20 px-4 py-2 rounded-full font-medium"></span>
         </div>
-        <div class="flex gap-4 flex-wrap">
-          <button id="shareBtn" class="px-6 py-3 bg-cyan-600 rounded-xl font-bold btn-glow">Share</button>
-          <button id="darkModeBtn" class="px-6 py-3 bg-white/20 rounded-xl font-bold btn-glow">Dark Mode</button>
+        <div class="flex gap-4">
+          <button id="bulkDeleteBtn" class="hidden px-6 py-3 bg-red-600 rounded-xl font-bold btn-glow">Delete Selected</button>
+          <button id="darkModeBtn" class="px-6 py-3 bg-white/20 rounded-xl font-bold btn-glow">Dark</button>
           <button id="signOutBtn" class="px-6 py-3 bg-red-600 rounded-xl font-bold btn-glow">Sign Out</button>
         </div>
       </div>
@@ -54,78 +54,50 @@
 
     <main class="max-w-6xl mx-auto px-6">
       <div class="flex gap-4 mb-8 overflow-x-auto pb-4">
-        <button class="tab-btn tab-active px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="inventory">Inventory</button>
+        <button class="tab-btn tab-active px-8 py-4 rounded-2xl font-bold text-lg glass" data-room="fridge">Fridge</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-room="pantry">Pantry</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-room="storage">Storage</button>
         <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="shopping">Shopping</button>
-        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="scanner">Scanner</button>
-        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="voice">Voice</button>
       </div>
 
-      <section id="inventory">
+      <div id="roomSection">
         <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
+          <select id="roomSelect" class="px-6 py-4 rounded-2xl text-black text-lg mb-4">
+            <option value="fridge">Fridge</option>
+            <option value="pantry">Pantry</option>
+            <option value="storage">Storage</option>
+          </select>
           <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <input id="invName" placeholder="Scan or type barcode/name" class="px-6 py-4 rounded-2xl text-black text-lg">
-            <input id="invQty" type="number" value="1" class="px-6 py-4 rounded-2xl text-black text-lg">
-            <input id="invExp" type="date" class="px-6 py-4 rounded-2xl text-black text-lg">
-            <button id="addItem" class="bg-emerald-600 hover:bg-emerald-700 rounded-2xl font-bold text-lg btn-glow">+ Add Item</button>
+            <input id="itemName" placeholder="Scan or type..." class="px-6 py-4 rounded-2xl text-black text-lg">
+            <input id="itemQty" type="number" value="1" class="px-6 py-4 rounded-2xl text-black text-lg">
+            <input id="itemExp" type="date" class="px-6 py-4 rounded-2xl text-black text-lg">
+            <button id="addItem" class="bg-emerald-600 rounded-2xl font-bold text-lg btn-glow">+ Add</button>
           </div>
         </div>
-        <div id="inventoryList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-      </section>
+        <div id="itemList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      </div>
 
       <section id="shopping" class="hidden">
         <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
           <div class="flex gap-4">
-            <input id="shopItem" placeholder="Add shopping item..." class="flex-1 px-6 py-4 rounded-2xl text-black text-lg">
+            <input id="shopItem" placeholder="Add item..." class="flex-1 px-6 py-4 rounded-2xl text-black text-lg">
             <button id="addShopping" class="px-8 py-4 bg-blue-600 rounded-2xl font-bold btn-glow">Add</button>
           </div>
         </div>
         <div id="shoppingList" class="space-y-4"></div>
       </section>
-
-      <section id="scanner" class="hidden text-center py-10">
-        <video id="video" width="100%" height="400" class="rounded-3xl shadow-2xl mb-6" playsinline autoplay muted></video>
-        <button id="startScan" class="px-12 py-6 bg-purple-600 rounded-2xl font-bold text-2xl btn-glow">Start Scanner</button>
-        <p id="scanStatus" class="mt-4 text-lg text-green-400"></p>
-      </section>
-
-      <section id="voice" class="hidden text-center py-20">
-        <button id="voiceBtn" class="w-40 h-40 bg-red-600 rounded-full text-8xl btn-glow shadow-2xl hover:scale-110 transition">Microphone</button>
-        <p class="mt-8 text-2xl">Say: "Add milk", "Add bananas", etc.</p>
-        <p id="voiceStatus" class="mt-4 text-xl text-green-400"></p>
-      </section>
     </main>
   </div>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-      authDomain: "pantrypal-6e410.firebaseapp.com",
-      projectId: "pantrypal-6e410",
-      storageBucket: "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
+    const messaging = firebase.messaging?.();
 
     const $ = s => document.querySelector(s);
     const $$ = s => document.querySelectorAll(s);
-
-    // FIXED: Never returns undefined
-    async function lookupProduct(barcode) {
-      if (!barcode || barcode.length < 7) return { name: barcode || "Unknown Item", image: null };
-      try {
-        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-        const data = await res.json();
-        if (data.status === 1) {
-          return {
-            name: data.product.product_name || data.product.brands || barcode || "Unknown Item",
-            image: data.product.image_front_url || data.product.image_front_small_url || null
-          };
-        }
-      } catch (e) { console.log("OpenFoodFacts failed, using barcode as name"); }
-      return { name: barcode || "Unknown Item", image: null };
-    }
+    let currentRoom = 'fridge';
 
     async function api(path, opts = {}) {
       const token = await auth.currentUser?.getIdToken();
@@ -133,82 +105,83 @@
         .then(r => r.ok ? r.json() : Promise.reject());
     }
 
-    function showTab(tab) {
-      $$('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-      $$('section[id]').forEach(s => s.classList.add('hidden'));
-      $(`[data-tab="${tab}"]`).classList.add('tab-active');
-      $(`#${tab}`).classList.remove('hidden');
+    async function loadData() {
+      const data = await api('/api/data');
+      renderRoom(currentRoom, data.rooms[currentRoom] || []);
+      renderShopping(data.shopping?.list || []);
+      checkExpirations(data.rooms);
     }
 
-    async function loadInventory() {
-      const data = await api('/api/inventory').catch(() => ({ items: [] }));
-      $('#inventoryList').innerHTML = data.items.map((item, i) => `
-        <div class="glass rounded-3xl p-6 shadow-xl flex gap-4 items-center">
-          ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg">` : 
-            '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">Box</div>'}
-          <div class="flex-1">
-            <h3 class="text-2xl font-bold">${item.name || "Unknown Item"}</h3>
-            <p class="opacity-80">×${item.quantity || 1} ${item.expiration ? '· Exp: ' + new Date(item.expiration).toLocaleDateString() : ''}</p>
+    function renderRoom(room, items) {
+      $('#itemList').innerHTML = items.map((item, i) => {
+        const daysLeft = item.expiration ? Math.ceil((new Date(item.expiration) - Date.now()) / 86400000) : null;
+        const isExpired = daysLeft !== null && daysLeft < 0;
+        const isExpiring = daysLeft !== null && daysLeft <= 3 && daysLeft >= 0;
+        return `
+          <div class="glass rounded-3xl p-6 shadow-xl flex gap-4 items-center ${isExpired ? 'expired' : isExpiring ? 'expiring' : ''}">
+            <input type="checkbox" class="w-6 h-6" data-index="${i}">
+            ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg">` : '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">Box</div>'}
+            <div class="flex-1">
+              <h3 class="text-2xl font-bold">${item.name}</h3>
+              <p class="opacity-80">×${item.quantity} ${item.expiration ? '· ' + (isExpired ? 'Expired' : daysLeft + ' days') : ''}</p>
+            </div>
+            <button onclick="deleteItem(${i})" class="text-red-400 font-bold hover:underline">Delete</button>
           </div>
-          <button onclick="deleteItem('inventory', ${i})" class="text-red-400 font-bold hover:underline">Delete</button>
-        </div>
-      `).join('');
+        `;
+      }).join('');
+      updateBulkButton();
     }
 
-    async function loadShopping() {
-      const data = await api('/api/shopping').catch(() => ({ list: [] }));
-      $('#shoppingList').innerHTML = data.list.map((item, i) => `
+    function renderShopping(list) {
+      $('#shoppingList').innerHTML = list.map((item, i) => `
         <div class="glass rounded-3xl p-6 shadow-xl flex justify-between items-center text-2xl font-bold">
-          <span>${item.itemName || "Unknown"}</span>
-          <button onclick="deleteItem('shopping', ${i})" class="text-red-400 hover:underline">Delete</button>
+          <span>${item.itemName}</span>
+          <button onclick="deleteShopping(${i})" class="text-red-400 hover:underline">Delete</button>
         </div>
       `).join('');
     }
 
-    window.deleteItem = async (type, i) => {
-      if (!confirm('Delete this item?')) return;
-      const data = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping');
-      const arr = type === 'inventory' ? data.items : data.list;
-      arr.splice(i, 1);
-      await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
-        method: 'POST',
-        body: JSON.stringify(type === 'inventory' ? { items: arr } : { list: arr })
+    function checkExpirations(rooms) {
+      const expiring = [];
+      Object.keys(rooms).forEach(room => {
+        rooms[room].forEach(item => {
+          if (item.expiration) {
+            const days = Math.ceil((new Date(item.expiration) - Date.now()) / 86400000);
+            if (days <= 3 && days >= 0) expiring.push(`${item.name} (${room}) expires in ${days} day${days === 1 ? '' : 's'}`);
+            if (days < 0) expiring.push(`${item.name} (${room}) is expired!`);
+          }
+        });
       });
-      type === 'inventory' ? loadInventory() : loadShopping();
+      if (expiring.length && Notification.permission === "granted") {
+        new Notification("PantryPal Alert", { body: expiring.join('\n'), icon: "/icon-192.png" });
+      }
+    }
+
+    window.deleteItem = async (i) => {
+      if (!confirm('Delete?')) return;
+      await fetch(`/api/room/${currentRoom}/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } });
+      loadData();
     };
 
-    $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        $('#userEmail').textContent = user.email.split('@')[0];
-        $('#auth').classList.add('hidden');
-        $('#app').classList.remove('hidden');
-        loadInventory();
-        loadShopping();
-      } else {
-        $('#auth').classList.remove('hidden');
-        $('#app').classList.add('hidden');
-      }
-    });
-
-    $('#signOutBtn').onclick = () => auth.signOut();
+    window.deleteShopping = async (i) => {
+      if (!confirm('Delete?')) return;
+      await fetch(`/api/shopping/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } });
+      loadData();
+    };
 
     $('#addItem').onclick = async () => {
-      const input = $('#invName').value.trim();
-      if (!input) return alert('Enter barcode or name');
-      const product = await lookupProduct(input);
-      await api('/api/inventory', {
+      const name = $('#itemName').value.trim();
+      if (!name) return alert('Enter item');
+      await api(`/api/room/${$('#roomSelect').value}`, {
         method: 'POST',
         body: JSON.stringify({
-          name: product.name,
-          image: product.image || null,
-          quantity: +$('#invQty').value || 1,
-          expiration: $('#invExp').value || null
+          name,
+          quantity: $('#itemQty').value || 1,
+          expiration: $('#itemExp').value || null
         })
       });
-      $('#invName').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
-      loadInventory();
+      $('#itemName').value = ''; $('#itemQty').value = 1; $('#itemExp').value = '';
+      loadData();
     };
 
     $('#addShopping').onclick = async () => {
@@ -216,76 +189,72 @@
       if (!name) return;
       await api('/api/shopping', { method: 'POST', body: JSON.stringify({ itemName: name }) });
       $('#shopItem').value = '';
-      loadShopping();
+      loadData();
     };
 
-    $$('.tab-btn').forEach(b => b.onclick = () => showTab(b.dataset.tab));
-
-    // Scanner
-    let codeReader = null;
-    $('#startScan').onclick = async () => {
-      if (codeReader) {
-        codeReader.reset(); codeReader = null;
-        $('#startScan').textContent = 'Start Scanner';
-        $('#video').srcObject = null;
-        return;
-      }
-      $('#startScan').textContent = 'Stop Scanner';
-      codeReader = new ZXing.BrowserMultiFormatReader();
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        $('#video').srcObject = stream;
-        codeReader.decodeFromVideoDevice(null, 'video', (result) => {
-          if (result) {
-            $('#invName').value = result.text;
-            showTab('inventory');
-            setTimeout(() => $('#addItem').click(), 500);
-            codeReader.reset(); codeReader = null;
-            $('#startScan').textContent = 'Start Scanner';
-            $('#video').srcObject = null;
-            $('#scanStatus').textContent = 'Added: ' + result.text;
-          }
-        });
-      } catch (e) {
-        alert('Camera access denied or not available');
-        $('#startScan').textContent = 'Start Scanner';
-      }
-    };
-
-    // Voice
-    if (annyang) {
-      annyang.addCommands({
-        'add *item': (item) => {
-          $('#shopItem').value = item;
-          $('#addShopping').click();
-          $('#voiceStatus').textContent = `Added: ${item}`;
-          setTimeout(() => $('#voiceStatus').textContent = '', 3000);
-        }
-      });
-      $('#voiceBtn').onclick = () => {
-        if (annyang.isListening()) {
-          annyang.abort();
-          $('#voiceBtn').style.background = '#ef4444';
+    $$('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        if (btn.dataset.room) {
+          currentRoom = btn.dataset.room;
+          $('#roomSection').classList.remove('hidden');
+          $('#shopping').classList.add('hidden');
+          loadData();
         } else {
-          annyang.start();
-          $('#voiceBtn').style.background = '#22c55e';
-          $('#voiceStatus').textContent = 'Listening...';
+          $('#roomSection').classList.add('hidden');
+          $('#shopping').classList.remove('hidden');
         }
+        $$('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        btn.classList.add('tab-active');
       };
+    });
+
+    $('#bulkDeleteBtn').onclick = async () => {
+      if (!confirm('Delete selected?')) return;
+      const indices = Array.from($$('input[type="checkbox"]:checked')).map(c => parseInt(c.dataset.index));
+      await api(`/api/room/${currentRoom}/bulk-delete`, { method: 'POST', body: JSON.stringify({ indices }) });
+      loadData();
+    };
+
+    function updateBulkButton() {
+      const checked = $$('input[type="checkbox"]:checked').length;
+      $('#bulkDeleteBtn').classList.toggle('hidden', checked === 0);
+      $('#bulkDeleteBtn').textContent = `Delete (${checked})`;
     }
 
-    // Dark Mode
-    $('#darkModeBtn').onclick = () => {
-      document.body.classList.toggle('dark');
-      localStorage.setItem('darkMode', document.body.classList.contains('dark'));
-    };
-    if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
+    document.addEventListener('change', e => e.target.type === 'checkbox' && updateBulkButton());
 
-    // Share
-    $('#shareBtn').onclick = () => {
-      navigator.clipboard.writeText(location.href);
-      alert('Link copied to clipboard!');
-    };
+    // Scanner, Voice, Dark Mode
+    let codeReader = null;
+    $('#itemName').addEventListener('click', async () => {
+      if (codeReader) return;
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      try {
+        const result = await codeReader.decodeFromVideoDevice(null, null, () => {});
+        $('#itemName').value = result.text;
+        codeReader.reset();
+      } catch (e) {}
+    });
+
+    if (annyang) {
+      annyang.addCommands({ 'add *item': item => { $('#shopItem').value = item; $('#addShopping').click(); } });
+      document.body.addEventListener('click', () => annyang.isListening() || annyang.start({ autoRestart: false }));
+    }
+
+    $('#darkModeBtn').onclick = () => { document.body.classList.toggle('dark'); localStorage.setItem('dark', document.body.classList.contains('dark')); };
+    if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
+
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        $('#userEmail').textContent = user.email.split('@')[0];
+        $('#auth').classList.add('hidden');
+        $('#app').classList.remove('hidden');
+        loadData();
+        if (Notification.permission === "default") Notification.requestPermission();
+      }
+    });
+
+    $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    $('#signOutBtn').onclick = () => auth.signOut();
   </script>
 </body>
 </html>
