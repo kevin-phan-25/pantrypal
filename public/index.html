@@ -1,148 +1,291 @@
-const express = require('express');
-const admin = require('firebase-admin');
-const cors = require('cors');
-const fileUpload = require('express-fileupload');
-const path = require('path');
-const { ImageAnnotatorClient } = require('@google-cloud/vision');
-require('dotenv').config();
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PantryPal Pro</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon-192.png">
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.20.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/annyang@2.6.1/annyang.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .glass { background: rgba(255,255,255,0.15); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
+    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); min-height: 100vh; }
+    .btn-glow { box-shadow: 0 0 20px rgba(139,92,246,0.5); transition: all 0.3s; }
+    .btn-glow:hover { box-shadow: 0 0 30px rgba(139,92,246,0.8); transform: translateY(-2px); }
+    .tab-active { background: rgba(255,255,255,0.3) !important; }
+    .dark { background: #0f0f1e !important; }
+    .dark .gradient-bg { background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); }
+    .dark .glass { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body class="min-h-screen gradient-bg text-white">
 
-const app = express();
+  <div id="auth" class="flex items-center justify-center min-h-screen p-6">
+    <div class="glass p-14 rounded-3xl shadow-2xl max-w-md w-full text-center">
+      <h1 class="text-7xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">PantryPal Pro</h1>
+      <button id="googleSignIn" class="w-full py-6 rounded-2xl bg-white text-gray-800 font-bold text-2xl shadow-2xl flex items-center justify-center gap-5">
+        <img src="https://developers.google.com/identity/images/g-logo.png" class="w-10 h-10" alt="G">
+        <span>Sign in with Google</span>
+      </button>
+    </div>
+  </div>
 
-app.use(cors({ origin: ['https://pantrypal-zdi4.onrender.com', 'http://localhost:3000'], credentials: true }));
-app.use(express.json({ limit: '10mb' }));
-app.use(fileUpload());
-app.use(express.static(path.join(__dirname, 'public')));
+  <div id="app" class="hidden min-h-screen pb-24">
+    <header class="glass sticky top-0 z-50 shadow-2xl p-6 mb-8">
+      <div class="flex flex-col sm:flex-row justify-between items-center gap-6">
+        <div class="flex items-center gap-6">
+          <h1 class="text-4xl font-black">PantryPal Pro</h1>
+          <span id="userEmail" class="bg-white/20 px-4 py-2 rounded-full font-medium"></span>
+        </div>
+        <div class="flex gap-4 flex-wrap">
+          <button id="shareBtn" class="px-6 py-3 bg-cyan-600 rounded-xl font-bold btn-glow">Share</button>
+          <button id="darkModeBtn" class="px-6 py-3 bg-white/20 rounded-xl font-bold btn-glow">Dark Mode</button>
+          <button id="signOutBtn" class="px-6 py-3 bg-red-600 rounded-xl font-bold btn-glow">Sign Out</button>
+        </div>
+      </div>
+    </header>
 
-let serviceAccount;
-try {
-  serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_KEY || require('./credentials.json'));
-} catch (e) {
-  console.error('Invalid FIREBASE_ADMIN_KEY');
-  process.exit(1);
-}
+    <main class="max-w-6xl mx-auto px-6">
+      <div class="flex gap-4 mb-8 overflow-x-auto pb-4">
+        <button class="tab-btn tab-active px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="inventory">Inventory</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="shopping">Shopping</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="scanner">Scanner</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="voice">Voice</button>
+      </div>
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+      <section id="inventory">
+        <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <input id="invName" placeholder="Scan or type barcode/name" class="px-6 py-4 rounded-2xl text-black text-lg">
+            <input id="invQty" type="number" value="1" class="px-6 py-4 rounded-2xl text-black text-lg">
+            <input id="invExp" type="date" class="px-6 py-4 rounded-2xl text-black text-lg">
+            <button id="addItem" class="bg-emerald-600 hover:bg-emerald-700 rounded-2xl font-bold text-lg btn-glow">+ Add Item</button>
+          </div>
+        </div>
+        <div id="inventoryList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      </section>
 
-const db = admin.firestore();
+      <section id="shopping" class="hidden">
+        <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
+          <div class="flex gap-4">
+            <input id="shopItem" placeholder="Add shopping item..." class="flex-1 px-6 py-4 rounded-2xl text-black text-lg">
+            <button id="addShopping" class="px-8 py-4 bg-blue-600 rounded-2xl font-bold btn-glow">Add</button>
+          </div>
+        </div>
+        <div id="shoppingList" class="space-y-4"></div>
+      </section>
 
-// THIS IS THE FIX: ignore undefined values globally
-db.settings({ ignoreUndefinedProperties: true });
+      <section id="scanner" class="hidden text-center py-10">
+        <video id="video" width="100%" height="400" class="rounded-3xl shadow-2xl mb-6" playsinline autoplay muted></video>
+        <button id="startScan" class="px-12 py-6 bg-purple-600 rounded-2xl font-bold text-2xl btn-glow">Start Scanner</button>
+        <p id="scanStatus" class="mt-4 text-lg text-green-400"></p>
+      </section>
 
-const vision = new ImageAnnotatorClient({
-  credentials: JSON.parse(process.env.GCLOUD_KEY_JSON || '{}')
-});
+      <section id="voice" class="hidden text-center py-20">
+        <button id="voiceBtn" class="w-40 h-40 bg-red-600 rounded-full text-8xl btn-glow shadow-2xl hover:scale-110 transition">Microphone</button>
+        <p class="mt-8 text-2xl">Say: "Add milk", "Add bananas", etc.</p>
+        <p id="voiceStatus" class="mt-4 text-xl text-green-400"></p>
+      </section>
+    </main>
+  </div>
 
-async function verifyToken(req, res, next) {
-  const token = req.headers.authorization?.split('Bearer ')[1];
-  if (!token) return res.status(401).json({ error: 'No token' });
-  try {
-    req.user = await admin.auth().verifyIdToken(token);
-    next();
-  } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-}
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
 
-// INVENTORY - FIXED: filter out undefined/null fields
-app.get('/api/inventory', verifyToken, async (req, res) => {
-  const doc = await db.collection('inventories').doc(req.user.uid).get();
-  res.json(doc.exists ? doc.data() : { items: [] });
-});
+    const $ = s => document.querySelector(s);
+    const $$ = s => document.querySelectorAll(s);
 
-app.post('/api/inventory', verifyToken, async (req, res) => {
-  let { name, image, quantity = 1, expiration } = req.body;
-
-  // CRITICAL FIX: never allow undefined/null name
-  if (!name || name.trim() === '') name = 'Unknown Item';
-
-  const item = {
-    name: name.trim(),
-    quantity: Number(quantity) || 1,
-    addedAt: new Date().toISOString()
-  };
-
-  // Only add these if they exist
-  if (image) item.image = image;
-  if (expiration) item.expiration = expiration;
-
-  const ref = db.collection('inventories').doc(req.user.uid);
-  const doc = await ref.get();
-
-  try {
-    if (doc.exists) {
-      await ref.update({
-        items: admin.firestore.FieldValue.arrayUnion(item)
-      });
-    } else {
-      await ref.set({ items: [item] });
+    // FIXED: Never returns undefined
+    async function lookupProduct(barcode) {
+      if (!barcode || barcode.length < 7) return { name: barcode || "Unknown Item", image: null };
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        const data = await res.json();
+        if (data.status === 1) {
+          return {
+            name: data.product.product_name || data.product.brands || barcode || "Unknown Item",
+            image: data.product.image_front_url || data.product.image_front_small_url || null
+          };
+        }
+      } catch (e) { console.log("OpenFoodFacts failed, using barcode as name"); }
+      return { name: barcode || "Unknown Item", image: null };
     }
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Firestore error:', error);
-    res.status(500).json({ error: 'Failed to save item' });
-  }
-});
 
-// SHOPPING LIST
-app.get('/api/shopping', verifyToken, async (req, res) => {
-  const doc = await db.collection('shopping').doc(req.user.uid).get();
-  res.json(doc.exists ? doc.data() : { list: [] });
-});
-
-app.post('/api/shopping', verifyToken, async (req, res) => {
-  const { itemName } = req.body;
-  if (!itemName || itemName.trim() === '') return res.status(400).json({ error: 'Invalid item' });
-
-  const item = {
-    itemName: itemName.trim(),
-    addedAt: new Date().toISOString()
-  };
-
-  const ref = db.collection('shopping').doc(req.user.uid);
-  const doc = await ref.get();
-
-  try {
-    if (doc.exists) {
-      await ref.update({
-        list: admin.firestore.FieldValue.arrayUnion(item)
-      });
-    } else {
-      await ref.set({ list: [item] });
+    async function api(path, opts = {}) {
+      const token = await auth.currentUser?.getIdToken();
+      return fetch(path, { ...opts, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...opts.headers } })
+        .then(r => r.ok ? r.json() : Promise.reject());
     }
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Firestore error:', error);
-    res.status(500).json({ error: 'Failed to save' });
-  }
-});
 
-// AI SCAN (unchanged - already safe)
-app.post('/api/scan', verifyToken, async (req, res) => {
-  try {
-    if (!req.files || !req.files.image) return res.status(400).json({ error: 'No image' });
-    const [result] = await vision.labelDetection(req.files.image.data);
-    const labels = result.labelAnnotations || [];
-    const foodKeywords = ['food','fruit','vegetable','drink','snack','ingredient','produce','dairy','meat','bread','milk','egg','cheese','yogurt','chicken','beef','apple','banana','tomato','potato','rice','pasta','oil','butter','juice'];
-    const detected = labels
-      .filter(l => l.score > 0.7)
-      .map(l => l.description.toLowerCase())
-      .filter(desc => foodKeywords.some(k => desc.includes(k)))
-      .map(desc => desc.charAt(0).toUpperCase() + desc.slice(1))
-      .slice(0, 15);
-    res.json({ labels: detected.length > 0 ? detected : labels.slice(0, 8).map(l => l.description) });
-  } catch (err) {
-    console.error('Vision error:', err);
-    res.status(500).json({ error: 'AI scan failed' });
-  }
-});
+    function showTab(tab) {
+      $$('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+      $$('section[id]').forEach(s => s.classList.add('hidden'));
+      $(`[data-tab="${tab}"]`).classList.add('tab-active');
+      $(`#${tab}`).classList.remove('hidden');
+    }
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+    async function loadInventory() {
+      const data = await api('/api/inventory').catch(() => ({ items: [] }));
+      $('#inventoryList').innerHTML = data.items.map((item, i) => `
+        <div class="glass rounded-3xl p-6 shadow-xl flex gap-4 items-center">
+          ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg">` : 
+            '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">Box</div>'}
+          <div class="flex-1">
+            <h3 class="text-2xl font-bold">${item.name || "Unknown Item"}</h3>
+            <p class="opacity-80">×${item.quantity || 1} ${item.expiration ? '· Exp: ' + new Date(item.expiration).toLocaleDateString() : ''}</p>
+          </div>
+          <button onclick="deleteItem('inventory', ${i})" class="text-red-400 font-bold hover:underline">Delete</button>
+        </div>
+      `).join('');
+    }
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`PantryPal Pro LIVE on port ${PORT}`);
-});
+    async function loadShopping() {
+      const data = await api('/api/shopping').catch(() => ({ list: [] }));
+      $('#shoppingList').innerHTML = data.list.map((item, i) => `
+        <div class="glass rounded-3xl p-6 shadow-xl flex justify-between items-center text-2xl font-bold">
+          <span>${item.itemName || "Unknown"}</span>
+          <button onclick="deleteItem('shopping', ${i})" class="text-red-400 hover:underline">Delete</button>
+        </div>
+      `).join('');
+    }
+
+    window.deleteItem = async (type, i) => {
+      if (!confirm('Delete this item?')) return;
+      const data = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping');
+      const arr = type === 'inventory' ? data.items : data.list;
+      arr.splice(i, 1);
+      await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
+        method: 'POST',
+        body: JSON.stringify(type === 'inventory' ? { items: arr } : { list: arr })
+      });
+      type === 'inventory' ? loadInventory() : loadShopping();
+    };
+
+    $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        $('#userEmail').textContent = user.email.split('@')[0];
+        $('#auth').classList.add('hidden');
+        $('#app').classList.remove('hidden');
+        loadInventory();
+        loadShopping();
+      } else {
+        $('#auth').classList.remove('hidden');
+        $('#app').classList.add('hidden');
+      }
+    });
+
+    $('#signOutBtn').onclick = () => auth.signOut();
+
+    $('#addItem').onclick = async () => {
+      const input = $('#invName').value.trim();
+      if (!input) return alert('Enter barcode or name');
+      const product = await lookupProduct(input);
+      await api('/api/inventory', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: product.name,
+          image: product.image || null,
+          quantity: +$('#invQty').value || 1,
+          expiration: $('#invExp').value || null
+        })
+      });
+      $('#invName').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
+      loadInventory();
+    };
+
+    $('#addShopping').onclick = async () => {
+      const name = $('#shopItem').value.trim();
+      if (!name) return;
+      await api('/api/shopping', { method: 'POST', body: JSON.stringify({ itemName: name }) });
+      $('#shopItem').value = '';
+      loadShopping();
+    };
+
+    $$('.tab-btn').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+    // Scanner
+    let codeReader = null;
+    $('#startScan').onclick = async () => {
+      if (codeReader) {
+        codeReader.reset(); codeReader = null;
+        $('#startScan').textContent = 'Start Scanner';
+        $('#video').srcObject = null;
+        return;
+      }
+      $('#startScan').textContent = 'Stop Scanner';
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        $('#video').srcObject = stream;
+        codeReader.decodeFromVideoDevice(null, 'video', (result) => {
+          if (result) {
+            $('#invName').value = result.text;
+            showTab('inventory');
+            setTimeout(() => $('#addItem').click(), 500);
+            codeReader.reset(); codeReader = null;
+            $('#startScan').textContent = 'Start Scanner';
+            $('#video').srcObject = null;
+            $('#scanStatus').textContent = 'Added: ' + result.text;
+          }
+        });
+      } catch (e) {
+        alert('Camera access denied or not available');
+        $('#startScan').textContent = 'Start Scanner';
+      }
+    };
+
+    // Voice
+    if (annyang) {
+      annyang.addCommands({
+        'add *item': (item) => {
+          $('#shopItem').value = item;
+          $('#addShopping').click();
+          $('#voiceStatus').textContent = `Added: ${item}`;
+          setTimeout(() => $('#voiceStatus').textContent = '', 3000);
+        }
+      });
+      $('#voiceBtn').onclick = () => {
+        if (annyang.isListening()) {
+          annyang.abort();
+          $('#voiceBtn').style.background = '#ef4444';
+        } else {
+          annyang.start();
+          $('#voiceBtn').style.background = '#22c55e';
+          $('#voiceStatus').textContent = 'Listening...';
+        }
+      };
+    }
+
+    // Dark Mode
+    $('#darkModeBtn').onclick = () => {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+    };
+    if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
+
+    // Share
+    $('#shareBtn').onclick = () => {
+      navigator.clipboard.writeText(location.href);
+      alert('Link copied to clipboard!');
+    };
+  </script>
+</body>
+</html>
