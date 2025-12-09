@@ -23,7 +23,6 @@
     .dark { background: #0f0f1e !important; }
     .dark .gradient-bg { background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); }
     .dark .glass { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.1); }
-    input:checked + label { @apply bg-purple-600 text-white; }
   </style>
 </head>
 <body class="min-h-screen gradient-bg text-white">
@@ -46,7 +45,6 @@
           <span id="userEmail" class="bg-white/20 px-4 py-2 rounded-full font-medium"></span>
         </div>
         <div class="flex gap-4 flex-wrap">
-          <button id="bulkDeleteBtn" class="hidden px-6 py-3 bg-red-600 rounded-xl font-bold btn-glow">Delete Selected</button>
           <button id="shareBtn" class="px-6 py-3 bg-cyan-600 rounded-xl font-bold btn-glow">Share</button>
           <button id="darkModeBtn" class="px-6 py-3 bg-white/20 rounded-xl font-bold btn-glow">Dark Mode</button>
           <button id="signOutBtn" class="px-6 py-3 bg-red-600 rounded-xl font-bold btn-glow">Sign Out</button>
@@ -65,7 +63,7 @@
       <section id="inventory">
         <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <input id="invName" placeholder="Scan or type..." class="px-6 py-4 rounded-2xl text-black text-lg">
+            <input id="invName" placeholder="Scan or type barcode/name" class="px-6 py-4 rounded-2xl text-black text-lg">
             <input id="invQty" type="number" value="1" class="px-6 py-4 rounded-2xl text-black text-lg">
             <input id="invExp" type="date" class="px-6 py-4 rounded-2xl text-black text-lg">
             <button id="addItem" class="bg-emerald-600 hover:bg-emerald-700 rounded-2xl font-bold text-lg btn-glow">+ Add Item</button>
@@ -77,7 +75,7 @@
       <section id="shopping" class="hidden">
         <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
           <div class="flex gap-4">
-            <input id="shopItem" placeholder="Add item..." class="flex-1 px-6 py-4 rounded-2xl text-black text-lg">
+            <input id="shopItem" placeholder="Add shopping item..." class="flex-1 px-6 py-4 rounded-2xl text-black text-lg">
             <button id="addShopping" class="px-8 py-4 bg-blue-600 rounded-2xl font-bold btn-glow">Add</button>
           </div>
         </div>
@@ -92,49 +90,40 @@
 
       <section id="voice" class="hidden text-center py-20">
         <button id="voiceBtn" class="w-40 h-40 bg-red-600 rounded-full text-8xl btn-glow shadow-2xl hover:scale-110 transition">Microphone</button>
-        <p class="mt-8 text-2xl">Say: "Add milk", "Add bananas"</p>
+        <p class="mt-8 text-2xl">Say: "Add milk", "Add bananas", etc.</p>
         <p id="voiceStatus" class="mt-4 text-xl text-green-400"></p>
       </section>
     </main>
   </div>
 
-  <!-- Edit Modal -->
-  <div id="editModal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-50 p-6">
-    <div class="glass p-8 rounded-3xl max-w-md w-full">
-      <h3 class="text-3xl font-bold mb-6">Edit Item</h3>
-      <input id="editName" class="w-full px-6 py-4 rounded-2xl text-black mb-4" placeholder="Name">
-      <input id="editQty" type="number" class="w-full px-6 py-4 rounded-2xl text-black mb-4" placeholder="Quantity">
-      <input id="editExp" type="date" class="w-full px-6 py-4 rounded-2xl text-black mb-6">
-      <div class="flex gap-4">
-        <button id="saveEdit" class="flex-1 bg-emerald-600 py-4 rounded-2xl font-bold btn-glow">Save</button>
-        <button id="cancelEdit" class="flex-1 bg-gray-600 py-4 rounded-2xl font-bold">Cancel</button>
-      </div>
-    </div>
-  </div>
-
   <script>
-    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
+      authDomain: "pantrypal-6e410.firebaseapp.com",
+      projectId: "pantrypal-6e410",
+      storageBucket: "pantrypal-6e410.firebasestorage.app",
+      messagingSenderId: "592127259891",
+      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
+    };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
+
     const $ = s => document.querySelector(s);
     const $$ = s => document.querySelectorAll(s);
 
-    let editIndex = null;
-    let currentTab = 'inventory';
-
+    // FIXED: Never returns undefined
     async function lookupProduct(barcode) {
       if (!barcode || barcode.length < 7) return { name: barcode || "Unknown Item", image: null };
       try {
         const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
         const data = await res.json();
-        if (data.status === 1 && data.product) {
-          const img = data.product.image_front_url || data.product.image_front_small_url || data.product.image_url;
+        if (data.status === 1) {
           return {
             name: data.product.product_name || data.product.brands || barcode || "Unknown Item",
-            image: img ? img + "?size=full" : null
+            image: data.product.image_front_url || data.product.image_front_small_url || null
           };
         }
-      } catch (e) {}
+      } catch (e) { console.log("OpenFoodFacts failed, using barcode as name"); }
       return { name: barcode || "Unknown Item", image: null };
     }
 
@@ -145,106 +134,51 @@
     }
 
     function showTab(tab) {
-      currentTab = tab;
       $$('.tab-btn').forEach(b => b.classList.remove('tab-active'));
       $$('section[id]').forEach(s => s.classList.add('hidden'));
       $(`[data-tab="${tab}"]`).classList.add('tab-active');
       $(`#${tab}`).classList.remove('hidden');
-      $('#bulkDeleteBtn').classList.add('hidden');
-      $$('input[type="checkbox"]').forEach(c => c.checked = false);
     }
 
     async function loadInventory() {
       const data = await api('/api/inventory').catch(() => ({ items: [] }));
       $('#inventoryList').innerHTML = data.items.map((item, i) => `
         <div class="glass rounded-3xl p-6 shadow-xl flex gap-4 items-center">
-          <input type="checkbox" class="w-6 h-6" data-index="${i}">
           ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg">` : 
             '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">Box</div>'}
           <div class="flex-1">
-            <h3 class="text-2xl font-bold">${item.name}</h3>
-            <p class="opacity-80">×${item.quantity} ${item.expiration ? '· Exp: ' + new Date(item.expiration).toLocaleDateString() : ''}</p>
+            <h3 class="text-2xl font-bold">${item.name || "Unknown Item"}</h3>
+            <p class="opacity-80">×${item.quantity || 1} ${item.expiration ? '· Exp: ' + new Date(item.expiration).toLocaleDateString() : ''}</p>
           </div>
-          <div class="flex gap-2">
-            <button onclick="openEdit('inventory', ${i})" class="text-blue-400 font-bold hover:underline">Edit</button>
-            <button onclick="deleteItem('inventory', ${i})" class="text-red-400 font-bold hover:underline">Delete</button>
-          </div>
+          <button onclick="deleteItem('inventory', ${i})" class="text-red-400 font-bold hover:underline">Delete</button>
         </div>
       `).join('');
-      updateBulkButton();
     }
 
     async function loadShopping() {
       const data = await api('/api/shopping').catch(() => ({ list: [] }));
       $('#shoppingList').innerHTML = data.list.map((item, i) => `
-        <div class="glass rounded-3xl p-6 shadow-xl flex items-center justify-between text-2xl font-bold">
-          <div class="flex items-center gap-4">
-            <input type="checkbox" class="w-6 h-6" data-index="${i}">
-            <span>${item.itemName}</span>
-          </div>
+        <div class="glass rounded-3xl p-6 shadow-xl flex justify-between items-center text-2xl font-bold">
+          <span>${item.itemName || "Unknown"}</span>
           <button onclick="deleteItem('shopping', ${i})" class="text-red-400 hover:underline">Delete</button>
         </div>
       `).join('');
-      updateBulkButton();
     }
 
-    function updateBulkButton() {
-      const checked = $$('input[type="checkbox"]:checked').length;
-      $('#bulkDeleteBtn').classList.toggle('hidden', checked === 0);
-      $('#bulkDeleteBtn').textContent = `Delete Selected (${checked})`;
-    }
-
-    window.openEdit = (type, index) => {
-      editIndex = index;
-      const items = type === 'inventory' ? (api('/api/inventory').then(d => d.items)) : null;
-      if (type === 'inventory') {
-        api('/api/inventory').then(data => {
-          const item = data.items[index];
-          $('#editName').value = item.name;
-          $('#editQty').value = item.quantity;
-          $('#editExp').value = item.expiration || '';
-          $('#editModal').classList.remove('hidden');
-        });
-      }
-    };
-
-    $('#saveEdit').onclick = async () => {
-      await api(`/api/inventory/${editIndex}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          name: $('#editName').value.trim(),
-          quantity: $('#editQty').value,
-          expiration: $('#editExp').value || null
-        })
-      });
-      $('#editModal').classList.add('hidden');
-      loadInventory();
-    };
-
-    $('#cancelEdit').onclick = () => $('#editModal').classList.add('hidden');
-
-    window.deleteItem = async (type, index) => {
-      if (!confirm('Delete?')) return;
-      await fetch(type === 'inventory' ? `/api/inventory/${index}` : `/api/shopping/${index}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }
+    window.deleteItem = async (type, i) => {
+      if (!confirm('Delete this item?')) return;
+      const data = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping');
+      const arr = type === 'inventory' ? data.items : data.list;
+      arr.splice(i, 1);
+      await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', {
+        method: 'POST',
+        body: JSON.stringify(type === 'inventory' ? { items: arr } : { list: arr })
       });
       type === 'inventory' ? loadInventory() : loadShopping();
     };
 
-    $('#bulkDeleteBtn').onclick = async () => {
-      if (!confirm('Delete all selected?')) return;
-      const indices = Array.from($$('input[type="checkbox"]:checked')).map(c => parseInt(c.dataset.index));
-      await api(currentTab === 'inventory' ? '/api/inventory/bulk-delete' : '/api/shopping/bulk-delete', {
-        method: 'POST',
-        body: JSON.stringify({ indices })
-      });
-      currentTab === 'inventory' ? loadInventory() : loadShopping();
-    };
-
-    $$('input[type="checkbox"]').forEach(c => c.onchange = updateBulkButton);
-
     $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+
     auth.onAuthStateChanged(user => {
       if (user) {
         $('#userEmail').textContent = user.email.split('@')[0];
@@ -252,15 +186,27 @@
         $('#app').classList.remove('hidden');
         loadInventory();
         loadShopping();
+      } else {
+        $('#auth').classList.remove('hidden');
+        $('#app').classList.add('hidden');
       }
     });
 
     $('#signOutBtn').onclick = () => auth.signOut();
+
     $('#addItem').onclick = async () => {
       const input = $('#invName').value.trim();
-      if (!input) return alert('Enter item');
+      if (!input) return alert('Enter barcode or name');
       const product = await lookupProduct(input);
-      await api('/api/inventory', { method: 'POST', body: JSON.stringify({ name: product.name, image: product.image, quantity: +$('#invQty').value || 1, expiration: $('#invExp').value || null }) });
+      await api('/api/inventory', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: product.name,
+          image: product.image || null,
+          quantity: +$('#invQty').value || 1,
+          expiration: $('#invExp').value || null
+        })
+      });
       $('#invName').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
       loadInventory();
     };
@@ -278,13 +224,18 @@
     // Scanner
     let codeReader = null;
     $('#startScan').onclick = async () => {
-      if (codeReader) { codeReader.reset(); codeReader = null; $('#startScan').textContent = 'Start Scanner'; $('#video').srcObject = null; return; }
+      if (codeReader) {
+        codeReader.reset(); codeReader = null;
+        $('#startScan').textContent = 'Start Scanner';
+        $('#video').srcObject = null;
+        return;
+      }
       $('#startScan').textContent = 'Stop Scanner';
       codeReader = new ZXing.BrowserMultiFormatReader();
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         $('#video').srcObject = stream;
-        codeReader.decodeFromVideoDevice(null, 'video', result => {
+        codeReader.decodeFromVideoDevice(null, 'video', (result) => {
           if (result) {
             $('#invName').value = result.text;
             showTab('inventory');
@@ -292,24 +243,49 @@
             codeReader.reset(); codeReader = null;
             $('#startScan').textContent = 'Start Scanner';
             $('#video').srcObject = null;
+            $('#scanStatus').textContent = 'Added: ' + result.text;
           }
         });
-      } catch (e) { alert('Camera denied'); $('#startScan').textContent = 'Start Scanner'; }
+      } catch (e) {
+        alert('Camera access denied or not available');
+        $('#startScan').textContent = 'Start Scanner';
+      }
     };
 
     // Voice
     if (annyang) {
-      annyang.addCommands({ 'add *item': item => { $('#shopItem').value = item; $('#addShopping').click(); } });
-      $('#voiceBtn').onclick = () => annyang.isListening() ? annyang.abort() : annyang.start();
+      annyang.addCommands({
+        'add *item': (item) => {
+          $('#shopItem').value = item;
+          $('#addShopping').click();
+          $('#voiceStatus').textContent = `Added: ${item}`;
+          setTimeout(() => $('#voiceStatus').textContent = '', 3000);
+        }
+      });
+      $('#voiceBtn').onclick = () => {
+        if (annyang.isListening()) {
+          annyang.abort();
+          $('#voiceBtn').style.background = '#ef4444';
+        } else {
+          annyang.start();
+          $('#voiceBtn').style.background = '#22c55e';
+          $('#voiceStatus').textContent = 'Listening...';
+        }
+      };
     }
 
-    $('#darkModeBtn').onclick = () => { document.body.classList.toggle('dark'); localStorage.setItem('darkMode', document.body.classList.contains('dark')); };
+    // Dark Mode
+    $('#darkModeBtn').onclick = () => {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+    };
     if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
 
-    $('#shareBtn').onclick = () => { navigator.clipboard.writeText(location.href); alert('Copied!'); };
-
-    // Update checkboxes on tab change
-    document.addEventListener('change', e => { if (e.target.type === 'checkbox') updateBulkButton(); });
+    // Share
+    $('#shareBtn').onclick = () => {
+      navigator.clipboard.writeText(location.href);
+      alert('Link copied to clipboard!');
+    };
   </script>
 </body>
 </html>
