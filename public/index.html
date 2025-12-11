@@ -5,322 +5,467 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PantryPal Pro</title>
   <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon-192.png" sizes="192x192">
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="https://unpkg.com/@zxing/browser@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/annyang@2.6.1/annyang.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/annyang@2.7.1/dist/annyang.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.0.18/24/outline/index.min.css">
   <style>
+    :root { --neumo-shadow: 8px 8px 16px #d1d9e6, -8px -8px 16px #f8f9fa; --neumo-inset: inset 8px 8px 16px #d1d9e6, inset -8px -8px 16px #f8f9fa; }
+    .dark { --neumo-shadow: 8px 8px 16px #2a2a2a, -8px -8px 16px #404040; --neumo-inset: inset 8px 8px 16px #2a2a2a, inset -8px -8px 16px #404040; }
     body { font-family: 'Inter', sans-serif; margin: 0; }
-    .glass { background: rgba(255,255,255,0.15); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
+    .neumo { box-shadow: var(--neumo-shadow); }
+    .neumo-pressed { box-shadow: var(--neumo-inset); transform: translateY(2px); }
     .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); min-height: 100vh; }
-    .btn-glow { box-shadow: 0 0 20px rgba(139,92,246,0.5); transition: all 0.3s; }
-    .btn-glow:hover { box-shadow: 0 0 30px rgba(139,92,246,0.8); transform: translateY(-2px); }
-    .tab-active { background: rgba(255,255,255,0.3) !important; }
-    .expired { background: rgba(239,68,68,0.3) !important; border-left: 6px solid #ef4444; }
-    .expiring { background: rgba(251,146,60,0.3) !important; border-left: 6px solid #fb923c; }
     .dark .gradient-bg { background: linear-gradient(135deg, #1e1b4b, #4c1d95, #7c3aed); }
-    .dark .glass { background: rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.1); }
+    .glass { background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
+    .dark .glass { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.1); }
+    .expired { background: rgba(239,68,68,0.2) !important; border-left: 4px solid #ef4444; }
+    .expiring { background: rgba(251,146,60,0.2) !important; border-left: 4px solid #fb923c; }
+    .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: loading 1.5s infinite; }
+    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .dark .skeleton { background: linear-gradient(90deg, #333 25%, #444 50%, #333 75%); }
+    .fab { position: fixed; bottom: 24px; right: 24px; z-index: 100; }
+    @media (prefers-color-scheme: dark) { .dark-auto { @apply dark; } }
   </style>
 </head>
-<body class="min-h-screen gradient-bg text-white">
-
+<body class="min-h-screen gradient-bg text-white dark-auto">
   <!-- LOGIN -->
-  <div id="auth" class="flex items-center justify-center min-h-screen p-6">
-    <div class="glass p-14 rounded-3xl shadow-2xl max-w-md w-full text-center">
-      <h1 class="text-7xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">PantryPal Pro</h1>
-      <button id="googleSignIn" class="w-full py-6 rounded-2xl bg-white text-gray-800 font-bold text-2xl shadow-2xl flex items-center justify-center gap-5 hover:scale-105 transition">
-        <img src="https://developers.google.com/identity/images/g-logo.png" class="w-10 h-10" alt="G">
+  <div id="auth" class="flex items-center justify-center min-h-screen p-4">
+    <div class="glass p-8 rounded-3xl neum o max-w-sm w-full text-center">
+      <h1 class="text-5xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">PantryPal Pro</h1>
+      <button id="googleSignIn" class="w-full py-4 rounded-2xl bg-white text-gray-800 font-bold text-xl flex items-center justify-center gap-3 neum o hover:neumo-pressed transition-all">
+        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /></svg>
         Sign in with Google
       </button>
     </div>
   </div>
 
   <!-- MAIN APP -->
-  <div id="app" class="hidden min-h-screen pb-24">
-    <header class="glass sticky top-0 z-50 shadow-2xl p-6 mb-8">
-      <div class="flex flex-col sm:flex-row justify-between items-center gap-6">
-        <div class="flex items-center gap-6">
-          <h1 class="text-4xl font-black">PantryPal Pro</h1>
-          <span id="userEmail" class="bg-white/20 px-4 py-2 rounded-full font-medium"></span>
+  <div id="app" class="hidden min-h-screen">
+    <header class="glass sticky top-0 z-50 p-4 shadow-2xl">
+      <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-4">
+          <h1 class="text-3xl font-black">PantryPal Pro</h1>
+          <span id="userEmail" class="bg-white/20 px-3 py-1 rounded-full text-sm font-medium"></span>
         </div>
-        <div class="flex gap-4">
-          <button id="bulkDeleteBtn" class="hidden px-6 py-3 bg-red-600 rounded-xl font-bold btn-glow">Delete Selected</button>
-          <button id="aiScanBtn" class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl font-bold btn-glow">AI Scan</button>
-          <button id="darkModeBtn" class="px-6 py-3 bg-white/20 rounded-xl font-bold btn-glow">Dark Mode</button>
-          <button id="signOutBtn" class="px-6 py-3 bg-red-600 rounded-xl font-bold btn-glow">Sign Out</button>
+        <div class="flex gap-2">
+          <button id="aiScanBtn" class="p-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl font-bold neum o hover:neumo-pressed transition-all" aria-label="AI Scan">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+          </button>
+          <button id="darkModeBtn" class="p-3 bg-white/20 rounded-xl font-bold neum o hover:neumo-pressed" aria-label="Toggle Dark Mode">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 002.354-17.646z" /></svg>
+          </button>
+          <button id="signOutBtn" class="p-3 bg-red-600 rounded-xl font-bold neum o hover:neumo-pressed" aria-label="Sign Out">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+          </button>
         </div>
       </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-6">
-      <div class="flex gap-4 mb-8 overflow-x-auto pb-4">
-        <button class="tab-btn tab-active px-8 py-4 rounded-2xl font-bold text-lg glass" data-room="fridge">Fridge</button>
-        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-room="pantry">Pantry</button>
-        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-room="storage">Storage</button>
-        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="shopping">Shopping List</button>
-      </div>
+    <main class="max-w-6xl mx-auto px-4 pb-20">
+      <!-- Tabs - Swipeable on mobile -->
+      <nav class="flex snap-x snap-mandatory gap-2 my-4 overflow-x-auto pb-2" role="tablist">
+        <button class="tab-btn snap-center flex-shrink-0 px-6 py-3 rounded-2xl font-bold text-lg glass tab-active" data-room="fridge" role="tab">Fridge</button>
+        <button class="tab-btn snap-center flex-shrink-0 px-6 py-3 rounded-2xl font-bold text-lg glass" data-room="pantry" role="tab">Pantry</button>
+        <button class="tab-btn snap-center flex-shrink-0 px-6 py-3 rounded-2xl font-bold text-lg glass" data-room="storage" role="tab">Storage</button>
+        <button class="tab-btn snap-center flex-shrink-0 px-6 py-3 rounded-2xl font-bold text-lg glass" data-tab="shopping" role="tab">Shopping</button>
+      </nav>
 
       <!-- INVENTORY SECTION -->
-      <section id="roomSection">
-        <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
-          <select id="roomSelect" class="w-full px-6 py-4 rounded-2xl text-black text-lg mb-6">
-            <option value="fridge">Fridge</option>
-            <option value="pantry">Pantry</option>
-            <option value="storage">Storage</option>
-          </select>
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-            <input id="itemName" placeholder="Scan barcode or type name..." class="px-6 py-4 rounded-2xl text-black text-lg">
-            <input id="itemQty" type="number" value="1" class="px-6 py-4 rounded-2xl text-black text-lg">
-            <input id="itemExp" type="date" class="px-6 py-4 rounded-2xl text-black text-lg">
-            <button id="addItem" class="bg-emerald-600 hover:bg-emerald-700 rounded-2xl font-bold text-lg btn-glow">+ Add Item</button>
+      <section id="roomSection" role="tabpanel">
+        <div class="glass p-6 rounded-3xl neum o my-4">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <input id="itemName" placeholder="Scan or type name..." class="px-4 py-3 rounded-2xl text-black text-base neum o focus:outline-none focus:ring-2 ring-purple-500" aria-label="Item Name">
+            <input id="itemQty" type="number" value="1" min="1" class="px-4 py-3 rounded-2xl text-black text-base neum o" aria-label="Quantity">
+            <input id="itemExp" type="date" class="px-4 py-3 rounded-2xl text-black text-base neum o" aria-label="Expiration Date">
+            <button id="addItem" class="bg-emerald-600 hover:bg-emerald-700 rounded-2xl font-bold text-base neum o hover:neumo-pressed transition-all" aria-label="Add Item">+ Add</button>
           </div>
-          <button id="scanBarcodeBtn" class="w-full py-5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl font-bold text-xl btn-glow">
-            Scan Barcode with Camera
+          <button id="scanBarcodeBtn" class="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl font-bold text-xl neum o hover:neumo-pressed transition-all" aria-label="Scan Barcode">
+            <svg class="w-6 h-6 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0M16 4l4.586 4.586a2 2 0 010 2.828M16 20l4.586-4.586a2 2 0 000-2.828M4 20L8.172 15.828a2 2 0 012.828 0M8 4H4m12 0h4" /></svg>
+            Scan Barcode
           </button>
         </div>
-        <div id="itemList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        <div id="itemList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        <div id="bulkDelete" class="hidden mt-4 text-center">
+          <button id="bulkDeleteBtn" class="px-6 py-3 bg-red-600 rounded-xl font-bold neum o hover:neumo-pressed">Delete Selected</button>
+        </div>
       </section>
 
       <!-- SHOPPING LIST -->
-      <section id="shopping" class="hidden">
-        <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
+      <section id="shopping" class="hidden" role="tabpanel">
+        <div class="glass p-6 rounded-3xl neum o my-4">
           <div class="flex gap-4">
-            <input id="shopItem" placeholder="Say or type item name..." class="flex-1 px-6 py-4 rounded-2xl text-black text-lg">
-            <button id="addShopping" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-2xl font-bold btn-glow">Add</button>
+            <input id="shopItem" placeholder="Type or say item..." class="flex-1 px-4 py-3 rounded-2xl text-black text-base neum o focus:outline-none focus:ring-2 ring-blue-500" aria-label="Shopping Item">
+            <button id="addShopping" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-2xl font-bold neum o hover:neumo-pressed" aria-label="Add to Shopping">Add</button>
           </div>
         </div>
-        <div id="shoppingList" class="space-y-6"></div>
+        <div id="shoppingList" class="space-y-4"></div>
       </section>
     </main>
 
-    <!-- AI SCAN MODAL -->
-    <div id="aiModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50 p-6">
-      <div class="glass p-10 rounded-3xl max-w-lg w-full text-center shadow-2xl">
-        <h2 class="text-4xl font-black mb-8">AI Photo Scan</h2>
-        <input type="file" id="aiPhoto" accept="image/*" capture="camera" class="hidden">
-        <button onclick="$('#aiPhoto').click()" class="w-full py-6 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl font-bold text-2xl btn-glow mb-6">
-          Take Photo
-        </button>
-        <div id="aiResult" class="space-y-4 mt-6"></div>
-        <button onclick="$('#aiModal').classList.add('hidden'); $('#aiResult').innerHTML=''" class="mt-8 w-full py-5 bg-gray-600 rounded-2xl font-bold">
-          Close
-        </button>
+    <!-- FAB for Quick Add -->
+    <button id="fabAdd" class="fab w-16 h-16 bg-emerald-600 rounded-full neum o hover:neumo-pressed text-white text-2xl shadow-lg" aria-label="Quick Add">+</button>
+
+    <!-- BARCODE MODAL -->
+    <div id="barcodeModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50 p-4">
+      <div class="glass p-6 rounded-3xl max-w-md w-full text-center">
+        <h2 class="text-2xl font-bold mb-4">Scan Barcode</h2>
+        <video id="barcodeVideo" class="w-full rounded-2xl mb-4" autoplay playsinline></video>
+        <button id="stopScan" class="w-full py-3 bg-gray-600 rounded-xl font-bold">Stop Scan</button>
       </div>
     </div>
-  </div>
 
-  <script>
-    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const $ = s => document.querySelector(s);
-    const $$ = s => document.querySelectorAll(s);
-    let currentRoom = 'fridge';
+    <!-- AI SCAN MODAL -->
+    <div id="aiModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50 p-4">
+      <div class="glass p-6 rounded-3xl max-w-lg w-full text-center">
+        <h2 class="text-2xl font-bold mb-4">AI Photo Scan</h2>
+        <input type="file" id="aiPhoto" accept="image/*" capture="environment" class="hidden">
+        <button id="takePhoto" class="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-bold mb-4 neum o hover:neumo-pressed">Take Photo</button>
+        <div id="aiResult" class="space-y-2"></div>
+        <button id="closeAi" class="mt-4 w-full py-3 bg-gray-600 rounded-xl font-bold">Close</button>
+      </div>
+    </div>
 
-    async function api(path, opts = {}) {
-      const token = await auth.currentUser?.getIdToken();
-      return fetch(path, { ...opts, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...opts.headers } })
-        .then(r => r.ok ? r.json() : Promise.reject(r));
-    }
+    <!-- TOAST CONTAINER -->
+    <div id="toastContainer"></div>
 
-    async function loadData() {
-      try {
-        const data = await api('/api/data');
-        renderRoom(currentRoom, data.rooms?.[currentRoom] || []);
-        renderShopping(data.shopping?.list || []);
-      } catch (e) { console.log('Load failed'); }
-    }
+    <script>
+      // Move Firebase config to env (for prod; hardcode for now)
+      const firebaseConfig = { 
+        apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", 
+        authDomain: "pantrypal-6e410.firebaseapp.com", 
+        projectId: "pantrypal-6e410", 
+        storageBucket: "pantrypal-6e410.firebasestorage.app", 
+        messagingSenderId: "592127259891", 
+        appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" 
+      };
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+      const $ = s => document.querySelector(s);
+      const $$ = s => document.querySelectorAll(s);
+      let currentRoom = 'fridge';
+      let scanner = null;
+      let videoEl = null;
 
-    function renderRoom(room, items) {
-      $('#itemList').innerHTML = items.map((item, i) => {
-        const daysLeft = item.expiration ? Math.ceil((new Date(item.expiration) - Date.now()) / 86400000) : null;
-        const expired = daysLeft < 0;
-        const expiring = daysLeft !== null && daysLeft <= 3 && daysLeft >= 0;
-        return `
-          <div class="glass rounded-3xl p-6 shadow-xl flex gap-6 items-center ${expired ? 'expired' : expiring ? 'expiring' : ''}">
-            <input type="checkbox" class="w-6 h-6" data-index="${i}">
-            ${item.image ? `<img src="${item.image}" class="w-28 h-28 rounded-2xl object-cover shadow-lg">` : '<div class="w-28 h-28 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">Box</div>'}
-            <div class="flex-1">
-              <h3 class="text-3xl font-bold">${item.name}</h3>
-              <p class="text-xl opacity-80">×${item.quantity} ${item.expiration ? `· ${expired ? 'EXPIRED' : expiring ? daysLeft + ' days left' : 'Good'}` : ''}</p>
-            </div>
-            <button onclick="deleteItem(${i})" class="text-red-400 font-bold text-xl hover:underline">Delete</button>
-          </div>
-        `;
-      }).join('');
-      updateBulkDelete();
-    }
-
-    function renderShopping(list) {
-      $('#shoppingList').innerHTML = list.map((item, i) => `
-        <div class="glass rounded-3xl p-6 shadow-xl flex justify-between items-center shadow-xl">
-          <span class="text-3xl font-bold">${item.itemName}</span>
-          <button onclick="deleteShopping(${i})" class="text-red-400 font-bold text-xl hover:underline">Delete</button>
-        </div>
-      `).join('');
-    }
-
-    async function lookupBarcode(code) {
-      try {
-        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
-        const data = await res.json();
-        if (data.status === 1) {
-          return {
-            name: data.product.product_name || data.product.brands || code,
-            image: data.product.image_front_url || data.product.image_front_small_url || null
-          };
-        }
-      } catch (e) {}
-      return { name: code, image: null };
-    }
-
-    // === ALL FEATURES RESTORED ===
-    let scanner = null;
-    $('#scanBarcodeBtn').onclick = async () => {
-      if (scanner) {
-        scanner.reset();
-        scanner = null;
-        $('#scanBarcodeBtn').textContent = 'Scan Barcode with Camera';
-        return;
+      // Toast Helper
+      function toast(msg, type = 'info') {
+        Toastify({
+          text: msg,
+          duration: 3000,
+          gravity: 'top',
+          position: 'right',
+          style: { background: type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6' },
+          className: 'neumo text-white font-bold'
+        }).showToast();
       }
-      scanner = new ZXing.BrowserMultiFormatReader();
-      try {
-        await scanner.decodeFromVideoDevice(null, document.createElement('video'), async (result) => {
-          if (result) {
-            const product = await lookupBarcode(result.text);
-            $('#itemName').value = product.name;
-            await api(`/api/room/${currentRoom}`, {
-              method: 'POST',
-              body: JSON.stringify({ name: product.name, image: product.image, quantity: $('#itemQty').value || 1, expiration: $('#itemExp').value || null })
-            });
-            scanner.reset();
-            scanner = null;
-            $('#scanBarcodeBtn').textContent = 'Scan Barcode with Camera';
-            loadData();
-          }
+
+      async function api(path, opts = {}) {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(path, { 
+          ...opts, 
+          headers: { 
+            Authorization: `Bearer ${token}`, 
+            'Content-Type': 'application/json', 
+            ...opts.headers 
+          } 
         });
-        $('#scanBarcodeBtn').textContent = 'Stop Scanning';
-      } catch (e) {
-        alert('Camera access denied');
-        $('#scanBarcodeBtn').textContent = 'Scan Barcode with Camera';
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
       }
-    };
 
-    // AI SCAN
-    $('#aiScanBtn').onclick = () => $('#aiModal').classList.remove('hidden');
-    $('#aiPhoto').onchange = async () => {
-      const file = $('#aiPhoto').files[0];
-      if (!file) return;
-      const form = new FormData();
-      form.append('image', file);
-      const res = await fetch('/api/scan', { method: 'POST', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }, body: form });
-      const data = await res.json();
-      $('#aiResult').innerHTML = (data.labels || []).map(l => `
-        <button onclick="addFromAI('${l}')" class="block w-full p-6 bg-white/20 rounded-2xl m-2 font-bold hover:bg-white/40 btn-glow text-xl">
-          + ${l}
-        </button>
-      `).join('');
-    };
-    window.addFromAI = async (name) => {
-      await api(`/api/room/${currentRoom}`, { method: 'POST', body: JSON.stringify({ name }) });
-      $('#aiModal').classList.add('hidden');
-      loadData();
-    };
-
-    // VOICE COMMANDS
-    if (annyang) {
-      const commands = {
-        'add *item to fridge': i => addVoice(i, 'fridge'),
-        'add *item to pantry': i => addVoice(i, 'pantry'),
-        'add *item to storage': i => addVoice(i, 'storage'),
-        'add *item': i => addVoice(i, currentRoom)
-      };
-      annyang.addCommands(commands);
-      annyang.start({ autoRestart: true });
-    }
-    async function addVoice(item, room) {
-      await api(`/api/room/${room}`, { method: 'POST', body: JSON.stringify({ name: item }) });
-      loadData();
-    }
-
-    // REST OF CODE (add, delete, tabs, dark mode, etc.)
-    $('#addItem').onclick = async () => {
-      const name = $('#itemName').value.trim();
-      if (!name) return;
-      const product = await lookupBarcode(name);
-      await api(`/api/room/${currentRoom}`, { method: 'POST', body: JSON.stringify({ name: product.name, image: product.image, quantity: $('#itemQty').value || 1, expiration: $('#itemExp').value || null }) });
-      $('#itemName').value = ''; $('#itemQty').value = 1; $('#itemExp').value = '';
-      loadData();
-    };
-
-    $('#addShopping').onclick = async () => {
-      const name = $('#shopItem').value.trim();
-      if (!name) return;
-      await api('/api/shopping', { method: 'POST', body: JSON.stringify({ itemName: name }) });
-      $('#shopItem').value = '';
-      loadData();
-    };
-
-    window.deleteItem = async (i) => {
-      if (!confirm('Delete?')) return;
-      await fetch(`/api/room/${currentRoom}/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } });
-      loadData();
-    };
-
-    window.deleteShopping = async (i) => {
-      if (!confirm('Delete?')) return;
-      await fetch(`/api/shopping/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } });
-      loadData();
-    };
-
-    function updateBulkDelete() {
-      const count = $$('input[type="checkbox"]:checked').length;
-      $('#bulkDeleteBtn').classList.toggle('hidden', count === 0);
-      $('#bulkDeleteBtn').textContent = `Delete Selected (${count})`;
-    }
-    $('#bulkDeleteBtn').onclick = async () => {
-      if (!confirm('Delete selected items?')) return;
-      const indices = Array.from($$('input[type="checkbox"]:checked')).map(c => parseInt(c.dataset.index));
-      await api(`/api/room/${currentRoom}/bulk-delete`, { method: 'POST', body: JSON.stringify({ indices }) });
-      loadData();
-    };
-    document.addEventListener('change', e => e.target.type === 'checkbox' && updateBulkDelete());
-
-    $$('.tab-btn').forEach(btn => {
-      btn.onclick = () => {
-        if (btn.dataset.room) {
-          currentRoom = btn.dataset.room;
-          $('#roomSection').classList.remove('hidden');
-          $('#shopping').classList.add('hidden');
-        } else {
-          $('#roomSection').classList.add('hidden');
-          $('#shopping').classList.remove('hidden');
+      async function loadData(skeleton = true) {
+        if (skeleton) renderSkeleton();
+        try {
+          const data = await api('/api/data');
+          renderRoom(currentRoom, data.rooms?.[currentRoom] || []);
+          if ($('#shopping').classList.contains('hidden')) return;
+          renderShopping(data.shopping?.list || []);
+        } catch (e) {
+          toast('Load failed', 'error');
         }
-        $$('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-        btn.classList.add('tab-active');
-        loadData();
-      };
-    });
-
-    // AUTH
-    $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        $('#userEmail').textContent = user.email;
-        $('#auth').classList.add('hidden');
-        $('#app').classList.remove('hidden');
-        loadData();
       }
-    });
-    $('#signOutBtn').onclick = () => auth.signOut();
 
-    // DARK MODE
-    $('#darkModeBtn').onclick = () => {
-      document.body.classList.toggle('dark');
-      localStorage.setItem('dark', document.body.classList.contains('dark'));
-    };
-    if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
-  </script>
-</body>
+      function renderSkeleton() {
+        const list = $('#itemList') || $('#shoppingList');
+        list.innerHTML = Array(6).fill().map(() => '<div class="skeleton h-32 rounded-3xl"></div>').join('');
+      }
+
+      function renderRoom(room, items) {
+        const list = $('#itemList');
+        list.innerHTML = items.map((item, i) => {
+          const expDate = item.expiration ? new Date(item.expiration) : null;
+          const daysLeft = expDate ? Math.ceil((expDate - Date.now()) / 86400000) : null;
+          const expired = daysLeft < 0;
+          const expiring = daysLeft <= 3 && daysLeft >= 0;
+          return `
+            <div class="glass rounded-3xl p-4 neum o flex gap-4 items-center ${expired ? 'expired' : expiring ? 'expiring' : ''}" role="article">
+              <input type="checkbox" class="w-5 h-5 rounded" data-index="${i}" aria-label="Select item">
+              ${item.image ? `<img src="${item.image}" alt="${item.name}" class="w-20 h-20 rounded-2xl object-cover shadow-md">` : '<div class="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">📦</div>'}
+              <div class="flex-1 min-w-0">
+                <h3 class="text-xl font-bold truncate">${item.name}</h3>
+                <p class="text-sm opacity-80">Qty: ${item.quantity} ${expDate ? `· ${expired ? 'Expired' : expiring ? `${daysLeft} days` : 'Fresh'}` : ''}</p>
+              </div>
+              <button onclick="deleteItem(${i})" class="p-2 text-red-400 hover:text-red-600" aria-label="Delete ${item.name}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+            </div>
+          `;
+        }).join('');
+        updateBulkDelete();
+      }
+
+      function renderShopping(list) {
+        $('#shoppingList').innerHTML = list.map((item, i) => `
+          <div class="glass rounded-3xl p-4 neum o flex justify-between items-center" role="listitem">
+            <span class="text-xl font-bold flex-1 min-w-0 truncate">${item.itemName}</span>
+            <button onclick="deleteShopping(${i})" class="p-2 text-red-400 hover:text-red-600 ml-4" aria-label="Delete ${item.itemName}">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+          </div>
+        `).join('');
+      }
+
+      // BARCODE SCANNER - FIXED: Modal preview, single scan, rear camera
+      $('#scanBarcodeBtn').onclick = () => {
+        $('#barcodeModal').classList.toggle('hidden');
+        if ($('#barcodeModal').classList.contains('hidden')) return;
+        startBarcodeScan();
+      };
+      $('#stopScan').onclick = stopBarcodeScan;
+
+      async function startBarcodeScan() {
+        videoEl = $('#barcodeVideo');
+        scanner = new ZXing.BrowserMultiFormatReader();
+        try {
+          const constraints = { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } };
+          await scanner.decodeOnceFromVideoDevice(constraints, videoEl, async (result, err) => {
+            if (err && err.name !== 'NotFoundException') throw err;
+            if (result) {
+              const product = await lookupBarcode(result.text);
+              $('#itemName').value = product.name;
+              await api(`/api/room/${currentRoom}`, {
+                method: 'POST',
+                body: JSON.stringify({ 
+                  name: product.name, 
+                  image: product.image, 
+                  quantity: parseInt($('#itemQty').value) || 1, 
+                  expiration: $('#itemExp').value || null 
+                })
+              });
+              toast('Item added from barcode!', 'success');
+              stopBarcodeScan();
+              loadData();
+            }
+          });
+        } catch (err) {
+          console.error('Scan error:', err);
+          toast(err.name === 'NotAllowedError' ? 'Camera permission denied' : 'Scan failed', 'error');
+          stopBarcodeScan();
+        }
+      }
+
+      function stopBarcodeScan() {
+        scanner?.reset();
+        scanner = null;
+        if (videoEl) videoEl.srcObject?.getTracks().forEach(track => track.stop());
+        $('#barcodeModal').classList.add('hidden');
+      }
+
+      async function lookupBarcode(code) {
+        try {
+          const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+          const data = await res.json();
+          if (data.status === 1) {
+            return {
+              name: data.product.product_name || data.product.brands || code,
+              image: data.product.image_front_url || null
+            };
+          }
+        } catch (e) { console.error('Barcode lookup failed'); }
+        return { name: code, image: null };
+      }
+
+      // AI SCAN - FIXED: File validation, env capture
+      $('#aiScanBtn, #takePhoto').onclick = () => $('#aiPhoto').click();
+      $('#aiPhoto').onchange = async () => {
+        const file = $('#aiPhoto').files[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) { toast('Image too large', 'error'); return; }
+        const form = new FormData();
+        form.append('image', file);
+        try {
+          const data = await fetch('/api/scan', { 
+            method: 'POST', 
+            headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }, 
+            body: form 
+          }).then(r => r.json());
+          $('#aiResult').innerHTML = (data.labels || []).map(l => `
+            <button onclick="addFromAI('${l}')" class="block w-full p-4 bg-white/20 rounded-2xl m-1 font-bold hover:bg-white/40 transition-all text-left" aria-label="Add ${l} to inventory">
+              + ${l}
+            </button>
+          `).join('');
+          toast('Detected items! Tap to add.', 'success');
+        } catch (e) {
+          toast('AI scan failed', 'error');
+        }
+      };
+      $('#closeAi').onclick = () => {
+        $('#aiModal').classList.add('hidden');
+        $('#aiResult').innerHTML = '';
+        $('#aiPhoto').value = '';
+      };
+      window.addFromAI = async (name) => {
+        await api(`/api/room/${currentRoom}`, { method: 'POST', body: JSON.stringify({ name }) });
+        $('#aiModal').classList.add('hidden');
+        $('#aiResult').innerHTML = '';
+        $('#aiPhoto').value = '';
+        loadData();
+        toast(`${name} added!`, 'success');
+      };
+
+      // VOICE COMMANDS - FIXED: Modern Annyang, error handling, continuous false
+      if (annyang) {
+        const commands = {
+          'add *item to fridge': i => addVoice(i, 'fridge'),
+          'add *item to pantry': i => addVoice(i, 'pantry'),
+          'add *item to storage': i => addVoice(i, 'storage'),
+          'add *item': i => addVoice(i, currentRoom)
+        };
+        annyang.addCommands(commands);
+        annyang.addCallback('error', (err) => {
+          if (err.error === 'not-allowed') toast('Microphone permission denied', 'error');
+          else console.error('Voice error:', err);
+        });
+        const started = annyang.start({ continuous: false, autoRestart: true });
+        if (!started) toast('Voice unavailable (try Chrome)', 'error');
+        else toast('Voice ready! Say "add milk to fridge"', 'success');
+        annyang.debug(false); // Prod: false
+      } else {
+        console.warn('Annyang unsupported');
+      }
+      async function addVoice(item, room) {
+        await api(`/api/room/${room}`, { method: 'POST', body: JSON.stringify({ name: item.trim() }) });
+        loadData();
+        toast(`Added ${item} to ${room}!`, 'success');
+      }
+
+      // Add Item
+      $('#addItem').onclick = async () => {
+        const name = $('#itemName').value.trim();
+        if (!name) { toast('Enter item name', 'error'); return; }
+        try {
+          const product = await lookupBarcode(name); // Auto-lookup if barcode-like
+          await api(`/api/room/${currentRoom}`, { 
+            method: 'POST', 
+            body: JSON.stringify({ 
+              name: product.name, 
+              image: product.image, 
+              quantity: parseInt($('#itemQty').value) || 1, 
+              expiration: $('#itemExp').value || null 
+            }) 
+          });
+          $('#itemName').value = ''; $('#itemQty').value = 1; $('#itemExp').value = '';
+          loadData();
+          toast('Item added!', 'success');
+        } catch (e) {
+          toast('Add failed', 'error');
+        }
+      };
+
+      // Shopping Add
+      $('#addShopping').onclick = async () => {
+        const name = $('#shopItem').value.trim();
+        if (!name) { toast('Enter item', 'error'); return; }
+        await api('/api/shopping', { method: 'POST', body: JSON.stringify({ itemName: name }) });
+        $('#shopItem').value = '';
+        loadData();
+        toast('Added to shopping!', 'success');
+      };
+
+      // Deletes
+      window.deleteItem = async (i) => {
+        if (!confirm('Delete item?')) return;
+        await api(`/api/room/${currentRoom}/${i}`, { method: 'DELETE' });
+        loadData();
+        toast('Item deleted', 'success');
+      };
+      window.deleteShopping = async (i) => {
+        if (!confirm('Delete from list?')) return;
+        await api(`/api/shopping/${i}`, { method: 'DELETE' });
+        loadData();
+        toast('Item removed', 'success');
+      };
+
+      // Bulk Delete
+      function updateBulkDelete() {
+        const count = $$('input[type="checkbox"]:checked').length;
+        const btn = $('#bulkDeleteBtn');
+        btn.classList.toggle('hidden', count === 0);
+        if (count > 0) btn.textContent = `Delete ${count} Selected`;
+      }
+      $('#bulkDeleteBtn').onclick = async () => {
+        if (!confirm('Delete selected?')) return;
+        const indices = Array.from($$('input[type="checkbox"]:checked')).map(c => parseInt(c.dataset.index));
+        await api(`/api/room/${currentRoom}/bulk-delete`, { method: 'POST', body: JSON.stringify({ indices }) });
+        loadData();
+        toast('Bulk delete complete', 'success');
+      };
+      document.addEventListener('change', e => {
+        if (e.target.type === 'checkbox') updateBulkDelete();
+      });
+
+      // Tabs
+      $$('.tab-btn').forEach(btn => {
+        btn.onclick = () => {
+          if (btn.dataset.tab === 'shopping') {
+            $('#roomSection').classList.add('hidden');
+            $('#shopping').classList.remove('hidden');
+            currentRoom = null;
+          } else {
+            currentRoom = btn.dataset.room;
+            $('#roomSection').classList.remove('hidden');
+            $('#shopping').classList.add('hidden');
+          }
+          $$('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+          btn.classList.add('tab-active');
+          loadData();
+        };
+      });
+
+      // FAB Quick Add (focuses name input)
+      $('#fabAdd').onclick = () => $('#itemName').focus();
+
+      // Auth
+      $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      auth.onAuthStateChanged(async (user) => {
+        if (user) {
+          $('#userEmail').textContent = user.email;
+          $('#auth').classList.add('hidden');
+          $('#app').classList.remove('hidden');
+          loadData();
+        }
+      });
+      $('#signOutBtn').onclick = () => auth.signOut().then(() => location.reload());
+
+      // Dark Mode (system pref + toggle)
+      const darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
+      function setDark(isDark) {
+        document.documentElement.classList.toggle('dark', isDark);
+        localStorage.setItem('darkMode', isDark);
+      }
+      darkMedia.addEventListener('change', e => setDark(e.matches));
+      $('#darkModeBtn').onclick = () => setDark(!document.documentElement.classList.contains('dark'));
+      setDark(localStorage.getItem('darkMode') === 'true' || darkMedia.matches);
+
+      // PWA Service Worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').then(reg => console.log('SW registered')).catch(err => console.error('SW failed', err));
+      }
+    </script>
+  </body>
 </html>
