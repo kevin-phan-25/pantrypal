@@ -1,21 +1,24 @@
 {
-  "name": "pantrypal-backend",
+  "name": "pantrypal-pro",
   "version": "1.0.0",
-  "main": "index.js",
-  "type": "commonjs",
+  "description": "Modern PantryPal Pro - Inventory Tracker with AI, Voice, Barcode",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "cors": "^2.8.5",
     "firebase-admin": "^12.5.0",
-    "@google-cloud/vision": "^4.2.0",
+    "cors": "^2.8.5",
+    "express-fileupload": "^1.4.0",
     "dotenv": "^16.4.5",
-    "express-fileupload": "^1.4.3"
+    "@google-cloud/vision": "^4.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=18.0.0"
   }
 }
