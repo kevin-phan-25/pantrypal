@@ -5,37 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PantryPal Pro</title>
   <link rel="manifest" href="/manifest.json">
-  <link rel="icon" href="/icon-192.png">
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-  <script src="https://unpkg.com/@zxing/library@0.20.0"></script>
+  <script src="https://unpkg.com/@zxing/browser@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/annyang@2.6.1/annyang.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: 'Inter', sans-serif; }
+    body { font-family: 'Inter', sans-serif; margin: 0; }
     .glass { background: rgba(255,255,255,0.15); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
     .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); min-height: 100vh; }
     .btn-glow { box-shadow: 0 0 20px rgba(139,92,246,0.5); transition: all 0.3s; }
     .btn-glow:hover { box-shadow: 0 0 30px rgba(139,92,246,0.8); transform: translateY(-2px); }
     .tab-active { background: rgba(255,255,255,0.3) !important; }
-    .dark .gradient-bg { background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); }
-    .dark .glass { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.1); }
-    .expired { background: rgba(239,68,68,0.3) !important; }
-    .expiring { background: rgba(251,146,60,0.3) !important; }
+    .expired { background: rgba(239,68,68,0.3) !important; border-left: 6px solid #ef4444; }
+    .expiring { background: rgba(251,146,60,0.3) !important; border-left: 6px solid #fb923c; }
+    .dark .gradient-bg { background: linear-gradient(135deg, #1e1b4b, #4c1d95, #7c3aed); }
+    .dark .glass { background: rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.1); }
   </style>
 </head>
 <body class="min-h-screen gradient-bg text-white">
 
+  <!-- LOGIN -->
   <div id="auth" class="flex items-center justify-center min-h-screen p-6">
     <div class="glass p-14 rounded-3xl shadow-2xl max-w-md w-full text-center">
       <h1 class="text-7xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">PantryPal Pro</h1>
-      <button id="googleSignIn" class="w-full py-6 rounded-2xl bg-white text-gray-800 font-bold text-2xl shadow-2xl flex items-center justify-center gap-5">
+      <button id="googleSignIn" class="w-full py-6 rounded-2xl bg-white text-gray-800 font-bold text-2xl shadow-2xl flex items-center justify-center gap-5 hover:scale-105 transition">
         <img src="https://developers.google.com/identity/images/g-logo.png" class="w-10 h-10" alt="G">
-        <span>Sign in with Google</span>
+        Sign in with Google
       </button>
     </div>
   </div>
 
+  <!-- MAIN APP -->
   <div id="app" class="hidden min-h-screen pb-24">
     <header class="glass sticky top-0 z-50 shadow-2xl p-6 mb-8">
       <div class="flex flex-col sm:flex-row justify-between items-center gap-6">
@@ -45,8 +46,8 @@
         </div>
         <div class="flex gap-4">
           <button id="bulkDeleteBtn" class="hidden px-6 py-3 bg-red-600 rounded-xl font-bold btn-glow">Delete Selected</button>
-          <button id="aiScanBtn" class="px-6 py-3 bg-purple-600 rounded-xl font-bold btn-glow">AI Scan</button>
-          <button id="darkModeBtn" class="px-6 py-3 bg-white/20 rounded-xl font-bold btn-glow">Dark</button>
+          <button id="aiScanBtn" class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl font-bold btn-glow">AI Scan</button>
+          <button id="darkModeBtn" class="px-6 py-3 bg-white/20 rounded-xl font-bold btn-glow">Dark Mode</button>
           <button id="signOutBtn" class="px-6 py-3 bg-red-600 rounded-xl font-bold btn-glow">Sign Out</button>
         </div>
       </div>
@@ -57,46 +58,54 @@
         <button class="tab-btn tab-active px-8 py-4 rounded-2xl font-bold text-lg glass" data-room="fridge">Fridge</button>
         <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-room="pantry">Pantry</button>
         <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-room="storage">Storage</button>
-        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="shopping">Shopping</button>
+        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="shopping">Shopping List</button>
       </div>
 
-      <div id="roomSection">
+      <!-- INVENTORY SECTION -->
+      <section id="roomSection">
         <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
-          <select id="roomSelect" class="px-6 py-4 rounded-2xl text-black text-lg mb-4 w-full">
+          <select id="roomSelect" class="w-full px-6 py-4 rounded-2xl text-black text-lg mb-6">
             <option value="fridge">Fridge</option>
             <option value="pantry">Pantry</option>
             <option value="storage">Storage</option>
           </select>
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <input id="itemName" placeholder="Scan barcode or type..." class="px-6 py-4 rounded-2xl text-black text-lg">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <input id="itemName" placeholder="Scan barcode or type name..." class="px-6 py-4 rounded-2xl text-black text-lg">
             <input id="itemQty" type="number" value="1" class="px-6 py-4 rounded-2xl text-black text-lg">
             <input id="itemExp" type="date" class="px-6 py-4 rounded-2xl text-black text-lg">
-            <button id="addItem" class="bg-emerald-600 rounded-2xl font-bold text-lg btn-glow">+ Add</button>
+            <button id="addItem" class="bg-emerald-600 hover:bg-emerald-700 rounded-2xl font-bold text-lg btn-glow">+ Add Item</button>
           </div>
-          <button id="scanBarcodeBtn" class="mt-4 w-full py-4 bg-purple-600 rounded-2xl font-bold btn-glow">Scan Barcode with Camera</button>
+          <button id="scanBarcodeBtn" class="w-full py-5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl font-bold text-xl btn-glow">
+            Scan Barcode with Camera
+          </button>
         </div>
         <div id="itemList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-      </div>
+      </section>
 
+      <!-- SHOPPING LIST -->
       <section id="shopping" class="hidden">
         <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
           <div class="flex gap-4">
-            <input id="shopItem" placeholder="Say or type item..." class="flex-1 px-6 py-4 rounded-2xl text-black text-lg">
-            <button id="addShopping" class="px-8 py-4 bg-blue-600 rounded-2xl font-bold btn-glow">Add</button>
+            <input id="shopItem" placeholder="Say or type item name..." class="flex-1 px-6 py-4 rounded-2xl text-black text-lg">
+            <button id="addShopping" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-2xl font-bold btn-glow">Add</button>
           </div>
         </div>
-        <div id="shoppingList" class="space-y-4"></div>
+        <div id="shoppingList" class="space-y-6"></div>
       </section>
     </main>
 
     <!-- AI SCAN MODAL -->
     <div id="aiModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50 p-6">
-      <div class="glass p-10 rounded-3xl max-w-lg w-full text-center">
-        <h2 class="text-4xl font-black mb-6">AI Photo Scan</h2>
+      <div class="glass p-10 rounded-3xl max-w-lg w-full text-center shadow-2xl">
+        <h2 class="text-4xl font-black mb-8">AI Photo Scan</h2>
         <input type="file" id="aiPhoto" accept="image/*" capture="camera" class="hidden">
-        <button onclick="$('#aiPhoto').click()" class="w-full py-6 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl font-bold text-2xl btn-glow mb-6">Take Photo</button>
-        <div id="aiResult" class="space-y-3"></div>
-        <button onclick="$('#aiModal').classList.add('hidden'); $('#aiResult').innerHTML=''" class="mt-6 w-full py-4 bg-gray-600 rounded-2xl font-bold">Close</button>
+        <button onclick="$('#aiPhoto').click()" class="w-full py-6 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl font-bold text-2xl btn-glow mb-6">
+          Take Photo
+        </button>
+        <div id="aiResult" class="space-y-4 mt-6"></div>
+        <button onclick="$('#aiModal').classList.add('hidden'); $('#aiResult').innerHTML=''" class="mt-8 w-full py-5 bg-gray-600 rounded-2xl font-bold">
+          Close
+        </button>
       </div>
     </div>
   </div>
@@ -109,70 +118,93 @@
     const $$ = s => document.querySelectorAll(s);
     let currentRoom = 'fridge';
 
-    const googleProvider = new firebase.auth.GoogleAuthProvider();
-
     async function api(path, opts = {}) {
       const token = await auth.currentUser?.getIdToken();
       return fetch(path, { ...opts, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...opts.headers } })
-        .then(r => r.ok ? r.json() : Promise.reject());
+        .then(r => r.ok ? r.json() : Promise.reject(r));
     }
 
     async function loadData() {
-      const data = await api('/api/data');
-      renderRoom(currentRoom, data.rooms[currentRoom] || []);
-      renderShopping(data.shopping?.list || []);
+      try {
+        const data = await api('/api/data');
+        renderRoom(currentRoom, data.rooms?.[currentRoom] || []);
+        renderShopping(data.shopping?.list || []);
+      } catch (e) { console.log('Load failed'); }
     }
 
     function renderRoom(room, items) {
       $('#itemList').innerHTML = items.map((item, i) => {
         const daysLeft = item.expiration ? Math.ceil((new Date(item.expiration) - Date.now()) / 86400000) : null;
-        const isExpired = daysLeft < 0;
-        const isExpiring = daysLeft <= 3 && daysLeft >= 0;
-        return `<div class="glass rounded-3xl p-6 shadow-xl flex gap-4 items-center ${isExpired ? 'expired' : isExpiring ? 'expiring' : ''}">
-          <input type="checkbox" class="w-6 h-6" data-index="${i}">
-          ${item.image ? `<img src="${item.image}" class="w-24 h-24 rounded-2xl object-cover shadow-lg">` : '<div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">Box</div>'}
-          <div class="flex-1"><h3 class="text-2xl font-bold">${item.name}</h3><p class="opacity-80">×${item.quantity} ${item.expiration ? '· ' + (isExpired ? 'Expired' : daysLeft + ' days') : ''}</p></div>
-          <button onclick="deleteItem(${i})" class="text-red-400 font-bold hover:underline">Delete</button>
-        </div>`;
+        const expired = daysLeft < 0;
+        const expiring = daysLeft !== null && daysLeft <= 3 && daysLeft >= 0;
+        return `
+          <div class="glass rounded-3xl p-6 shadow-xl flex gap-6 items-center ${expired ? 'expired' : expiring ? 'expiring' : ''}">
+            <input type="checkbox" class="w-6 h-6" data-index="${i}">
+            ${item.image ? `<img src="${item.image}" class="w-28 h-28 rounded-2xl object-cover shadow-lg">` : '<div class="w-28 h-28 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">Box</div>'}
+            <div class="flex-1">
+              <h3 class="text-3xl font-bold">${item.name}</h3>
+              <p class="text-xl opacity-80">×${item.quantity} ${item.expiration ? `· ${expired ? 'EXPIRED' : expiring ? daysLeft + ' days left' : 'Good'}` : ''}</p>
+            </div>
+            <button onclick="deleteItem(${i})" class="text-red-400 font-bold text-xl hover:underline">Delete</button>
+          </div>
+        `;
       }).join('');
-      updateBulkButton();
+      updateBulkDelete();
     }
 
     function renderShopping(list) {
-      $('#shoppingList').innerHTML = list.map((item, i) => `<div class="glass rounded-3xl p-6 shadow-xl flex justify-between items-center text-2xl font-bold"><span>${item.itemName}</span><button onclick="deleteShopping(${i})" class="text-red-400 hover:underline">Delete</button></div>`).join('');
+      $('#shoppingList').innerHTML = list.map((item, i) => `
+        <div class="glass rounded-3xl p-6 shadow-xl flex justify-between items-center shadow-xl">
+          <span class="text-3xl font-bold">${item.itemName}</span>
+          <button onclick="deleteShopping(${i})" class="text-red-400 font-bold text-xl hover:underline">Delete</button>
+        </div>
+      `).join('');
     }
 
     async function lookupBarcode(code) {
       try {
         const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
         const data = await res.json();
-        if (data.status === 1) return { name: data.product.product_name || data.product.brands || code, image: data.product.image_front_url || null };
+        if (data.status === 1) {
+          return {
+            name: data.product.product_name || data.product.brands || code,
+            image: data.product.image_front_url || data.product.image_front_small_url || null
+          };
+        }
       } catch (e) {}
       return { name: code, image: null };
     }
 
-    // BARCODE SCANNER
-    let codeReader = null;
+    // === ALL FEATURES RESTORED ===
+    let scanner = null;
     $('#scanBarcodeBtn').onclick = async () => {
-      if (codeReader) { codeReader.reset(); codeReader = null; $('#scanBarcodeBtn').textContent = 'Scan Barcode'; return; }
-      $('#scanBarcodeBtn').textContent = 'Stop Scan';
-      codeReader = new ZXing.BrowserMultiFormatReader();
+      if (scanner) {
+        scanner.reset();
+        scanner = null;
+        $('#scanBarcodeBtn').textContent = 'Scan Barcode with Camera';
+        return;
+      }
+      scanner = new ZXing.BrowserMultiFormatReader();
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        codeReader.decodeFromVideoDevice(null, video, async (result) => {
+        await scanner.decodeFromVideoDevice(null, document.createElement('video'), async (result) => {
           if (result) {
             const product = await lookupBarcode(result.text);
             $('#itemName').value = product.name;
-            await api(`/api/room/${$('#roomSelect').value}`, { method: 'POST', body: JSON.stringify({ name: product.name, image: product.image, quantity: $('#itemQty').value || 1, expiration: $('#itemExp').value || null }) });
-            codeReader.reset(); codeReader = null;
-            $('#scanBarcodeBtn').textContent = 'Scan Barcode';
-            stream.getTracks().forEach(t => t.stop());
+            await api(`/api/room/${currentRoom}`, {
+              method: 'POST',
+              body: JSON.stringify({ name: product.name, image: product.image, quantity: $('#itemQty').value || 1, expiration: $('#itemExp').value || null })
+            });
+            scanner.reset();
+            scanner = null;
+            $('#scanBarcodeBtn').textContent = 'Scan Barcode with Camera';
             loadData();
           }
         });
-      } catch (e) { alert('Camera denied'); $('#scanBarcodeBtn').textContent = 'Scan Barcode'; }
+        $('#scanBarcodeBtn').textContent = 'Stop Scanning';
+      } catch (e) {
+        alert('Camera access denied');
+        $('#scanBarcodeBtn').textContent = 'Scan Barcode with Camera';
+      }
     };
 
     // AI SCAN
@@ -184,11 +216,14 @@
       form.append('image', file);
       const res = await fetch('/api/scan', { method: 'POST', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }, body: form });
       const data = await res.json();
-      $('#aiResult').innerHTML = (data.labels || []).map(label => `<button onclick="addFromAI('${label}')" class="block w-full p-4 bg-white/20 rounded-xl m-2 font-bold hover:bg-white/40">${label}</button>`).join('');
+      $('#aiResult').innerHTML = (data.labels || []).map(l => `
+        <button onclick="addFromAI('${l}')" class="block w-full p-6 bg-white/20 rounded-2xl m-2 font-bold hover:bg-white/40 btn-glow text-xl">
+          + ${l}
+        </button>
+      `).join('');
     };
-
     window.addFromAI = async (name) => {
-      await api(`/api/room/${$('#roomSelect').value}`, { method: 'POST', body: JSON.stringify({ name }) });
+      await api(`/api/room/${currentRoom}`, { method: 'POST', body: JSON.stringify({ name }) });
       $('#aiModal').classList.add('hidden');
       loadData();
     };
@@ -196,25 +231,25 @@
     // VOICE COMMANDS
     if (annyang) {
       const commands = {
-        'add *item to fridge': item => addVoiceItem(item, 'fridge'),
-        'add *item to pantry': item => addVoiceItem(item, 'pantry'),
-        'add *item to storage': item => addVoiceItem(item, 'storage'),
-        'add *item': item => addVoiceItem(item, currentRoom)
+        'add *item to fridge': i => addVoice(i, 'fridge'),
+        'add *item to pantry': i => addVoice(i, 'pantry'),
+        'add *item to storage': i => addVoice(i, 'storage'),
+        'add *item': i => addVoice(i, currentRoom)
       };
       annyang.addCommands(commands);
       annyang.start({ autoRestart: true });
     }
-    async function addVoiceItem(item, room) {
+    async function addVoice(item, room) {
       await api(`/api/room/${room}`, { method: 'POST', body: JSON.stringify({ name: item }) });
       loadData();
     }
 
-    // Rest of the code (addItem, delete, bulk, etc.) — same as before
+    // REST OF CODE (add, delete, tabs, dark mode, etc.)
     $('#addItem').onclick = async () => {
       const name = $('#itemName').value.trim();
-      if (!name) return alert('Enter item');
+      if (!name) return;
       const product = await lookupBarcode(name);
-      await api(`/api/room/${$('#roomSelect').value}`, { method: 'POST', body: JSON.stringify({ name: product.name, image: product.image, quantity: $('#itemQty').value || 1, expiration: $('#itemExp').value || null }) });
+      await api(`/api/room/${currentRoom}`, { method: 'POST', body: JSON.stringify({ name: product.name, image: product.image, quantity: $('#itemQty').value || 1, expiration: $('#itemExp').value || null }) });
       $('#itemName').value = ''; $('#itemQty').value = 1; $('#itemExp').value = '';
       loadData();
     };
@@ -227,42 +262,64 @@
       loadData();
     };
 
-    window.deleteItem = async (i) => { if (confirm('Delete?')) { await fetch(`/api/room/${currentRoom}/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } }); loadData(); }};
-    window.deleteShopping = async (i) => { if (confirm('Delete?')) { await fetch(`/api/shopping/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } }); loadData(); }};
+    window.deleteItem = async (i) => {
+      if (!confirm('Delete?')) return;
+      await fetch(`/api/room/${currentRoom}/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } });
+      loadData();
+    };
 
+    window.deleteShopping = async (i) => {
+      if (!confirm('Delete?')) return;
+      await fetch(`/api/shopping/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` } });
+      loadData();
+    };
+
+    function updateBulkDelete() {
+      const count = $$('input[type="checkbox"]:checked').length;
+      $('#bulkDeleteBtn').classList.toggle('hidden', count === 0);
+      $('#bulkDeleteBtn').textContent = `Delete Selected (${count})`;
+    }
     $('#bulkDeleteBtn').onclick = async () => {
-      if (!confirm('Delete selected?')) return;
+      if (!confirm('Delete selected items?')) return;
       const indices = Array.from($$('input[type="checkbox"]:checked')).map(c => parseInt(c.dataset.index));
       await api(`/api/room/${currentRoom}/bulk-delete`, { method: 'POST', body: JSON.stringify({ indices }) });
       loadData();
     };
+    document.addEventListener('change', e => e.target.type === 'checkbox' && updateBulkDelete());
 
-    function updateBulkButton() {
-      const checked = $$('input[type="checkbox"]:checked').length;
-      $('#bulkDeleteBtn').classList.toggle('hidden', checked === 0);
-      $('#bulkDeleteBtn').textContent = `Delete (${checked})`;
-    }
-    document.addEventListener('change', e => e.target.type === 'checkbox' && updateBulkButton());
-
-    $$('.tab-btn').forEach(btn => btn.onclick = () => {
-      if (btn.dataset.room) { currentRoom = btn.dataset.room; $('#roomSection').classList.remove('hidden'); $('#shopping').classList.add('hidden'); }
-      else { $('#roomSection').classList.add('hidden'); $('#shopping').classList.remove('hidden'); }
-      $$('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-      btn.classList.add('tab-active');
-      loadData();
+    $$('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        if (btn.dataset.room) {
+          currentRoom = btn.dataset.room;
+          $('#roomSection').classList.remove('hidden');
+          $('#shopping').classList.add('hidden');
+        } else {
+          $('#roomSection').classList.add('hidden');
+          $('#shopping').classList.remove('hidden');
+        }
+        $$('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        btn.classList.add('tab-active');
+        loadData();
+      };
     });
 
-    $('#googleSignIn').onclick = () => auth.signInWithPopup(googleProvider);
+    // AUTH
+    $('#googleSignIn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
     auth.onAuthStateChanged(user => {
       if (user) {
-        $('#userEmail').textContent = user.email.split('@')[0];
+        $('#userEmail').textContent = user.email;
         $('#auth').classList.add('hidden');
         $('#app').classList.remove('hidden');
         loadData();
       }
     });
     $('#signOutBtn').onclick = () => auth.signOut();
-    $('#darkModeBtn').onclick = () => { document.body.classList.toggle('dark'); localStorage.setItem('dark', document.body.classList.contains('dark')); };
+
+    // DARK MODE
+    $('#darkModeBtn').onclick = () => {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('dark', document.body.classList.contains('dark'));
+    };
     if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
   </script>
 </body>
