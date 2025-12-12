@@ -13,21 +13,22 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
   <style>
     body { font-family: 'Inter', sans-serif; margin: 0; }
-    .glass { background: rgba(255,255,255,0.12); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.2); }
-    .gradient-bg { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%); min-height: 100vh; }
-    .dark .gradient-bg { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #6d28d9 100%); }
-    .dark .glass { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.1); }
-    .btn-primary { @apply bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl px-8 py-4 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105; }
-    .tab-btn { @apply px-8 py-4 rounded-full font-bold text-lg glass transition-all duration-300 hover:scale-105; }
-    .tab-active { @apply bg-white/30 text-white scale-105 shadow-xl; }
-    .card { @apply glass rounded-3xl p-8 shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-3xl; }
-    .exp-badge { @apply px-5 py-2 rounded-full text-sm font-bold; }
-    .exp-good { @apply bg-emerald-500/20 text-emerald-300 border border-emerald-500/50; }
-    .exp-soon { @apply bg-orange-500/20 text-orange-300 border border-orange-500/50; }
-    .exp-today { @apply bg-red-500/30 text-red-300 border border-red-500/50 animate-pulse; }
-    .exp-gone { @apply bg-red-600/30 text-red-200 border border-red-600/50; }
-    .scanner-icon { fill: currentColor; width: 36px; height: 36px; }
-    .spinner { @apply border-4 border-white/30 border-t-white rounded-full w-8 h-8 animate-spin; }
+    .glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); min-height: 100vh; }
+    .dark .gradient-bg { background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%); }
+    .dark .glass { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.05); }
+    .btn { @apply bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl px-8 py-4 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105; }
+    .tab-btn { @apply px-8 py-4 rounded-2xl font-bold text-lg glass transition-all duration-300 hover:scale-105; }
+    .tab-active { @apply bg-white/20 text-white scale-105 shadow-xl; }
+    .card { @apply glass rounded-3xl p-6 shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl; }
+    .exp-badge { @apply px-4 py-2 rounded-full text-sm font-bold; }
+    .exp-good { @apply bg-emerald-500/20 text-emerald-300 border border-emerald-500/30; }
+    .exp-soon { @apply bg-orange-500/20 text-orange-300 border border-orange-500/30; }
+    .exp-today { @apply bg-red-500/30 text-red-300 border border-red-500/30 animate-pulse; }
+    .exp-gone { @apply bg-red-600/30 text-red-200 border border-red-600/30; }
+    .scanner-icon { fill: currentColor; width: 32px; height: 32px; }
+    .spinner { border: 4px solid #ffffff40; border-top: 4px solid white; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body class="min-h-screen gradient-bg text-white">
@@ -36,25 +37,26 @@
   <div id="auth" class="flex items-center justify-center min-h-screen p-6">
     <div class="glass p-16 rounded-3xl shadow-2xl max-w-md w-full text-center">
       <h1 class="text-7xl font-black mb-8 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">PantryPal Pro</h1>
-      <p class="text-2xl mb-12 opacity-90">Track your pantry like never before</p>
-      <button id="googleSignIn" class="btn-primary w-full text-2xl py-6">
+      <p class="text-xl mb-12 opacity-90">Smart pantry tracking with AI & alerts</p>
+      <button id="googleSignIn" class="btn w-full text-2xl py-6">
         <span id="loginText">Sign in with Google</span>
         <div id="loginSpinner" class="hidden spinner mx-auto mt-4"></div>
       </button>
+      <p id="loginError" class="mt-4 text-red-300 hidden">Login failed. Try again.</p>
     </div>
   </div>
 
   <!-- MAIN APP -->
-  <div id="app" class="hidden min-h-screen pb-32">
+  <div id="app" class="hidden min-h-screen pb-24">
     <header class="glass sticky top-0 z-50 shadow-2xl p-6 mb-10">
       <div class="flex flex-col sm:flex-row justify-between items-center gap-6">
         <div class="flex items-center gap-6">
-          <h1 class="text-5xl font-black">PantryPal Pro</h1>
+          <h1 class="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">PantryPal Pro</h1>
           <span id="userEmail" class="bg-white/20 px-6 py-3 rounded-full text-lg font-medium"></span>
         </div>
         <div class="flex gap-4">
-          <button id="darkModeBtn" class="px-6 py-3 bg-white/20 rounded-xl font-bold">Dark Mode</button>
-          <button id="signOutBtn" class="px-8 py-3 bg-gradient-to-r from-red-500 to-pink-600 rounded-xl font-bold">Sign Out</button>
+          <button id="darkModeBtn" class="px-6 py-3 bg-white/20 rounded-xl font-bold btn-glow">Dark Mode</button>
+          <button id="signOutBtn" class="px-8 py-3 bg-gradient-to-r from-red-500 to-pink-600 rounded-xl font-bold btn-glow">Sign Out</button>
         </div>
       </div>
     </header>
@@ -75,7 +77,7 @@
           <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div class="relative">
               <input id="invName" placeholder="Name or scan barcode" class="w-full px-6 py-5 rounded-2xl text-black text-lg pr-16">
-              <button id="scanBtn" class="absolute right-4 top-4">
+              <button id="scanBtn" class="absolute right-4 top-4 p-2 bg-white/20 rounded-full hover:bg-white/30 transition">
                 <svg class="scanner-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <rect x="3" y="3" width="4" height="18" fill="currentColor"/>
                   <rect x="8" y="3" width="2" height="18" fill="currentColor"/>
@@ -87,7 +89,7 @@
             </div>
             <input id="invQty" type="number" value="1" min="1" placeholder="Quantity" class="px-6 py-5 rounded-2xl text-black text-lg">
             <input id="invExp" type="date" class="px-6 py-5 rounded-2xl text-black text-lg">
-            <button id="addItem" class="btn-primary text-xl py-5">+ Add Item</button>
+            <button id="addItem" class="btn text-xl py-5">+ Add Item</button>
           </div>
         </div>
 
@@ -100,7 +102,7 @@
           <h2 class="text-3xl font-black mb-8">Shopping List</h2>
           <div class="flex gap-6 mb-8">
             <input id="shopItem" placeholder="Add item..." class="flex-1 px-6 py-5 rounded-2xl text-black text-lg">
-            <button id="addShopping" class="btn-primary text-xl py-5">Add</button>
+            <button id="addShopping" class="btn text-xl py-5">Add</button>
           </div>
         </div>
         <div id="shoppingList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
@@ -110,7 +112,7 @@
       <section id="voice" class="hidden text-center py-32">
         <div class="glass p-20 rounded-3xl shadow-2xl max-w-2xl mx-auto">
           <h2 class="text-5xl font-black mb-12">Voice Add</h2>
-          <button id="voiceBtn" class="w-48 h-48 bg-gradient-to-r from-red-500 to-pink-600 rounded-full text-9xl font-bold shadow-3xl hover:scale-110 transition">Microphone</button>
+          <button id="voiceBtn" class="w-48 h-48 bg-gradient-to-r from-red-500 to-pink-600 rounded-full text-9xl font-bold shadow-3xl hover:scale-110 transition btn-glow">Microphone</button>
           <p class="mt-12 text-2xl opacity-90">Hold and say: "Add milk quantity 2"</p>
           <p id="voiceResult" class="mt-10 text-3xl text-green-400 font-bold"></p>
         </div>
@@ -121,11 +123,11 @@
         <div class="glass p-20 rounded-3xl shadow-2xl max-w-2xl mx-auto">
           <h2 class="text-5xl font-black mb-12">AI Photo Scan</h2>
           <input type="file" id="aiPhoto" accept="image/*" capture="camera" class="hidden">
-          <button onclick="$('#aiPhoto').click()" class="btn-primary text-2xl py-10 px-20 mb-8">Take Photo of Pantry</button>
+          <button onclick="$('#aiPhoto').click()" class="btn text-2xl py-10 px-20 mb-8">Take Photo of Pantry</button>
           <div id="preview" class="hidden mb-8">
             <img id="previewImg" class="w-full max-w-lg mx-auto rounded-3xl shadow-2xl">
           </div>
-          <button id="aiScanBtn" class="btn-primary text-2xl py-10 px-20 hidden">Scan with AI</button>
+          <button id="aiScanBtn" class="btn text-2xl py-10 px-20 hidden">Scan with AI</button>
           <div id="aiResult" class="mt-12 space-y-6"></div>
         </div>
       </section>
@@ -133,9 +135,11 @@
   </div>
 
   <script>
+    const API = window.location.origin;
     const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
+    let idToken = null;
     const $ = s => document.querySelector(s);
 
     // AUTH
@@ -143,6 +147,10 @@
       $('#loginText').classList.add('hidden');
       $('#loginSpinner').classList.remove('hidden');
       auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+        .then(async () => {
+          idToken = await auth.currentUser.getIdToken();
+          loadData();
+        })
         .catch(err => {
           alert('Sign in failed: ' + err.message);
           $('#loginText').classList.remove('hidden');
@@ -150,8 +158,9 @@
         });
     };
 
-    auth.onAuthStateChanged(user => {
+    auth.onAuthStateChanged(async user => {
       if (user) {
+        idToken = await user.getIdToken();
         $('#userEmail').textContent = user.email;
         $('#auth').classList.add('hidden');
         $('#app').classList.remove('hidden');
@@ -227,7 +236,8 @@
     $('#addItem').onclick = async () => {
       const name = $('#invName').value.trim();
       if (!name) return alert('Enter name');
-      await api('/api/room/fridge', { method: 'POST', body: JSON.stringify({ name, quantity: +$('#invQty').value || 1, expiration: $('#invExp').value || null }) });
+      const product = await lookupProduct(name);
+      await api('/api/room/fridge', { method: 'POST', body: JSON.stringify({ name: product.name, image: product.image, quantity: +$('#invQty').value || 1, expiration: $('#invExp').value || null }) });
       $('#invName').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
       loadData();
     };
@@ -252,7 +262,8 @@
       scanner = new ZXing.BrowserMultiFormatReader();
       scanner.decodeFromVideoDevice(null, document.createElement('video'), async (result) => {
         if (result) {
-          $('#invName').value = result.text;
+          const product = await lookupProduct(result.text);
+          $('#invName').value = product.name;
           scanner.reset();
           scanner = null;
           $('#addItem').click();
@@ -272,14 +283,53 @@
       $('#voiceBtn').onpointerup = () => annyang.abort();
     }
 
+    // AI SCAN
+    $('#aiScanBtn').onclick = async () => {
+      const file = $('#aiPhoto').files[0];
+      if (!file) return alert('Select photo');
+      $('#aiScanBtn').innerHTML = '<div class="spinner"></div>';
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch(API + '/api/scan', { method: 'POST', headers: { Authorization: `Bearer ${idToken}` }, body: form });
+      const data = await res.json();
+      $('#aiResult').innerHTML = data.labels ? data.labels.map(l => `<button class="p-6 bg-white/20 rounded-2xl font-bold m-2 hover:scale-110 transition btn-glow" onclick="$('#shopItem').value='${l}'; $('#addShopping').click()">+ ${l}</button>`).join('') : '<p>No items detected</p>';
+      $('#aiScanBtn').innerHTML = 'Scan Photo';
+    };
+
+    $('#aiPhoto').onchange = e => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          $('#previewImg').src = ev.target.result;
+          $('#preview').classList.remove('hidden');
+          $('#aiScanBtn').classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
     // DARK MODE
     $('#darkModeBtn').onclick = () => document.body.classList.toggle('dark');
 
-    // API
+    // API HELPER
     async function api(path, opts = {}) {
       const token = await auth.currentUser?.getIdToken();
       return fetch(path, { ...opts, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...opts.headers } })
         .then(r => r.ok ? r.json() : null);
+    }
+
+    // OPEN FOOD FACTS
+    async function lookupProduct(barcode) {
+      if (!barcode || barcode.length < 7) return { name: barcode, image: null };
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        const data = await res.json();
+        if (data.status === 1) {
+          return { name: data.product.product_name || data.product.brands || barcode, image: data.product.image_front_small_url || data.product.image_front_url };
+        }
+      } catch (e) {}
+      return { name: barcode, image: null };
     }
 
     // INITIAL LOAD
