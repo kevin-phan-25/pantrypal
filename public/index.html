@@ -13,122 +13,119 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
   <style>
-    body { font-family: 'Inter', sans-serif; }
-    .glass { background: rgba(255,255,255,0.15); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
-    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); min-height: 100vh; }
-    .btn-glow { box-shadow: 0 0 20px rgba(139,92,246,0.5); transition: all 0.3s; }
-    .btn-glow:hover { box-shadow: 0 0 30px rgba(139,92,246,0.8); transform: translateY(-2px); }
-    .tab-active { background: rgba(255,255,255,0.3) !important; }
-    .spinner { border: 4px solid #ffffff40; border-top: 4px solid white; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    body { font-family: 'Inter', sans-serif; margin: 0; }
+    .glass { background: rgba(255,255,255,0.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.2); }
+    .gradient-bg { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%); min-height: 100vh; transition: all 0.5s; }
+    .dark .gradient-bg { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #6d28d9 100%); }
+    .dark .glass { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.1); }
+    .btn-primary { @apply bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl px-8 py-4 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105; }
+    .tab-btn { @apply px-8 py-4 rounded-2xl font-bold text-lg glass transition-all duration-300 hover:scale-105; }
+    .tab-active { @apply bg-white/30 text-white scale-105 shadow-xl; }
+    .card { @apply glass rounded-3xl p-6 shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-3xl; }
+    .exp-badge { @apply px-4 py-2 rounded-full text-sm font-bold; }
+    .exp-good { @apply bg-emerald-500/20 text-emerald-300; }
+    .exp-soon { @apply bg-orange-500/20 text-orange-300; }
+    .exp-today { @apply bg-red-500/30 text-red-300 animate-pulse; }
+    .exp-gone { @apply bg-red-600/30 text-red-200; }
+    .spinner { @apply border-4 border-white/30 border-t-white rounded-full w-8 h-8 animate-spin; }
   </style>
 </head>
 <body class="min-h-screen gradient-bg text-white">
 
   <!-- LOGIN -->
   <div id="auth" class="flex items-center justify-center min-h-screen p-6">
-    <div class="glass p-14 rounded-3xl shadow-2xl max-w-md w-full text-center">
-      <h1 class="text-7xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">PantryPal Pro</h1>
-      <button id="googleSignIn" class="w-full py-6 rounded-2xl bg-white text-gray-800 font-bold text-2xl shadow-2xl flex items-center justify-center gap-5">
-        <img src="https://developers.google.com/identity/images/g-logo.png" class="w-10 h-10" alt="G">
+    <div class="glass p-16 rounded-3xl shadow-2xl max-w-md w-full text-center">
+      <h1 class="text-7xl font-black mb-8 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">PantryPal Pro</h1>
+      <p class="text-xl mb-12 opacity-90">Never waste food again</p>
+      <button id="googleSignIn" class="btn-primary w-full text-2xl">
         <span id="loginText">Sign in with Google</span>
-        <div id="loginSpinner" class="hidden spinner"></div>
+        <div id="loginSpinner" class="hidden spinner mx-auto mt-2"></div>
       </button>
     </div>
   </div>
 
   <!-- MAIN APP -->
-  <div id="app" class="hidden min-h-screen pb-24">
-    <header class="glass sticky top-0 z-50 shadow-2xl p-6 mb-8">
+  <div id="app" class="hidden min-h-screen pb-32">
+    <header class="glass sticky top-0 z-50 shadow-2xl p-6 mb-10">
       <div class="flex flex-col sm:flex-row justify-between items-center gap-6">
         <div class="flex items-center gap-6">
-          <h1 class="text-4xl font-black">PantryPal Pro</h1>
-          <span id="userEmail" class="bg-white/20 px-4 py-2 rounded-full font-medium"></span>
+          <h1 class="text-5xl font-black">PantryPal Pro</h1>
+          <span id="userEmail" class="bg-white/20 px-6 py-3 rounded-full text-lg font-medium"></span>
         </div>
-        <div class="flex gap-4 flex-wrap">
-          <span class="px-6 py-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 font-bold shadow-lg">Pro: Unlimited</span>
-          <button id="shareListBtn" class="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-bold btn-glow">Share List</button>
-          <button id="darkModeBtn" class="px-5 py-3 rounded-xl glass btn-glow font-bold">Dark Mode</button>
+        <div class="flex gap-4">
+          <button id="darkModeBtn" class="px-6 py-3 bg-white/20 rounded-xl font-bold btn-glow">Dark Mode</button>
           <button id="signOutBtn" class="px-8 py-3 bg-gradient-to-r from-red-500 to-pink-600 rounded-xl font-bold btn-glow">Sign Out</button>
         </div>
       </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-6 py-10">
-      <!-- CLICKABLE TABS -->
-      <div class="flex gap-4 mb-8 overflow-x-auto pb-4">
-        <button class="tab-btn tab-active px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="inventory">Inventory</button>
-        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="shopping">Shopping List</button>
-        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="scanner">Scanner</button>
-        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="voice">Voice</button>
-        <button class="tab-btn px-8 py-4 rounded-2xl font-bold text-lg glass" data-tab="ai">AI Scan</button>
+    <main class="max-w-7xl mx-auto px-6">
+      <!-- TABS -->
+      <div class="flex gap-6 mb-12 overflow-x-auto pb-4">
+        <button class="tab-btn tab-active" data-tab="inventory">Inventory</button>
+        <button class="tab-btn" data-tab="shopping">Shopping List</button>
+        <button class="tab-btn" data-tab="voice">Voice Add</button>
+        <button class="tab-btn" data-tab="ai">AI Scan</button>
       </div>
 
       <!-- INVENTORY -->
       <section id="inventory">
-        <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
+        <div class="glass p-10 rounded-3xl shadow-2xl mb-10">
+          <h2 class="text-3xl font-black mb-8">Add Item</h2>
           <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <input id="invName" placeholder="Barcode or name" class="px-6 py-4 rounded-2xl text-black text-lg">
-            <input id="invQty" type="number" value="1" class="px-6 py-4 rounded-2xl text-black text-lg">
-            <input id="invExp" type="date" class="px-6 py-4 rounded-2xl text-black text-lg">
-            <button id="addItem" class="bg-emerald-600 hover:bg-emerald-700 rounded-2xl font-bold text-lg btn-glow">+ Add Item</button>
+            <div class="relative">
+              <input id="invName" placeholder="Type name or scan barcode" class="w-full px-6 py-5 rounded-2xl text-black text-lg pr-14">
+              <button id="scanBtn" class="absolute right-4 top-4 text-3xl">📷</button>
+            </div>
+            <input id="invQty" type="number" value="1" min="1" placeholder="Quantity" class="px-6 py-5 rounded-2xl text-black text-lg">
+            <input id="invExp" type="date" class="px-6 py-5 rounded-2xl text-black text-lg">
+            <button id="addItem" class="btn-primary text-xl">+ Add Item</button>
           </div>
         </div>
-        <div id="inventoryList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
+        <div id="inventoryList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
       </section>
 
       <!-- SHOPPING LIST -->
       <section id="shopping" class="hidden">
-        <div class="glass p-10 rounded-3xl shadow-2xl mb-8">
-          <div class="flex gap-4">
-            <input id="shopItem" placeholder="Add item..." class="flex-1 px-6 py-4 rounded-2xl text-black text-lg">
-            <button id="addShopping" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-2xl font-bold btn-glow">Add</button>
+        <div class="glass p-10 rounded-3xl shadow-2xl mb-10">
+          <h2 class="text-3xl font-black mb-8">Shopping List</h2>
+          <div class="flex gap-6 mb-8">
+            <input id="shopItem" placeholder="Add item..." class="flex-1 px-6 py-5 rounded-2xl text-black text-lg">
+            <button id="addShopping" class="btn-primary text-xl">Add</button>
           </div>
         </div>
-        <div id="shoppingList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-      </section>
-
-      <!-- SCANNER -->
-      <section id="scanner" class="hidden text-center">
-        <video id="video" width="100%" height="400" class="rounded-3xl shadow-2xl mb-6" playsinline></video>
-        <button id="startScan" class="px-12 py-6 bg-purple-600 hover:bg-purple-700 rounded-2xl font-bold text-2xl btn-glow">Start Scanner</button>
+        <div id="shoppingList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
       </section>
 
       <!-- VOICE -->
-      <section id="voice" class="hidden text-center">
-        <button id="voiceBtn" class="w-32 h-32 bg-red-600 rounded-full text-6xl btn-glow">Microphone</button>
-        <p class="mt-6 text-2xl">Say: "Add milk"</p>
+      <section id="voice" class="hidden text-center py-20">
+        <div class="glass p-16 rounded-3xl shadow-2xl max-w-2xl mx-auto">
+          <h2 class="text-4xl font-black mb-10">Voice Add</h2>
+          <button id="voiceBtn" class="w-40 h-40 bg-gradient-to-r from-red-500 to-pink-600 rounded-full text-8xl font-bold shadow-2xl hover:scale-110 transition btn-glow">Microphone</button>
+          <p class="mt-10 text-2xl opacity-90">Hold and say: "Add milk quantity 2"</p>
+          <p id="voiceResult" class="mt-8 text-3xl text-green-400 font-bold"></p>
+        </div>
       </section>
 
       <!-- AI SCAN -->
-      <section id="ai" class="hidden text-center">
-        <input type="file" id="aiPhoto" accept="image/*" capture="camera" class="mb-6">
-        <button id="aiScan" class="px-12 py-6 bg-indigo-600 hover:bg-indigo-700 rounded-2xl font-bold text-2xl btn-glow">Scan Photo</button>
-        <div id="aiResult" class="mt-8"></div>
+      <section id="ai" class="hidden text-center py-20">
+        <div class="glass p-16 rounded-3xl shadow-2xl max-w-2xl mx-auto">
+          <h2 class="text-4xl font-black mb-10">AI Photo Scan</h2>
+          <input type="file" id="aiPhoto" accept="image/*" capture="camera" class="hidden">
+          <button onclick="$('#aiPhoto').click()" class="btn-primary text-2xl py-8 px-16">Take Photo</button>
+          <div id="preview" class="mt-10 hidden">
+            <img id="previewImg" class="w-full max-w-md mx-auto rounded-3xl shadow-2xl">
+          </div>
+          <button id="aiScanBtn" class="mt-8 btn-primary text-2xl py-8 px-16 hidden">Scan with AI</button>
+          <div id="aiResult" class="mt-12 space-y-4"></div>
+        </div>
       </section>
     </main>
   </div>
 
-  <!-- SHARE MODAL -->
-  <div id="shareModal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-50 p-6">
-    <div class="glass p-10 rounded-3xl max-w-md w-full text-center shadow-2xl">
-      <h3 class="text-3xl font-bold mb-6">Share Your List</h3>
-      <div id="qrCode" class="mb-6"></div>
-      <input id="shareLink" class="w-full px-6 py-4 rounded-2xl text-center font-mono bg-white/20" readonly>
-      <button id="copyBtn" class="mt-4 px-8 py-4 bg-green-600 rounded-2xl font-bold btn-glow">Copy Link</button>
-      <button id="closeShare" class="mt-4 text-white/70">Close</button>
-    </div>
-  </div>
-
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM",
-      authDomain: "pantrypal-6e410.firebaseapp.com",
-      projectId: "pantrypal-6e410",
-      storageBucket: "pantrypal-6e410.firebasestorage.app",
-      messagingSenderId: "592127259891",
-      appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyDBoPIbHabZnjdScsTyFi3osVyPp88KuSM", authDomain: "pantrypal-6e410.firebaseapp.com", projectId: "pantrypal-6e410", storageBucket: "pantrypal-6e410.firebasestorage.app", messagingSenderId: "592127259891", appId: "1:592127259891:web:fcc158b7b1c35ce0b3b386" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const $ = s => document.querySelector(s);
@@ -138,9 +135,6 @@
       $('#loginText').classList.add('hidden');
       $('#loginSpinner').classList.remove('hidden');
       auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
-        .then(() => {
-          // Success handled in onAuthStateChanged
-        })
         .catch(err => {
           alert('Sign in failed: ' + err.message);
           $('#loginText').classList.remove('hidden');
@@ -163,11 +157,123 @@
 
     $('#signOutBtn').onclick = () => auth.signOut();
 
-    // REST OF YOUR CODE (inventory, shopping, scanner, voice, AI, share) — same as last working version
-    // (Add the full script from previous working version here — inventory add/delete, scanner, voice, AI, share)
-    // For brevity, it's the same as my last message — just copy it in
+    // TABS
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        btn.classList.add('tab-active');
+        document.querySelectorAll('section[id]').forEach(s => s.classList.add('hidden'));
+        $(`#${btn.dataset.tab}`).classList.remove('hidden');
+      };
+    });
 
-    // ... (paste the rest of the script from my previous working version)
+    // INVENTORY
+    async function loadInventory() {
+      const data = await api('/api/inventory') || { items: [] };
+      $('#inventoryList').innerHTML = data.items.map((item, i) => {
+        const daysLeft = item.expiration ? Math.ceil((new Date(item.expiration) - Date.now()) / 86400000) : null;
+        const badge = daysLeft === null ? '' : daysLeft < 0 ? `<span class="exp-badge exp-gone">Expired</span>` : daysLeft === 0 ? `<span class="exp-badge exp-today">Today!</span>` : daysLeft <= 3 ? `<span class="exp-badge exp-soon">${daysLeft}d left</span>` : `<span class="exp-badge exp-good">Good</span>`;
+        return `
+          <div class="card flex gap-6">
+            ${item.image ? `<img src="${item.image}" class="w-32 h-32 rounded-2xl object-cover shadow-xl">` : '<div class="w-32 h-32 bg-white/20 rounded-2xl flex items-center justify-center text-6xl">?</div>'}
+            <div class="flex-1">
+              <h3 class="text-3xl font-bold">${item.name}</h3>
+              <p class="text-xl opacity-80 mt-2">Quantity: ${item.quantity}</p>
+              ${badge ? `<div class="mt-3">${badge}</div>` : ''}
+            </div>
+            <button onclick="deleteItem('inventory', ${i})" class="text-red-400 font-bold text-2xl self-start">Delete</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // SHOPPING LIST
+    async function loadShopping() {
+      const data = await api('/api/shopping') || { list: [] };
+      $('#shoppingList').innerHTML = data.list.map((item, i) => `
+        <div class="card flex justify-between items-center">
+          <span class="text-3xl font-bold">${item.itemName}</span>
+          <button onclick="deleteItem('shopping', ${i})" class="text-red-400 font-bold text-2xl">Delete</button>
+        </div>
+      `).join('');
+    }
+
+    // DELETE
+    window.deleteItem = async (type, i) => {
+      if (!confirm('Delete this item?')) return;
+      const data = await api(type === 'inventory' ? '/api/inventory' : '/api/shopping');
+      const arr = type === 'inventory' ? data.items : data.list;
+      arr.splice(i, 1);
+      await api(type === 'inventory' ? '/api/inventory' : '/api/shopping', { method: 'POST', body: JSON.stringify(type === 'inventory' ? { items: arr } : { list: arr }) });
+      type === 'inventory' ? loadInventory() : loadShopping();
+    };
+
+    // ADD ITEM
+    $('#addItem').onclick = async () => {
+      const name = $('#invName').value.trim();
+      if (!name) return alert('Enter name or scan');
+      const product = await lookupProduct(name);
+      await api('/api/inventory', { method: 'POST', body: JSON.stringify({ name: product.name, image: product.image, quantity: +$('#invQty').value || 1, expiration: $('#invExp').value || null }) });
+      $('#invName').value = ''; $('#invQty').value = 1; $('#invExp').value = '';
+      loadInventory();
+    };
+
+    // BARCODE SCANNER INTEGRATED
+    let scanner = null;
+    $('#scanBtn').onclick = () => {
+      if (scanner) {
+        scanner.reset();
+        scanner = null;
+        return;
+      }
+      scanner = new ZXing.BrowserMultiFormatReader();
+      scanner.decodeFromVideoDevice(null, document.createElement('video'), async (result) => {
+        if (result) {
+          const product = await lookupProduct(result.text);
+          $('#invName').value = product.name;
+          scanner.reset();
+          scanner = null;
+          $('#addItem').click();
+        }
+      });
+    };
+
+    // VOICE
+    if (annyang) {
+      annyang.addCommand('add *item', item => {
+        $('#shopItem').value = item;
+        $('#addShopping').click();
+      });
+      $('#voiceBtn').onpointerdown = () => annyang.start();
+      $('#voiceBtn').onpointerup = () => annyang.abort();
+    }
+
+    // DARK MODE
+    $('#darkModeBtn').onclick = () => document.body.classList.toggle('dark');
+
+    // API HELPER
+    async function api(path, opts = {}) {
+      const token = await auth.currentUser?.getIdToken();
+      return fetch(path, { ...opts, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...opts.headers } })
+        .then(r => r.ok ? r.json() : null);
+    }
+
+    // OPEN FOOD FACTS
+    async function lookupProduct(barcode) {
+      if (!barcode || barcode.length < 7) return { name: barcode, image: null };
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        const data = await res.json();
+        if (data.status === 1) {
+          return { name: data.product.product_name || data.product.brands || barcode, image: data.product.image_front_small_url || data.product.image_front_url };
+        }
+      } catch (e) {}
+      return { name: barcode, image: null };
+    }
+
+    // LOAD ON START
+    loadInventory();
+    loadShopping();
   </script>
 </body>
 </html>
